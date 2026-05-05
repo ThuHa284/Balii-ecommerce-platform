@@ -1,0 +1,42 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Dependency directories
+node_modules/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Env files
+.env
+.env.*
+
+# Cache
+.cache/
+.turbo/
+.eslintcache
+
+# Coverage
+coverage/
+
+# Vercel
+.vercel/
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.swp
