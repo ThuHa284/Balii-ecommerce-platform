@@ -29,8 +29,8 @@ function AddressCard({
       className={cn(
         "w-full text-left p-4 rounded-xl border-2 transition-all duration-200 group",
         selected
-          ? "border-primary bg-pink-50/60 shadow-md shadow-pink-200/30"
-          : "border-white/50 bg-white/40 hover:border-pink-200 hover:bg-white/60"
+          ? "border-primary bg-violet-50/60 shadow-md shadow-violet-200/30"
+          : "border-white/50 bg-white/40 hover:border-violet-200 hover:bg-white/60"
       )}
     >
       <div className="flex items-start gap-3">
@@ -126,7 +126,7 @@ export default function AddressSelectorModal({
                   "w-full flex items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed text-sm font-medium transition-all",
                   atLimit
                     ? "border-muted/30 text-muted-foreground/50 cursor-not-allowed"
-                    : "border-pink-200 text-primary hover:border-primary hover:bg-pink-50/30"
+                    : "border-violet-200 text-primary hover:border-primary hover:bg-violet-50/30"
                 )}
               >
                 <Plus className="w-4 h-4" />

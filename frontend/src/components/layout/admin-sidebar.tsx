@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingCart, Users, BarChart3, LogOut, Settings } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, Users, BarChart3, LogOut, Settings, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const adminLinks = [
   { href: "/admin/dashboard", label: "Tổng quan", icon: LayoutDashboard },
   { href: "/admin/products", label: "Sản phẩm", icon: Package },
   { href: "/admin/orders", label: "Đơn hàng", icon: ShoppingCart },
+  { href: "/admin/vouchers", label: "Voucher", icon: Ticket },
   { href: "/admin/users", label: "Khách hàng", icon: Users },
   { href: "/admin/analytics", label: "Phân tích", icon: BarChart3 },
 ];
@@ -18,7 +19,6 @@ export default function AdminSidebar() {
 
   return (
     <aside className="w-64 min-h-screen glass-card rounded-none border-t-0 border-b-0 border-l-0 p-6 hidden lg:block">
-      {/* Logo */}
       <Link href="/admin/dashboard" className="flex items-center gap-2 mb-8">
         <span className="font-heading text-2xl font-bold text-gradient">Balii</span>
         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
@@ -26,7 +26,6 @@ export default function AdminSidebar() {
         </span>
       </Link>
 
-      {/* Navigation */}
       <nav className="space-y-1">
         {adminLinks.map((link) => {
           const isActive = pathname === link.href || pathname?.startsWith(link.href + "/");
@@ -37,7 +36,7 @@ export default function AdminSidebar() {
               className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
                 isActive
-                  ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-300/30"
+                  ? "bg-violet-500 text-white shadow-lg shadow-violet-300/25"
                   : "text-foreground/70 hover:bg-white/50 hover:text-foreground"
               )}
             >
@@ -48,12 +47,8 @@ export default function AdminSidebar() {
         })}
       </nav>
 
-      {/* Bottom actions */}
       <div className="mt-auto pt-8 border-t border-white/30 mt-8 space-y-1">
-        <Link
-          href="/"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-foreground/70 hover:bg-white/50 transition-all"
-        >
+        <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-foreground/70 hover:bg-white/50 transition-all">
           <Settings className="w-5 h-5" />
           Cài đặt
         </Link>

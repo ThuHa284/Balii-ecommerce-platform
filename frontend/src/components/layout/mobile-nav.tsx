@@ -51,7 +51,7 @@ export default function MobileNav() {
                 className={cn(
                   "block px-4 py-3 rounded-xl text-sm font-medium transition-all",
                   pathname === link.href
-                    ? "bg-gradient-to-r from-pink-100 to-rose-100 text-primary"
+                    ? "bg-violet-100 text-primary"
                     : "text-foreground/80 hover:bg-white/40"
                 )}
               >

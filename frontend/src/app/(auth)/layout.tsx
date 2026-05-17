@@ -10,15 +10,15 @@ export default function AuthLayout({
       className="relative min-h-screen w-full overflow-hidden flex flex-col items-center justify-center px-4 py-12 bg-[url('/auth_background.jpg')] bg-cover bg-center bg-no-repeat"
     >
       {/* Soft dreamy overlay for readability */}
-      <div className="absolute inset-0 bg-pink-50/30 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-violet-50/30 backdrop-blur-sm" />
 
       {/* Content above overlay */}
       <div className="relative z-10 flex flex-col items-center w-full">
         {/* Logo */}
         <Link href="/" className="mb-8 text-center clickable">
           <span className="font-heading text-4xl font-bold drop-shadow-md"
-            style={{ color: '#c2566d' }}>Balii</span>
-          <span className="block text-sm tracking-[0.3em] text-rose-700/80 uppercase mt-1 drop-shadow-sm font-medium">
+            style={{ color: '#7c5cbf' }}>Balii</span>
+          <span className="block text-sm tracking-[0.3em] text-violet-700/80 uppercase mt-1 drop-shadow-sm font-medium">
             Sleepwear
           </span>
         </Link>
@@ -31,7 +31,7 @@ export default function AuthLayout({
         {/* Back to home */}
         <Link
           href="/"
-          className="mt-6 text-sm text-rose-700/70 hover:text-rose-800 transition-colors font-medium drop-shadow-sm"
+          className="mt-6 text-sm text-violet-700/70 hover:text-violet-800 transition-colors font-medium drop-shadow-sm"
         >
           ← Quay về trang chủ
         </Link>

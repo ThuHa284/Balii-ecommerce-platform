@@ -22,7 +22,7 @@ export default function SearchPage() {
           <h1 className="font-heading text-3xl font-bold text-foreground mb-4">Tìm kiếm</h1>
           <form className="max-w-lg mx-auto relative" action="/search" method="get">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <input name="q" type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Tìm kiếm sản phẩm đồ ngủ..." className="w-full pl-12 pr-4 py-4 rounded-2xl glass-card text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+            <input name="q" type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Tìm kiếm sản phẩm đồ ngủ..." className="w-full pl-12 pr-4 py-4 rounded-2xl glass-card text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
           </form>
         </div>
 

@@ -5,13 +5,19 @@ import { useAuthStore } from "@/store/auth.store";
 import { refreshTokenApi } from "@/lib/api/auth.api";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { login, setLoading } = useAuthStore();
+  const { setUser, setLoading } = useAuthStore();
 
   useEffect(() => {
     async function hydrateAuth() {
       try {
         const result = await refreshTokenApi();
-        login(result.user, result.accessToken);
+        // Hydrate user from persisted/refreshed token
+        // (login() expects LoginCredentials — use setUser + direct store update)
+        setUser(result.user);
+        useAuthStore.setState({
+          token: result.accessToken,
+          isAuthenticated: true,
+        });
       } catch {
         // Not authenticated, that's fine
       } finally {
@@ -19,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     hydrateAuth();
-  }, [login, setLoading]);
+  }, [setUser, setLoading]);
 
   return <>{children}</>;
 }

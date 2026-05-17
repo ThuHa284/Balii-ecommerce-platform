@@ -16,7 +16,7 @@ export default function Footer() {
           <input
             type="email"
             placeholder="Nhập email của bạn..."
-            className="flex-1 px-5 py-3 rounded-xl bg-white/70 border border-white/50 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm placeholder:text-muted-foreground/60"
+            className="flex-1 px-5 py-3 rounded-xl bg-white/70 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm placeholder:text-muted-foreground/60"
           />
           <button type="submit" className="btn-primary whitespace-nowrap">
             Đăng ký
@@ -42,10 +42,10 @@ export default function Footer() {
                 giá cả hợp lý.
               </p>
               <div className="flex gap-3">
-                <a href="#" className="p-2.5 rounded-xl bg-white/50 hover:bg-pink-100 transition-colors clickable">
+                <a href="#" className="p-2.5 rounded-xl bg-white/50 hover:bg-violet-50 transition-colors clickable">
                   <Globe className="w-4 h-4 text-foreground" />
                 </a>
-                <a href="#" className="p-2.5 rounded-xl bg-white/50 hover:bg-pink-100 transition-colors clickable">
+                <a href="#" className="p-2.5 rounded-xl bg-white/50 hover:bg-violet-50 transition-colors clickable">
                   <Camera className="w-4 h-4 text-foreground" />
                 </a>
               </div>
@@ -123,7 +123,7 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span>Thiết kế với</span>
-              <Heart className="w-3 h-3 text-pink-500 fill-pink-500" />
+              <Heart className="w-3 h-3 text-violet-500 fill-violet-500" />
               <span>tại Việt Nam</span>
             </div>
           </div>

@@ -64,8 +64,8 @@ export default function ChatWidget() {
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "fixed bottom-6 right-6 z-40 p-4 rounded-full shadow-2xl transition-all duration-300",
-          "bg-gradient-to-r from-pink-500 to-rose-500 text-white",
-          "hover:scale-110 active:scale-95 hover:shadow-pink-400/40",
+          "bg-violet-500 text-white",
+          "hover:scale-110 active:scale-95 hover:shadow-violet-400/40",
           isOpen && "rotate-90"
         )}
       >
@@ -80,7 +80,7 @@ export default function ChatWidget() {
         )}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-pink-500 to-rose-500 text-white p-4">
+        <div className="bg-violet-500 text-white p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-xl">
               <Sparkles className="w-5 h-5" />
@@ -106,7 +106,7 @@ export default function ChatWidget() {
                 className={cn(
                   "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm",
                   msg.role === "user"
-                    ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-br-md"
+                    ? "bg-violet-500 text-white rounded-br-md"
                     : "bg-white/70 text-foreground rounded-bl-md"
                 )}
               >
@@ -132,9 +132,9 @@ export default function ChatWidget() {
             <div className="flex justify-start">
               <div className="bg-white/70 rounded-2xl rounded-bl-md px-4 py-3">
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             </div>
@@ -156,13 +156,13 @@ export default function ChatWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Nhập tin nhắn..."
-              className="flex-1 px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm"
+              className="flex-1 px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
               disabled={isLoading}
             />
             <button
               type="submit"
               disabled={!input.trim() || isLoading}
-              className="p-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:hover:scale-100"
+              className="p-2.5 rounded-xl bg-violet-500 text-white hover:bg-violet-600 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
             >
               <Send className="w-4 h-4" />
             </button>

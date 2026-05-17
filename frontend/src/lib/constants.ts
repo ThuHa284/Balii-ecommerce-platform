@@ -53,6 +53,25 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cod: "Thanh toán khi nhận hàng (COD)",
 };
 
+export const VOUCHER_STATUS_LABELS: Record<string, string> = {
+  active: "Đang hoạt động",
+  expired: "Đã hết hạn",
+  used_up: "Đã hết lượt",
+  inactive: "Tạm ngưng",
+};
+
+export const VOUCHER_STATUS_COLORS: Record<string, string> = {
+  active: "bg-emerald-100 text-emerald-800",
+  expired: "bg-gray-100 text-gray-800",
+  used_up: "bg-orange-100 text-orange-800",
+  inactive: "bg-red-100 text-red-800",
+};
+
+export const VOUCHER_DISCOUNT_TYPE_LABELS: Record<string, string> = {
+  percent: "Giảm %",
+  fixed: "Giảm cố định",
+};
+
 export const PAGINATION = {
   DEFAULT_PAGE: 1,
   DEFAULT_LIMIT: 12,

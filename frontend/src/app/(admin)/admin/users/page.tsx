@@ -21,7 +21,7 @@ export default function AdminUsersPage() {
       <div className="glass-card p-4 mb-6">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm theo tên hoặc email..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm theo tên hoặc email..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm" />
         </div>
       </div>
       <div className="glass-card overflow-hidden">
@@ -41,7 +41,7 @@ export default function AdminUsersPage() {
               <tr key={user.id} className="border-b border-white/20 hover:bg-white/30 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-r from-pink-400 to-rose-500 flex items-center justify-center text-white text-sm font-bold">{user.fullName.charAt(0)}</div>
+                    <div className="w-9 h-9 rounded-full bg-violet-500 flex items-center justify-center text-white text-sm font-bold">{user.fullName.charAt(0)}</div>
                     <div><p className="text-sm font-medium">{user.fullName}</p><p className="text-xs text-muted-foreground">{user.email}</p></div>
                   </div>
                 </td>

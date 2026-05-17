@@ -4,48 +4,49 @@
 
 /* ============================================
    BALII SLEEPWEAR — Design System
-   Dreamy, Premium, Glassmorphism Aesthetic
+   Soft Luxury: Cute & Modern Aesthetic
+   Palette: Ivory + Lavender + Peach + Sage
    ============================================ */
 
 @layer base {
   :root {
-    --background: 340 50% 96%;
-    --foreground: 340 10% 15%;
+    --background: 30 25% 97%;
+    --foreground: 250 10% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 340 10% 15%;
+    --card-foreground: 250 10% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 340 10% 15%;
-    --primary: 340 65% 55%;
+    --popover-foreground: 250 10% 15%;
+    --primary: 262 52% 55%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 340 30% 90%;
-    --secondary-foreground: 340 10% 25%;
-    --muted: 340 20% 92%;
-    --muted-foreground: 340 10% 45%;
-    --accent: 340 40% 88%;
-    --accent-foreground: 340 10% 20%;
+    --secondary: 25 55% 92%;
+    --secondary-foreground: 25 30% 25%;
+    --muted: 30 15% 92%;
+    --muted-foreground: 250 8% 45%;
+    --accent: 155 30% 90%;
+    --accent-foreground: 155 25% 20%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 340 20% 88%;
-    --input: 340 20% 88%;
-    --ring: 340 65% 55%;
+    --border: 260 15% 90%;
+    --input: 260 15% 90%;
+    --ring: 262 52% 55%;
     --radius: 1rem;
 
     /* Chart colors */
-    --chart-1: 340 65% 55%;
-    --chart-2: 280 60% 55%;
-    --chart-3: 200 60% 55%;
-    --chart-4: 160 60% 45%;
-    --chart-5: 30 80% 55%;
+    --chart-1: 262 52% 55%;
+    --chart-2: 25 60% 55%;
+    --chart-3: 155 45% 45%;
+    --chart-4: 200 55% 50%;
+    --chart-5: 340 50% 55%;
 
     /* Sidebar */
-    --sidebar-background: 340 40% 97%;
-    --sidebar-foreground: 340 10% 25%;
-    --sidebar-primary: 340 65% 55%;
+    --sidebar-background: 30 20% 97%;
+    --sidebar-foreground: 250 10% 25%;
+    --sidebar-primary: 262 52% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 340 40% 92%;
-    --sidebar-accent-foreground: 340 10% 20%;
-    --sidebar-border: 340 20% 90%;
-    --sidebar-ring: 340 65% 55%;
+    --sidebar-accent: 260 30% 93%;
+    --sidebar-accent-foreground: 262 20% 20%;
+    --sidebar-border: 260 15% 91%;
+    --sidebar-ring: 262 52% 55%;
   }
 
   * {
@@ -54,14 +55,10 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
-    background: linear-gradient(
-      135deg,
-      hsl(340, 50%, 96%) 0%,
-      hsl(330, 45%, 94%) 25%,
-      hsl(320, 40%, 95%) 50%,
-      hsl(340, 55%, 97%) 75%,
-      hsl(350, 45%, 96%) 100%
-    );
+    background-color: hsl(30, 25%, 97%);
+    background-image:
+      radial-gradient(ellipse at 20% 0%, hsl(262, 40%, 95%) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, hsl(25, 50%, 95%) 0%, transparent 50%);
     background-attachment: fixed;
     min-height: 100vh;
   }
@@ -77,10 +74,10 @@
    ============================================ */
 @layer components {
   .glass-card {
-    @apply bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl rounded-2xl;
+    @apply bg-white/65 backdrop-blur-xl border border-white/50 shadow-xl rounded-2xl;
     box-shadow:
-      0 8px 32px rgba(219, 112, 147, 0.15),
-      0 2px 8px rgba(219, 112, 147, 0.1),
+      0 8px 32px rgba(130, 100, 180, 0.1),
+      0 2px 8px rgba(130, 100, 180, 0.06),
       inset 0 1px 0 rgba(255, 255, 255, 0.6);
   }
 
@@ -89,10 +86,10 @@
   }
 
   .glass-card-hover:hover {
-    @apply bg-white/70;
+    @apply bg-white/75;
     box-shadow:
-      0 12px 40px rgba(219, 112, 147, 0.2),
-      0 4px 12px rgba(219, 112, 147, 0.15),
+      0 12px 40px rgba(130, 100, 180, 0.14),
+      0 4px 12px rgba(130, 100, 180, 0.1),
       inset 0 1px 0 rgba(255, 255, 255, 0.8);
     transform: translateY(-2px);
   }
@@ -100,22 +97,22 @@
   /* Glass Navbar */
   .glass-navbar {
     @apply bg-white/70 backdrop-blur-2xl border-b border-white/40;
-    box-shadow: 0 4px 20px rgba(219, 112, 147, 0.1);
+    box-shadow: 0 4px 20px rgba(130, 100, 180, 0.06);
   }
 
-  /* Button variants */
+  /* Button variants — solid, no gradient */
   .btn-primary {
-    @apply bg-gradient-to-r from-pink-400 to-rose-500 text-white 
+    @apply bg-violet-500 text-white
            font-medium rounded-xl px-6 py-2.5
-           hover:from-pink-500 hover:to-rose-600
-           hover:scale-[1.02] active:scale-95 
-           transition-all duration-200 shadow-lg shadow-pink-300/30;
+           hover:bg-violet-600
+           hover:scale-[1.02] active:scale-95
+           transition-all duration-200 shadow-lg shadow-violet-300/25;
   }
 
   .btn-outline {
-    @apply border-2 border-pink-300 text-pink-600 bg-transparent
+    @apply border-2 border-violet-300 text-violet-600 bg-transparent
            font-medium rounded-xl px-6 py-2.5
-           hover:bg-pink-50 hover:border-pink-400
+           hover:bg-violet-50 hover:border-violet-400
            hover:scale-[1.02] active:scale-95
            transition-all duration-200;
   }
@@ -125,9 +122,9 @@
     @apply hover:scale-[1.02] active:scale-95 transition-all duration-200 cursor-pointer;
   }
 
-  /* Text gradient */
+  /* Text gradient — kept minimal */
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-violet-500 to-purple-600;
   }
 
   /* Fade-in animation for page elements */
@@ -160,16 +157,16 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(340, 30%, 95%);
+  background: hsl(30, 15%, 95%);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(340, 40%, 80%);
+  background: hsl(260, 20%, 82%);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(340, 50%, 70%);
+  background: hsl(260, 25%, 70%);
 }
 
 /* ============================================

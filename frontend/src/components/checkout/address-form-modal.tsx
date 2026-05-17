@@ -52,7 +52,7 @@ function Field({
 }
 
 const inputCls =
-  "w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm placeholder:text-muted-foreground/60 transition-all";
+  "w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm placeholder:text-muted-foreground/60 transition-all";
 const inputErrorCls = "border-red-300 focus:ring-red-200";
 
 // ─── Component Props ──────────────────────────────────────────────────────────
@@ -212,7 +212,7 @@ export default function AddressFormModal({
               {...register("isDefault")}
               type="checkbox"
               disabled={addresses.length === 0}
-              className="w-4 h-4 rounded text-primary focus:ring-pink-300"
+              className="w-4 h-4 rounded text-primary focus:ring-violet-300"
             />
             <span className="text-sm text-foreground/70 group-hover:text-foreground transition-colors">
               Đặt làm địa chỉ mặc định

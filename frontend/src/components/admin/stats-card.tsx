@@ -21,8 +21,8 @@ const iconMap = {
 const gradientMap = {
   revenue: "from-emerald-400 to-teal-500",
   orders: "from-blue-400 to-indigo-500",
-  customers: "from-purple-400 to-pink-500",
-  products: "from-orange-400 to-rose-500",
+  customers: "from-purple-400 to-violet-500",
+  products: "from-orange-400 to-amber-500",
 };
 
 export default function StatsCard({ title, value, change, icon, isCurrency }: StatsCardProps) {

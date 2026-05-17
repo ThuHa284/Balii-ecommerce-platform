@@ -37,7 +37,7 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       const result = await registerApi(formData);
-      login(result.user, result.accessToken);
+      login({ email: formData.email, password: formData.password });
       router.push("/");
     } catch {
       setError("Đăng ký thất bại. Vui lòng thử lại.");
@@ -80,7 +80,7 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 placeholder={field.placeholder}
                 required
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/50 border border-pink-100 focus:outline-none focus:ring-2 focus:ring-pink-300 focus:bg-white transition-all text-sm placeholder:text-muted-foreground/60"
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/50 border border-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-white transition-all text-sm placeholder:text-muted-foreground/60"
               />
               {(field.name === "password" || field.name === "confirmPassword") && field.name === "password" && (
                 <button

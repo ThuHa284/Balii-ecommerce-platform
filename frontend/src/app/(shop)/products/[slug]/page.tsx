@@ -51,7 +51,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
             <div className="glass-card overflow-hidden aspect-[3/4] relative rounded-2xl">
               <Image src={product.images[mainImage] || product.thumbnail} alt={product.name} fill className="object-cover" priority />
               {hasDiscount && (
-                <span className="absolute top-4 left-4 px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-full">
+                <span className="absolute top-4 left-4 px-3 py-1.5 text-xs font-bold bg-red-500 text-white rounded-full">
                   -{Math.round(((product.basePrice - product.salePrice!) / product.basePrice) * 100)}%
                 </span>
               )}
@@ -95,7 +95,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
               <p className="text-sm font-medium text-foreground mb-3">Kích thước: <span className="text-primary">{selectedSize}</span></p>
               <div className="flex gap-2">
                 {uniqueSizes.map((size) => (
-                  <button key={size} onClick={() => setSelectedSize(size)} className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${selectedSize === size ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-300/30" : "bg-white/60 border border-white/50 text-foreground hover:bg-white/80"} hover:scale-[1.02] active:scale-95`}>
+                  <button key={size} onClick={() => setSelectedSize(size)} className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${selectedSize === size ? "bg-violet-500 text-white shadow-lg shadow-violet-300/25" : "bg-white/60 border border-white/50 text-foreground hover:bg-white/80"} hover:scale-[1.02] active:scale-95`}>
                     {size}
                   </button>
                 ))}
@@ -107,7 +107,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
               <p className="text-sm font-medium text-foreground mb-3">Màu sắc: <span className="text-primary">{selectedColor}</span></p>
               <div className="flex gap-3">
                 {product.variants.filter((v, i, arr) => arr.findIndex((a) => a.color === v.color) === i).map((v) => (
-                  <button key={v.color} onClick={() => setSelectedColor(v.color)} className={`w-10 h-10 rounded-full border-2 transition-all hover:scale-110 ${selectedColor === v.color ? "border-primary ring-2 ring-pink-300 ring-offset-2" : "border-white/50"}`} style={{ backgroundColor: v.colorCode }} title={v.color} />
+                  <button key={v.color} onClick={() => setSelectedColor(v.color)} className={`w-10 h-10 rounded-full border-2 transition-all hover:scale-110 ${selectedColor === v.color ? "border-primary ring-2 ring-violet-300 ring-offset-2" : "border-white/50"}`} style={{ backgroundColor: v.colorCode }} title={v.color} />
                 ))}
               </div>
             </div>
@@ -132,7 +132,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
               <button onClick={handleAddToCart} className="btn-primary flex-1 flex items-center justify-center gap-2 py-3.5 text-base">
                 <ShoppingBag className="w-5 h-5" /> Thêm vào giỏ
               </button>
-              <button className="p-3.5 rounded-xl border-2 border-pink-300 text-pink-600 hover:bg-pink-50 transition-all hover:scale-[1.02] active:scale-95">
+              <button className="p-3.5 rounded-xl border-2 border-violet-300 text-violet-600 hover:bg-violet-50 transition-all hover:scale-[1.02] active:scale-95">
                 <Heart className="w-5 h-5" />
               </button>
             </div>

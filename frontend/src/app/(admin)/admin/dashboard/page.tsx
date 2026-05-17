@@ -62,7 +62,7 @@ export default function AdminDashboardPage() {
             {revenueByMonth.map((item) => (
               <div key={item.month} className="flex-1 flex flex-col items-center gap-1">
                 <div
-                  className="w-full bg-gradient-to-t from-pink-500 to-rose-400 rounded-t-lg transition-all hover:from-pink-600 hover:to-rose-500 cursor-pointer relative group"
+                  className="w-full bg-violet-500 rounded-t-lg transition-all hover:bg-violet-600 cursor-pointer relative group"
                   style={{ height: `${(item.revenue / maxRevenue) * 100}%` }}
                 >
                   <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-foreground text-white text-[10px] px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">

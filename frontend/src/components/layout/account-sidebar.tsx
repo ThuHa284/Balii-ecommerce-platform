@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, Package, MapPin, Heart, LogOut } from "lucide-react";
+import { User, Package, MapPin, Heart, LogOut, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const accountLinks = [
   { href: "/account/profile", label: "Thông tin cá nhân", icon: User },
   { href: "/account/orders", label: "Đơn hàng của tôi", icon: Package },
+  { href: "/account/vouchers", label: "Voucher của tôi", icon: Ticket },
   { href: "/account/addresses", label: "Sổ địa chỉ", icon: MapPin },
   { href: "/account/wishlist", label: "Sản phẩm yêu thích", icon: Heart },
 ];
@@ -29,7 +30,7 @@ export default function AccountSidebar() {
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
                   isActive
-                    ? "bg-gradient-to-r from-pink-100 to-rose-100 text-primary"
+                    ? "bg-violet-100 text-primary"
                     : "text-foreground/70 hover:bg-white/40 hover:text-foreground"
                 )}
               >

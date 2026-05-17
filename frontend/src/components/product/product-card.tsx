@@ -32,7 +32,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">
           {hasDiscount && (
-            <span className="px-2.5 py-1 text-xs font-bold bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-full">
+              <span className="px-2.5 py-1 text-xs font-bold bg-red-500 text-white rounded-full">
               -{discountPercent}%
             </span>
           )}

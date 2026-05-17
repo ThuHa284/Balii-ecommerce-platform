@@ -89,7 +89,7 @@ export default function CartPage() {
               </div>
             </div>
             {subtotal < 500000 && (
-              <p className="text-xs text-muted-foreground mb-4 bg-pink-50 p-3 rounded-xl">
+              <p className="text-xs text-muted-foreground mb-4 bg-violet-50 p-3 rounded-xl">
                 💡 Mua thêm <strong>{formatCurrency(500000 - subtotal)}</strong> để được miễn phí vận chuyển
               </p>
             )}

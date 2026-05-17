@@ -74,7 +74,7 @@ export default function LoginPage() {
               required
               autoComplete="email"
               disabled={isLoading}
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/50 border border-pink-100 focus:outline-none focus:ring-2 focus:ring-pink-300 focus:bg-white transition-all text-sm placeholder:text-muted-foreground/60 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/50 border border-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-white transition-all text-sm placeholder:text-muted-foreground/60 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
         </div>
@@ -95,7 +95,7 @@ export default function LoginPage() {
               required
               autoComplete="current-password"
               disabled={isLoading}
-              className="w-full pl-10 pr-12 py-3 rounded-xl bg-white/50 border border-pink-100 focus:outline-none focus:ring-2 focus:ring-pink-300 focus:bg-white transition-all text-sm placeholder:text-muted-foreground/60 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full pl-10 pr-12 py-3 rounded-xl bg-white/50 border border-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-white transition-all text-sm placeholder:text-muted-foreground/60 disabled:opacity-60 disabled:cursor-not-allowed"
             />
             <button
               type="button"
@@ -134,9 +134,9 @@ export default function LoginPage() {
 
         {/* Divider */}
         <div className="relative flex items-center gap-3">
-          <div className="flex-1 h-px bg-pink-100" />
+          <div className="flex-1 h-px bg-violet-100" />
           <span className="text-xs text-muted-foreground">hoặc</span>
-          <div className="flex-1 h-px bg-pink-100" />
+          <div className="flex-1 h-px bg-violet-100" />
         </div>
 
         {/* Google OAuth */}
@@ -165,7 +165,7 @@ export default function LoginPage() {
       </p>
 
       {/* Dev hint */}
-      <div className="mt-6 p-3 rounded-xl bg-pink-50/60 border border-pink-100 text-xs text-muted-foreground space-y-1">
+      <div className="mt-6 p-3 rounded-xl bg-violet-50/60 border border-violet-100 text-xs text-muted-foreground space-y-1">
         <p className="font-medium text-foreground/70">Tài khoản thử nghiệm:</p>
         <p>👤 User: <span className="font-mono">user@gmail.com</span> / <span className="font-mono">123456</span></p>
         <p>🛡️ Admin: <span className="font-mono">admin@gmail.com</span> / <span className="font-mono">123456</span></p>

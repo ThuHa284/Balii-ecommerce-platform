@@ -43,14 +43,14 @@ export default function ResetPasswordPage() {
           <label className="block text-sm font-medium text-foreground mb-1.5">Mật khẩu mới</label>
           <div className="relative">
             <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ít nhất 6 ký tự" required className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/50 border border-pink-100 focus:outline-none focus:ring-2 focus:ring-pink-300 focus:bg-white transition-all text-sm placeholder:text-muted-foreground/60" />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ít nhất 6 ký tự" required className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/50 border border-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-white transition-all text-sm placeholder:text-muted-foreground/60" />
           </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">Xác nhận mật khẩu</label>
           <div className="relative">
             <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Nhập lại mật khẩu" required className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/50 border border-pink-100 focus:outline-none focus:ring-2 focus:ring-pink-300 focus:bg-white transition-all text-sm placeholder:text-muted-foreground/60" />
+            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Nhập lại mật khẩu" required className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/50 border border-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-white transition-all text-sm placeholder:text-muted-foreground/60" />
           </div>
         </div>
         <button type="submit" disabled={isLoading} className="btn-primary w-full flex items-center justify-center gap-2">

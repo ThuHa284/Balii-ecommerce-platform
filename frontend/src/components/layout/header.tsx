@@ -50,13 +50,13 @@ function AuthSection() {
     return (
       <Link
         href="/login"
-        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-foreground hover:text-pink-500 transition-colors relative group"
+        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-foreground hover:text-violet-500 transition-colors relative group"
         aria-label="Đăng nhập"
       >
         <User className="w-4 h-4" />
         <span className="hidden sm:inline">Đăng nhập</span>
         {/* Subtle underline on hover */}
-        <span className="absolute bottom-0.5 left-4 right-4 h-px bg-gradient-to-r from-pink-400 to-rose-500 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+        <span className="absolute bottom-0.5 left-4 right-4 h-px bg-violet-500 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
       </Link>
     );
   }
@@ -83,7 +83,7 @@ function AuthSection() {
         aria-expanded={dropdownOpen}
         aria-haspopup="true"
       >
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center text-white text-xs font-bold shadow-md ring-2 ring-white/60 group-hover:ring-pink-300 transition-all">
+        <div className="w-8 h-8 rounded-full bg-violet-500 flex items-center justify-center text-white text-xs font-bold shadow-md ring-2 ring-white/60 group-hover:ring-violet-300 transition-all">
           {initials}
         </div>
         <ChevronDown
@@ -124,30 +124,30 @@ function AuthSection() {
           <Link
             href="/account/profile"
             onClick={() => setDropdownOpen(false)}
-            className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground/80 hover:text-pink-500 hover:bg-pink-50/40 transition-colors group"
+            className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground/80 hover:text-violet-500 hover:bg-violet-50/40 transition-colors group"
             role="menuitem"
           >
-            <User className="w-4 h-4 text-muted-foreground group-hover:text-pink-400 transition-colors" />
+            <User className="w-4 h-4 text-muted-foreground group-hover:text-violet-400 transition-colors" />
             Hồ sơ cá nhân
           </Link>
 
           <Link
             href="/account/orders"
             onClick={() => setDropdownOpen(false)}
-            className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground/80 hover:text-pink-500 hover:bg-pink-50/40 transition-colors group"
+            className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground/80 hover:text-violet-500 hover:bg-violet-50/40 transition-colors group"
             role="menuitem"
           >
-            <Package className="w-4 h-4 text-muted-foreground group-hover:text-pink-400 transition-colors" />
+            <Package className="w-4 h-4 text-muted-foreground group-hover:text-violet-400 transition-colors" />
             Đơn hàng của tôi
           </Link>
 
           <Link
             href="/account/vouchers"
             onClick={() => setDropdownOpen(false)}
-            className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground/80 hover:text-pink-500 hover:bg-pink-50/40 transition-colors group"
+            className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground/80 hover:text-violet-500 hover:bg-violet-50/40 transition-colors group"
             role="menuitem"
           >
-            <Ticket className="w-4 h-4 text-muted-foreground group-hover:text-pink-400 transition-colors" />
+            <Ticket className="w-4 h-4 text-muted-foreground group-hover:text-violet-400 transition-colors" />
             Kho Voucher
           </Link>
         </nav>
@@ -251,7 +251,7 @@ export default function Header() {
                 className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors relative group"
               >
                 {link.label}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-pink-400 to-rose-500 group-hover:w-full transition-all duration-300" />
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-violet-500 group-hover:w-full transition-all duration-300" />
               </Link>
             ))}
           </nav>
@@ -288,7 +288,7 @@ export default function Header() {
             >
               <ShoppingBag className="w-5 h-5 text-foreground" />
               {itemCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-fade-in">
+                <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-violet-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-fade-in">
                   {itemCount}
                 </span>
               )}
@@ -320,12 +320,12 @@ export default function Header() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm kiếm sản phẩm đồ ngủ..."
-              className="w-full px-5 py-3 rounded-xl glass-card text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 placeholder:text-muted-foreground/60"
+              className="w-full px-5 py-3 rounded-xl glass-card text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 placeholder:text-muted-foreground/60"
               autoFocus={isSearchOpen}
             />
             <button
               type="submit"
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-gradient-to-r from-pink-400 to-rose-500 text-white hover:scale-105 active:scale-95 transition-transform"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 hover:scale-105 active:scale-95 transition-all"
             >
               <Search className="w-4 h-4" />
             </button>

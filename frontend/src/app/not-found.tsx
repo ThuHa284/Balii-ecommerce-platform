@@ -6,8 +6,8 @@ export default function NotFound() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="glass-card p-12 text-center max-w-lg animate-in fade-in slide-in-from-bottom-4 duration-700">
         {/* Cute Cat Icon with bounce */}
-        <div className="relative inline-flex items-center justify-center w-28 h-28 rounded-full bg-pink-100/80 mb-6 mx-auto">
-          <Cat className="w-14 h-14 text-pink-400 animate-bounce" />
+        <div className="relative inline-flex items-center justify-center w-28 h-28 rounded-full bg-violet-100/80 mb-6 mx-auto">
+          <Cat className="w-14 h-14 text-violet-400 animate-bounce" />
           {/* Little sparkles */}
           <span className="absolute top-1 right-1 text-xl">✨</span>
           <span className="absolute bottom-1 left-2 text-lg">💕</span>
@@ -36,7 +36,7 @@ export default function NotFound() {
         </Link>
 
         {/* Decorative paw prints */}
-        <div className="mt-8 flex justify-center gap-3 text-pink-300/60 text-xl select-none">
+        <div className="mt-8 flex justify-center gap-3 text-violet-300/60 text-xl select-none">
           <span>🐾</span>
           <span>🐾</span>
           <span>🐾</span>

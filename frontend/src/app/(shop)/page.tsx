@@ -49,7 +49,7 @@ export default function HomePage() {
             <source src={HERO_VIDEO_URL} type="video/mp4" />
           </video>
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-pink-200 via-rose-100 to-pink-300" />
+          <div className="absolute inset-0 bg-violet-100" />
         )}
 
         {/* Overlay */}
@@ -59,7 +59,7 @@ export default function HomePage() {
         <div className="relative z-10 text-center px-4 max-w-3xl mx-auto">
           <div className="fade-in-up">
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card text-sm font-medium text-foreground mb-6">
-              <Sparkles className="w-4 h-4 text-pink-500" />
+              <Sparkles className="w-4 h-4 text-violet-500" />
               Bộ sưu tập mới 2024
             </span>
           </div>
@@ -106,7 +106,7 @@ export default function HomePage() {
             { icon: RotateCcw, title: "Đổi trả 30 ngày", desc: "Đổi trả miễn phí, không lo rủi ro" },
           ].map((feature) => (
             <div key={feature.title} className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-pink-400 to-rose-500 shadow-lg shadow-pink-300/30">
+              <div className="p-3 rounded-xl bg-violet-500 shadow-lg shadow-violet-300/20">
                 <feature.icon className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -205,7 +205,7 @@ export default function HomePage() {
                 { value: "10K+", label: "Khách hàng" },
               ].map((stat) => (
                 <div key={stat.label}>
-                  <p className="text-2xl font-bold text-gradient">{stat.value}</p>
+                  <p className="text-2xl font-bold text-primary">{stat.value}</p>
                   <p className="text-xs text-muted-foreground">{stat.label}</p>
                 </div>
               ))}

@@ -42,11 +42,11 @@ export default function CheckoutPage() {
                   <h2 className="font-heading text-lg font-semibold">Địa chỉ giao hàng</h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div><label className="block text-sm font-medium mb-1.5">Họ và tên</label><input type="text" required placeholder="Nguyễn Văn An" className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm" /></div>
-                  <div><label className="block text-sm font-medium mb-1.5">Số điện thoại</label><input type="tel" required placeholder="0901234567" className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm" /></div>
-                  <div><label className="block text-sm font-medium mb-1.5">Tỉnh/Thành phố</label><input type="text" required placeholder="TP. Hồ Chí Minh" className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm" /></div>
-                  <div><label className="block text-sm font-medium mb-1.5">Quận/Huyện</label><input type="text" required placeholder="Quận 1" className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm" /></div>
-                  <div className="sm:col-span-2"><label className="block text-sm font-medium mb-1.5">Địa chỉ cụ thể</label><input type="text" required placeholder="Số nhà, đường..." className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm" /></div>
+                  <div><label className="block text-sm font-medium mb-1.5">Họ và tên</label><input type="text" required placeholder="Nguyễn Văn An" className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm" /></div>
+                  <div><label className="block text-sm font-medium mb-1.5">Số điện thoại</label><input type="tel" required placeholder="0901234567" className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm" /></div>
+                  <div><label className="block text-sm font-medium mb-1.5">Tỉnh/Thành phố</label><input type="text" required placeholder="TP. Hồ Chí Minh" className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm" /></div>
+                  <div><label className="block text-sm font-medium mb-1.5">Quận/Huyện</label><input type="text" required placeholder="Quận 1" className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm" /></div>
+                  <div className="sm:col-span-2"><label className="block text-sm font-medium mb-1.5">Địa chỉ cụ thể</label><input type="text" required placeholder="Số nhà, đường..." className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm" /></div>
                 </div>
               </div>
 
@@ -58,7 +58,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="space-y-3">
                   {(["cod", "vnpay", "momo"] as const).map((method) => (
-                    <label key={method} className={`flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all ${paymentMethod === method ? "bg-pink-50 border-2 border-primary" : "bg-white/40 border-2 border-transparent hover:bg-white/60"}`}>
+                    <label key={method} className={`flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all ${paymentMethod === method ? "bg-violet-50 border-2 border-primary" : "bg-white/40 border-2 border-transparent hover:bg-white/60"}`}>
                       <input type="radio" name="payment" value={method} checked={paymentMethod === method} onChange={(e) => setPaymentMethod(e.target.value)} className="w-4 h-4 text-primary" />
                       <span className="text-sm font-medium">{PAYMENT_METHOD_LABELS[method]}</span>
                     </label>
@@ -72,7 +72,7 @@ export default function CheckoutPage() {
                   <FileText className="w-5 h-5 text-primary" />
                   <h2 className="font-heading text-lg font-semibold">Ghi chú</h2>
                 </div>
-                <textarea placeholder="Ghi chú cho đơn hàng (không bắt buộc)..." rows={3} className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm resize-none" />
+                <textarea placeholder="Ghi chú cho đơn hàng (không bắt buộc)..." rows={3} className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm resize-none" />
               </div>
             </div>
 
