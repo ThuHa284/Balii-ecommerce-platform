@@ -90,6 +90,15 @@ const config: Config = {
         shimmer: {
           "100%": { transform: "translateX(100%)" },
         },
+        "ai-scan": {
+          "0%": { top: "0%", opacity: "0.4" },
+          "50%": { opacity: "1" },
+          "100%": { top: "100%", opacity: "0.4" },
+        },
+        "ai-spin-slow": {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -97,6 +106,8 @@ const config: Config = {
         "fade-in": "fade-in 0.5s ease-out forwards",
         "slide-in-right": "slide-in-right 0.3s ease-out",
         shimmer: "shimmer 2s infinite",
+        "ai-scan": "ai-scan 2.5s ease-in-out infinite",
+        "ai-spin-slow": "ai-spin-slow 8s linear infinite",
       },
     },
   },

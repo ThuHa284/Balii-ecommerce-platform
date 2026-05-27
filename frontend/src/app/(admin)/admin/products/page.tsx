@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Plus, Search, Pencil, Trash2, X } from "lucide-react";
+import Link from "next/link";
+import { Plus, Search, Pencil, Trash2, X, FileSpreadsheet } from "lucide-react";
 import { MOCK_PRODUCTS } from "@/lib/api/mock-data";
 import { formatCurrency } from "@/lib/utils";
+import ExcelImportModal from "@/components/admin/excel-import-modal";
 
 export default function AdminProductsPage() {
   const [products] = useState(MOCK_PRODUCTS);
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showExcelImport, setShowExcelImport] = useState(false);
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
@@ -17,14 +20,22 @@ export default function AdminProductsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-heading text-3xl font-bold text-foreground mb-2">Quản lý sản phẩm</h1>
           <p className="text-muted-foreground">{products.length} sản phẩm</p>
         </div>
-        <button className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Thêm sản phẩm
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowExcelImport(true)}
+            className="btn-outline flex items-center gap-2 text-sm"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> Import Excel
+          </button>
+          <Link href="/admin/products/form" className="btn-primary flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Thêm sản phẩm
+          </Link>
+        </div>
       </div>
 
       {/* Search */}
@@ -86,9 +97,13 @@ export default function AdminProductsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
-                      <button className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors">
+                      <Link
+                        href={`/admin/products/form?edit=${product.slug}`}
+                        className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                        title="Sửa sản phẩm"
+                      >
                         <Pencil className="w-4 h-4" />
-                      </button>
+                      </Link>
                       <button onClick={() => setDeleteId(product.id)} className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -123,6 +138,9 @@ export default function AdminProductsPage() {
           </div>
         </div>
       )}
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal open={showExcelImport} onClose={() => setShowExcelImport(false)} />
     </div>
   );
 }

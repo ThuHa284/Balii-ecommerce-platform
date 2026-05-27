@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Sparkles, Star, Truck, ShieldCheck, RotateCcw } from "lucide-react";
+import { ArrowRight, Sparkles, Star, Truck, ShieldCheck, RotateCcw, Wand2 } from "lucide-react";
 import ProductGrid from "@/components/product/product-grid";
 import { MOCK_PRODUCTS } from "@/lib/api/mock-data";
 import { MOCK_CATEGORIES } from "@/lib/api/mock-data";
@@ -220,6 +220,56 @@ export default function HomePage() {
             />
           </div>
         </div>
+      </section>
+
+      {/* ============================================
+          AI TRY-ON BANNER
+          ============================================ */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        <Link
+          href="/try-on"
+          className="block group"
+        >
+          <div className="relative overflow-hidden rounded-3xl tryon-banner-bg glass-card p-8 md:p-12 lg:p-16">
+            {/* Decorative elements */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-violet-400/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-400/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-300/30 text-xs font-semibold text-violet-600 mb-4">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  TÍNH NĂNG MỚI — AI
+                </div>
+                <h2 className="font-heading text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-3 leading-tight">
+                  Mặc Thử Quần Áo{" "}
+                  <span className="text-gradient">Bằng AI</span>
+                </h2>
+                <p className="text-muted-foreground leading-relaxed max-w-lg mb-6 text-sm md:text-base">
+                  Xem trước sản phẩm trên chính bạn! Chỉ cần tải ảnh, chọn quần áo 
+                  yêu thích — AI sẽ tạo ảnh mặc thử chân thực trong vài giây.
+                </p>
+                <div className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-500 text-white font-medium text-sm shadow-lg shadow-violet-300/25 group-hover:bg-violet-600 group-hover:scale-[1.02] active:scale-95 transition-all">
+                  <Wand2 className="w-4 h-4" />
+                  Thử ngay miễn phí
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+
+              {/* Right side — decorative illustration */}
+              <div className="hidden md:flex items-center justify-center">
+                <div className="relative">
+                  <div className="w-32 h-32 lg:w-40 lg:h-40 rounded-3xl bg-gradient-to-br from-violet-400/20 to-purple-400/20 backdrop-blur-sm border border-violet-200/30 flex items-center justify-center rotate-6 group-hover:rotate-3 transition-transform duration-500">
+                    <Wand2 className="w-14 h-14 lg:w-16 lg:h-16 text-violet-400" />
+                  </div>
+                  <div className="absolute -top-3 -left-3 w-16 h-16 rounded-2xl bg-white/50 backdrop-blur-sm border border-white/40 flex items-center justify-center -rotate-12 group-hover:-rotate-6 transition-transform duration-500 shadow-lg">
+                    <Sparkles className="w-7 h-7 text-purple-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Link>
       </section>
 
       {/* ============================================

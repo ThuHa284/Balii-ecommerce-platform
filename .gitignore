@@ -12,24 +12,36 @@ pnpm-debug.log*
 
 # Dependency directories
 node_modules/
+frontend/node_modules/
 
 # Build outputs
 .next/
 out/
 dist/
 build/
+coverage/
 
-# Env files
-.env
-.env.*
+# NestJS
+apps/**/dist
+libs/**/dist
 
-# Cache
+# Turbo / cache
 .cache/
 .turbo/
 .eslintcache
 
-# Coverage
-coverage/
+# TypeScript
+*.tsbuildinfo
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Docker
+docker-data/
+postgres_data/
+minio_data/
 
 # Vercel
 .vercel/
@@ -40,3 +52,12 @@ coverage/
 
 # Misc
 *.swp
+
+# Mac/Linux temp
+*.pid
+*.seed
+*.pid.lock
+
+# Runtime
+tmp/
+temp/

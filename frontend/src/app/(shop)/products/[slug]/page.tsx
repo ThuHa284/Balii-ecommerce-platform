@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Star, Minus, Plus, ShoppingBag, Heart, Truck, RotateCcw, ShieldCheck } from "lucide-react";
+import { Star, Minus, Plus, ShoppingBag, Heart, Truck, RotateCcw, ShieldCheck, Wand2 } from "lucide-react";
+import Link from "next/link";
 import { MOCK_PRODUCTS } from "@/lib/api/mock-data";
 import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/store/cart.store";
@@ -128,7 +129,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 mb-8">
+            <div className="flex gap-3 mb-4">
               <button onClick={handleAddToCart} className="btn-primary flex-1 flex items-center justify-center gap-2 py-3.5 text-base">
                 <ShoppingBag className="w-5 h-5" /> Thêm vào giỏ
               </button>
@@ -136,6 +137,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                 <Heart className="w-5 h-5" />
               </button>
             </div>
+
+            {/* AI Try-On Button */}
+            <Link
+              href={`/try-on?product=${product.slug}`}
+              className="flex items-center justify-center gap-2.5 w-full mb-8 px-6 py-3.5 rounded-xl bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200/60 text-violet-600 font-medium text-sm hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:scale-[1.01] active:scale-[0.98] transition-all group"
+            >
+              <Wand2 className="w-5 h-5 text-violet-500 group-hover:rotate-12 transition-transform" />
+              <span>Mặc thử ảo bằng AI</span>
+              <span className="ml-1 px-2 py-0.5 rounded-full bg-violet-500/10 text-[10px] font-bold text-violet-500 uppercase tracking-wider">Mới</span>
+            </Link>
 
             {/* Features */}
             <div className="grid grid-cols-3 gap-4 pt-6 border-t border-white/30">
