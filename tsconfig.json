@@ -21,6 +21,9 @@
     "strictBindCallApply": false,
     "ignoreDeprecations": "5.0",
     "noFallthroughCasesInSwitch": false,
-    "paths": {}
+    "baseUrl": ".",
+    "paths": {
+      "@app/database": ["libs/database/src"]
+    }
   }
 }

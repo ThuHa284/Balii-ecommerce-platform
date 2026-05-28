@@ -28,6 +28,15 @@
         "tsConfigPath": "apps/cart-service/tsconfig.app.json"
       }
     },
+    "market-analysis-service": {
+      "type": "application",
+      "root": "apps/market-analysis-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/market-analysis-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/market-analysis-service/tsconfig.app.json"
+      }
+    },
     "order-service": {
       "type": "application",
       "root": "apps/order-service",
