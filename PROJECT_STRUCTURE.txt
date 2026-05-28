@@ -27,6 +27,27 @@ Balii-ecommerce-platform
 |   |   |   +---app.e2e-spec.ts
 |   |   |   \---jest-e2e.json
 |   |   \---tsconfig.app.json
+|   +---market-analysis-service
+|   |   +---src
+|   |   |   +---adapters
+|   |   |   |   +---shopee-public-crawler.adapter.ts
+|   |   |   |   +---tiktok-public-crawler.adapter.ts
+|   |   |   |   \---website-crawler.adapter.ts
+|   |   |   +---agent
+|   |   |   |   \---market-agent.service.ts
+|   |   |   +---dto
+|   |   |   |   \---search-market.dto.ts
+|   |   |   +---entities
+|   |   |   |   \---market-product.entity.ts
+|   |   |   +---main.ts
+|   |   |   +---market-analysis-service.controller.spec.ts
+|   |   |   +---market-analysis-service.controller.ts
+|   |   |   +---market-analysis-service.module.ts
+|   |   |   \---market-analysis-service.service.ts
+|   |   +---test
+|   |   |   +---app.e2e-spec.ts
+|   |   |   \---jest-e2e.json
+|   |   \---tsconfig.app.json
 |   +---order-service
 |   |   +---src
 |   |   |   +---main.ts
@@ -62,6 +83,36 @@ Balii-ecommerce-platform
 |   |   \---tsconfig.app.json
 |   +---user-service
 |   |   +---src
+|   |   |   +---addresses
+|   |   |   |   +---addresses.controller.ts
+|   |   |   |   +---addresses.module.ts
+|   |   |   |   \---addresses.service.ts
+|   |   |   +---auth
+|   |   |   |   +---dto
+|   |   |   |   |   +---login.dto.ts
+|   |   |   |   |   +---register.dto.ts
+|   |   |   |   |   \---resend-verification.dto.ts
+|   |   |   |   +---guards
+|   |   |   |   |   +---jwt-auth.guard.ts
+|   |   |   |   |   \---roles.guard.ts
+|   |   |   |   +---strategies
+|   |   |   |   |   +---google.strategy.ts
+|   |   |   |   |   +---jwt.strategy.ts
+|   |   |   |   |   \---local.strategy.ts
+|   |   |   |   +---auth.controller.ts
+|   |   |   |   +---auth.module.ts
+|   |   |   |   \---auth.service.ts
+|   |   |   +---entities
+|   |   |   |   +---email-verification.entity.ts
+|   |   |   |   +---oauth-account.entity.ts
+|   |   |   |   +---password-reset.entity.ts
+|   |   |   |   +---role.entity.ts
+|   |   |   |   +---user.entity.ts
+|   |   |   |   \---user-address.entity.ts
+|   |   |   +---users
+|   |   |   |   +---users.controller.ts
+|   |   |   |   +---users.module.ts
+|   |   |   |   \---users.service.ts
 |   |   |   +---main.ts
 |   |   |   +---user-service.controller.spec.ts
 |   |   |   +---user-service.controller.ts
@@ -89,6 +140,7 @@ Balii-ecommerce-platform
 |   |   +---02-indexes.sql
 |   |   \---03-seed.sql
 |   \---migrations
+|       \---20260828_create_market_analysis_service.sql
 +---docs
 |   +---adr
 |   |   +---001-use-microservices.md
@@ -339,9 +391,12 @@ Balii-ecommerce-platform
 |   +---database
 |   |   \---src
 |   |       +---migrations
-|   |       |   \---.gitkeep
+|   |       |   +---.gitkeep
+|   |       |   +---20260528113000-CreateMarketAnalysis.ts
+|   |       |   \---20260528121000-AddMarketProductColumns.ts
 |   |       +---base.entity.ts
 |   |       +---database.module.ts
+|   |       +---data-source.ts
 |   |       +---index.ts
 |   |       \---typeorm.config.ts
 |   +---kafka
@@ -359,11 +414,12 @@ Balii-ecommerce-platform
 +---scripts
 |   +---create-kafka-topics.sh
 |   +---deploy-all.sh
+|   +---open-chrome.ts
 |   +---run-migrations.sh
-|   \---seed.ts
+|   +---seed.ts
+|   \---tiktok-login.ts
 +---storage
 +---.env
-+---.env.example
 +---.gitignore
 +---.prettierrc
 +---docker-compose.prod.yml
