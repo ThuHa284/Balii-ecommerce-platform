@@ -1,8 +1,13 @@
 import { Module } from '@nestjs/common';
-import { UserServiceController } from './user-service.controller';
-import { UserServiceService } from './user-service.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { UserServiceController } from './user-service.controller';
+import { UserServiceService } from './user-service.service';
+
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { AddressesModule } from './addresses/addresses.module';
 
 @Module({
   imports: [
@@ -26,7 +31,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         synchronize: false,
       }),
     }),
+
+    AuthModule,
+    UsersModule,
+    AddressesModule,
   ],
+
   controllers: [UserServiceController],
   providers: [UserServiceService],
 })
