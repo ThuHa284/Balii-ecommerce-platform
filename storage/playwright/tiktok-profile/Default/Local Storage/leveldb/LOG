@@ -1,0 +1,7 @@
+2026/05/28-14:36:02.043 2508 Reusing MANIFEST E:\HocODayNe\DoAnTotNghiep\LVTN\Balii-ecommerce-platform\storage\playwright\tiktok-profile\Default\Local Storage\leveldb/MANIFEST-000001
+2026/05/28-14:36:02.049 2508 Recovering log #4
+2026/05/28-14:36:02.050 2508 Level-0 table #7: started
+2026/05/28-14:36:02.056 2508 Level-0 table #7: 111357 bytes OK
+2026/05/28-14:36:02.056 2508 Recovering log #6
+2026/05/28-14:36:02.058 2508 Reusing old log E:\HocODayNe\DoAnTotNghiep\LVTN\Balii-ecommerce-platform\storage\playwright\tiktok-profile\Default\Local Storage\leveldb/000006.log 
+2026/05/28-14:36:02.060 2508 Delete type=0 #4

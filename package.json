@@ -24,15 +24,23 @@
     "start:order": "nest start order-service --watch",
     "start:payment": "nest start payment-service --watch",
     "start:cart": "nest start cart-service --watch",
-    "start:tryon": "nest start virtual-tryon-service --watch"
+    "start:tryon": "nest start virtual-tryon-service --watch",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate libs/database/src/migrations/AutoMigration -d libs/database/src/data-source.ts",
+    "migration:create": "typeorm-ts-node-commonjs migration:create libs/database/src/migrations/NewMigration",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d libs/database/src/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d libs/database/src/data-source.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/typeorm": "^11.0.1",
+    "axios": "^1.16.1",
+    "cheerio": "^1.2.0",
     "pg": "^8.21.0",
+    "playwright": "^1.60.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^1.0.0"

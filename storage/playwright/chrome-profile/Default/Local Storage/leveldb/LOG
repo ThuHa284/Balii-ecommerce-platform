@@ -1,0 +1,8 @@
+2026/05/28-14:20:11.619 55b4 Creating DB E:\HocODayNe\DoAnTotNghiep\LVTN\Balii-ecommerce-platform\storage\playwright\chrome-profile\Default\Local Storage\leveldb since it was missing.
+2026/05/28-14:20:11.633 55b4 Reusing MANIFEST E:\HocODayNe\DoAnTotNghiep\LVTN\Balii-ecommerce-platform\storage\playwright\chrome-profile\Default\Local Storage\leveldb/MANIFEST-000001
+2026/05/28-14:20:46.211 24cc Level-0 table #5: started
+2026/05/28-14:20:46.215 24cc Level-0 table #5: 44838 bytes OK
+2026/05/28-14:20:46.217 24cc Delete type=0 #3
+2026/05/28-14:21:11.646 24cc Level-0 table #7: started
+2026/05/28-14:21:11.650 24cc Level-0 table #7: 117314 bytes OK
+2026/05/28-14:21:11.652 24cc Delete type=0 #4

@@ -161,19 +161,6 @@ services:
     networks:
       - balii-network
 
-  # ============================================================
-  # Mailhog (fake SMTP dev)
-  # ============================================================
-  mailhog:
-    image: mailhog/mailhog
-    container_name: balii-mailhog
-    restart: always
-    ports:
-      - "1025:1025"
-      - "8025:8025"
-    networks:
-      - balii-network
-
 volumes:
   postgres_data:
   redis_data:
