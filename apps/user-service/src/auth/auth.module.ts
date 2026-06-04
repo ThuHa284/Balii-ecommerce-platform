@@ -12,9 +12,14 @@ import { Role } from '../entities/role.entity';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { EmailVerification } from '../entities/email-verification.entity';
+import { UsersModule } from '../users/users.module';
+import { PasswordReset } from '../entities/password-reset.entity';
+
+
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Role, EmailVerification]),
+    UsersModule,
+    TypeOrmModule.forFeature([User, Role, EmailVerification, PasswordReset]),
 
     PassportModule,
 
