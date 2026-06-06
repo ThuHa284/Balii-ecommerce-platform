@@ -9,15 +9,13 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import Redis from 'ioredis';
+import { randomBytes } from 'crypto';
+import nodemailer = require('nodemailer');
 
 import { User } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
 import { RegisterDto } from './dto/register.dto';
-
-import { randomBytes } from 'crypto';
-import nodemailer = require('nodemailer');
 import { EmailVerification } from '../entities/email-verification.entity';
-
 @Injectable()
 export class AuthService {
   private redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -27,10 +25,8 @@ export class AuthService {
     private emailVerificationRepo: Repository<EmailVerification>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
-
     @InjectRepository(Role)
     private roleRepo: Repository<Role>,
-
     private jwtService: JwtService,
   ) {}
   async register(dto: RegisterDto) {
@@ -56,8 +52,18 @@ export class AuthService {
     });
 
     await this.userRepo.save(user);
-    const token = randomBytes(32).toString('hex');
 
+    if (!this.isEmailVerificationEnabled()) {
+      user.emailVerifiedAt = new Date();
+      await this.userRepo.save(user);
+
+      return {
+        message: 'Dang ky thanh cong.',
+        userId: user.id,
+      };
+    }
+
+    const token = randomBytes(32).toString('hex');
     await this.emailVerificationRepo.save({
       userId: user.id,
       token,
@@ -67,7 +73,7 @@ export class AuthService {
     await this.sendVerificationEmail(user.email, token);
 
     return {
-      message: 'Đăng ký thành công. Vui lòng xác thực email.',
+      message: 'Dang ky thanh cong. Vui long xac thuc email.',
       userId: user.id,
     };
   }
@@ -84,26 +90,18 @@ export class AuthService {
       throw new UnauthorizedException('Tai khoan nay dang nhap bang Google');
     }
 
-    //const isMatch = await bcrypt.compare(password, user.passwordHash);
-    console.log('LOGIN EMAIL:', email);
-    console.log('USER FOUND:', user ? user.email : null);
-    console.log('PASSWORD INPUT:', password);
-    console.log('PASSWORD HASH:', user?.passwordHash);
-
     const isMatch = await bcrypt.compare(password, user.passwordHash);
-
-    console.log('IS_MATCH:', isMatch);
     if (!isMatch) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Email hoac mat khau khong dung');
     }
 
     if (!user.isActive) {
       throw new UnauthorizedException('Tai khoan da bi khoa');
     }
 
-    if (!user.emailVerifiedAt) {
+    if (!user.emailVerifiedAt && this.isEmailVerificationEnabled()) {
       throw new UnauthorizedException(
-        'Vui lòng xác thực email trước khi đăng nhập',
+        'Vui long xac thuc email truoc khi dang nhap',
       );
     }
     return user;
@@ -155,51 +153,26 @@ export class AuthService {
   }
   async logout(userId: string, accessToken: string) {
     await this.redis.del(`refresh_token:${userId}`);
-
     await this.redis.set(`blacklist:${accessToken}`, '1', 'EX', 15 * 60);
 
-    return { message: 'Đăng xuất thành công' };
+    return { message: 'Dang xuat thanh cong' };
   }
-  private async sendVerificationEmail(email: string, token: string) {
-    const transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST,
-      port: Number(process.env.MAIL_PORT),
-      secure: false,
-      auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS,
-      },
-    });
 
-    const verifyUrl = `${process.env.APP_URL || 'http://localhost:4001'}/auth/verify-email?token=${token}`;
-
-    await transporter.sendMail({
-      from: process.env.MAIL_FROM || 'no-reply@balii.com',
-      to: email,
-      subject: 'Xác thực tài khoản Balii SleepWear',
-      html: `
-      <h2>Xác thực tài khoản</h2>
-      <p>Bấm vào link bên dưới để xác thực email:</p>
-      <a href="${verifyUrl}">${verifyUrl}</a>
-      <p>Link có hiệu lực trong 15 phút.</p>
-    `,
-    });
-  }
   async verifyEmail(token: string) {
     const record = await this.emailVerificationRepo.findOne({
       where: { token },
     });
 
     if (!record) {
-      throw new BadRequestException('Token xác thực không hợp lệ');
+      throw new BadRequestException('Token xac thuc khong hop le');
     }
 
     if (record.usedAt) {
-      throw new BadRequestException('Token đã được sử dụng');
+      throw new BadRequestException('Token da duoc su dung');
     }
 
     if (record.expiresAt < new Date()) {
-      throw new BadRequestException('Token đã hết hạn');
+      throw new BadRequestException('Token da het han');
     }
 
     await this.userRepo.update(record.userId, {
@@ -210,21 +183,32 @@ export class AuthService {
     await this.emailVerificationRepo.save(record);
 
     return {
-      message: 'Xác thực email thành công',
+      message: 'Xac thuc email thanh cong',
     };
   }
+
   async resendVerificationEmail(email: string) {
     const user = await this.userRepo.findOne({
       where: { email },
     });
 
     if (!user) {
-      throw new BadRequestException('Email chưa được đăng ký');
+      throw new BadRequestException('Email chua duoc dang ky');
     }
 
     if (user.emailVerifiedAt) {
       return {
-        message: 'Email này đã được xác thực',
+        message: 'Email nay da duoc xac thuc',
+      };
+    }
+
+    if (!this.isEmailVerificationEnabled()) {
+      await this.userRepo.update(user.id, {
+        emailVerifiedAt: new Date(),
+      });
+
+      return {
+        message: 'Moi truong local dang tat xac thuc email.',
       };
     }
 
@@ -241,7 +225,6 @@ export class AuthService {
       .execute();
 
     const token = randomBytes(32).toString('hex');
-
     await this.emailVerificationRepo.save({
       userId: user.id,
       token,
@@ -251,7 +234,50 @@ export class AuthService {
     await this.sendVerificationEmail(user.email, token);
 
     return {
-      message: 'Đã gửi lại email xác thực. Vui lòng kiểm tra hộp thư.',
+      message: 'Da gui lai email xac thuc.',
     };
+  }
+
+  private async sendVerificationEmail(email: string, token: string) {
+    const transporter = nodemailer.createTransport({
+      host: process.env.MAIL_HOST,
+      port: Number(process.env.MAIL_PORT),
+      secure: false,
+      auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS,
+      },
+    });
+
+    const verifyBaseUrl =
+      process.env.FRONTEND_URL ||
+      process.env.APP_URL ||
+      'http://localhost:3000';
+    const verifyUrl = `${verifyBaseUrl}/auth/verify-email?token=${token}`;
+
+    await transporter.sendMail({
+      from: process.env.MAIL_FROM || 'no-reply@balii.com',
+      to: email,
+      subject: 'Xac thuc tai khoan Balii SleepWear',
+      html: `
+        <h2>Xac thuc tai khoan</h2>
+        <p>Bam vao link ben duoi de xac thuc email:</p>
+        <a href="${verifyUrl}">${verifyUrl}</a>
+        <p>Link co hieu luc trong 15 phut.</p>
+      `,
+    });
+  }
+
+  private isEmailVerificationEnabled(): boolean {
+    if (process.env.DISABLE_EMAIL_VERIFICATION === 'true') {
+      return false;
+    }
+
+    return Boolean(
+      process.env.MAIL_HOST &&
+      process.env.MAIL_PORT &&
+      process.env.MAIL_USER &&
+      process.env.MAIL_PASS,
+    );
   }
 }
