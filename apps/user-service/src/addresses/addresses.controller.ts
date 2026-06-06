@@ -6,35 +6,53 @@ import {
   Delete,
   Body,
   Param,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AddressesService } from './addresses.service';
+import { CreateAddressDto } from './dto/create-address.dto';
+import { UpdateAddressDto } from './dto/update-address.dto';
+import { CurrentUser } from '@app/common';
 
 @Controller('users/me/addresses')
 @UseGuards(JwtAuthGuard)
 export class AddressesController {
-  constructor(private addressesService: AddressesService) {}
+  constructor(private readonly addressesService: AddressesService) {
+      console.log('AddressesController loaded');
+  }
 
   @Get()
-  findMyAddresses(@Req() req) {
-    return this.addressesService.findByUser(req.user.userId);
-  }
+findAll(@CurrentUser() user: any) {
+  return this.addressesService.findAll(user.id);
+}
 
-  @Post()
-  create(@Req() req, @Body() dto: any) {
-    return this.addressesService.create(req.user.userId, dto);
-  }
+@Post()
+create(@CurrentUser() user: any, @Body() dto: CreateAddressDto) {
+  console.log('===== CONTROLLER CREATE ADDRESS =====');
+  console.log('CURRENT USER:', user);
+  console.log('BODY:', dto);
+  console.log('=====================================');
 
-  @Patch(':id')
-  update(@Req() req, @Param('id') id: string, @Body() dto: any) {
-    return this.addressesService.update(req.user.userId, id, dto);
-  }
+ return this.addressesService.create(user.id, dto);}
 
-  @Delete(':id')
-  delete(@Req() req, @Param('id') id: string) {
-    return this.addressesService.delete(req.user.userId, id);
-  }
+@Patch(':id')
+update(
+  @CurrentUser() user: any,
+  @Param('id') id: string,
+  @Body() dto: UpdateAddressDto,
+) {
+  return this.addressesService.update(user.id, id, dto);
+}
+
+@Delete(':id')
+remove(@CurrentUser() user: any, @Param('id') id: string) {
+  return this.addressesService.remove(user.id, id);
+}
+
+@Patch(':id/default')
+setDefault(@CurrentUser() user: any, @Param('id') id: string) {
+  return this.addressesService.setDefault(user.id, id);
+}
+
 }

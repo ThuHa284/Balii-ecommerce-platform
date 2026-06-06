@@ -6,5 +6,5 @@ async function bootstrap() {
   const app = await NestFactory.create(UserServiceModule);
   await app.listen(process.env.USER_SERVICE_PORT ?? 3001);
 }
-bootstrap(); 
 
+bootstrap();

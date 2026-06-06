@@ -8,11 +8,8 @@ import { UserAddress } from '../entities/user-address.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserAddress]),
-  ],
-
+    TypeOrmModule.forFeature([UserAddress])],
   controllers: [AddressesController],
-
   providers: [AddressesService],
 })
 export class AddressesModule {}

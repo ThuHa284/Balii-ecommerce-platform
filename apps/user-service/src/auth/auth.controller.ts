@@ -14,15 +14,26 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 
+import { Request } from 'express';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { PasswordReset } from '../entities/password-reset.entity';
+import { User } from '../entities/user.entity';
+import { TypeOrmModule } from '@nestjs/typeorm/dist/typeorm.module';
 
 
 @Controller('auth')
+
+  
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
   register(@Body() dto: RegisterDto) {
+
+   
     return this.authService.register(dto);
   }
   @Get('test')
@@ -36,11 +47,7 @@ test() {
     return this.authService.login(req.user);
   }
 
-  @Post('refresh')
-  refresh(@Body() body: { userId: string; refreshToken: string }) {
-    return this.authService.refresh(body.userId, body.refreshToken);
-  }
-
+  
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   logout(@Req() req, @Headers('authorization') authorization: string) {
@@ -56,4 +63,34 @@ test() {
     resendVerification(@Body() dto: ResendVerificationDto) {
       return this.authService.resendVerificationEmail(dto.email);
     }
+
+     @Post('refresh')
+        refreshToken(@Body() dto: RefreshTokenDto) {
+        console.log('REFRESH API CALLED');
+        console.log('BODY:', dto);
+         return this.authService.refreshToken(dto.refreshToken);
+      } 
+
+      @Post('forgot-password')
+        async forgotPassword(
+        @Body() dto: ForgotPasswordDto,
+        @Req() req,
+        ) 
+      {
+        return this.authService.forgotPassword(
+          dto.email,
+          req.ip,
+          req.headers['user-agent'],
+       );
+    }
+        @Post('reset-password')
+            resetPassword(@Body() dto: ResetPasswordDto) {
+            return this.authService.resetPassword(dto);
+        }
 }
+imports: [
+  TypeOrmModule.forFeature([
+    User,
+    PasswordReset,
+  ]),
+]

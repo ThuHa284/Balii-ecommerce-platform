@@ -8,12 +8,14 @@ import { UserServiceService } from './user-service.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AddressesModule } from './addresses/addresses.module';
+import { LocationsModule } from './locations/locations.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      
     }),
 
     TypeOrmModule.forRootAsync({
@@ -35,6 +37,7 @@ import { AddressesModule } from './addresses/addresses.module';
     AuthModule,
     UsersModule,
     AddressesModule,
+    LocationsModule,
   ],
 
   controllers: [UserServiceController],
