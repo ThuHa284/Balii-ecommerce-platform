@@ -67,8 +67,9 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        heading: ["var(--font-playfair)", "serif"],
-        body: ["var(--font-lato)", "sans-serif"],
+        heading: ["BaliiNumbers", "var(--font-playfair)", "serif"],
+        body: ["BaliiNumbers", "var(--font-lato)", "sans-serif"],
+        mono: ["BaliiNumbers", "ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
       },
       keyframes: {
         "accordion-down": {

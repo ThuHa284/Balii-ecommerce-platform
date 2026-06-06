@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { Search, Upload, Check, ShoppingBag, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTryOnStore } from "@/store/tryon.store";
-import { MOCK_PRODUCTS } from "@/lib/api/mock-data";
+import { getProducts } from "@/lib/api/products.api";
 import { formatCurrency } from "@/lib/utils";
 import { Product } from "@/types/product.types";
 import { toast } from "sonner";
@@ -24,9 +24,23 @@ export default function TryOnGarmentPicker({
     selectedProduct ? "shop" : "shop"
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const filteredProducts = MOCK_PRODUCTS.filter((p) =>
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const response = await getProducts({ limit: 100 });
+        setProducts(response.products);
+      } catch {
+        toast.error("Khong tai duoc danh sach san pham. Vui long thu lai.");
+      }
+    }
+
+    void loadProducts();
+  }, []);
+
+  const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 

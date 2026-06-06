@@ -1,6 +1,54 @@
+import fs from "fs";
 import type { NextConfig } from "next";
+import path from "path";
+
+function loadRootEnv() {
+  const rootEnvPath = path.resolve(__dirname, "..", ".env");
+
+  if (!fs.existsSync(rootEnvPath)) {
+    return;
+  }
+
+  const envFile = fs.readFileSync(rootEnvPath, "utf8");
+
+  for (const rawLine of envFile.split(/\r?\n/)) {
+    const line = rawLine.trim();
+
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf("=");
+
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim();
+    const value = line
+      .slice(separatorIndex + 1)
+      .trim()
+      .replace(/^['"]|['"]$/g, "");
+
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadRootEnv();
+
+process.env.NEXT_PUBLIC_API_URL ??=
+  process.env.API_GATEWAY_URL ||
+  `http://localhost:${process.env.API_GATEWAY_PORT || "4000"}`;
+process.env.NEXT_PUBLIC_SOCKET_URL ??=
+  process.env.TRYON_SERVICE_URL || "http://localhost:4006";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
+
   images: {
     remotePatterns: [
       {
@@ -16,6 +64,11 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "via.placeholder.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
         pathname: "/**",
       },
     ],

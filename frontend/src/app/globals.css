@@ -9,6 +9,12 @@
    ============================================ */
 
 @layer base {
+  @font-face {
+    font-family: 'BaliiNumbers';
+    src: local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
+    unicode-range: U+0030-0039, U+002C, U+002E, U+20AB, U+0025; /* 0-9, comma, dot, ₫, % */
+  }
+
   :root {
     --background: 30 25% 97%;
     --foreground: 250 10% 15%;
@@ -51,6 +57,8 @@
 
   * {
     @apply border-border;
+    font-variant-numeric: lining-nums;
+    font-feature-settings: "lnum" 1;
   }
 
   body {
@@ -146,6 +154,66 @@
 
   .fade-in-up-delay-4 {
     animation-delay: 0.4s;
+  }
+
+  /* ============================================
+     Combo & Promo — Promotional Styles
+     ============================================ */
+  .combo-gradient {
+    background: linear-gradient(
+      135deg,
+      hsl(262, 50%, 94%) 0%,
+      hsl(340, 40%, 94%) 30%,
+      hsl(25, 50%, 94%) 60%,
+      hsl(262, 45%, 93%) 100%
+    );
+    background-size: 200% 200%;
+    animation: combo-bg-shift 8s ease-in-out infinite;
+  }
+
+  .promo-pulse {
+    animation: promo-pulse-anim 2s ease-in-out infinite;
+  }
+
+  .freeship-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full;
+    background: linear-gradient(135deg, hsl(155, 50%, 92%), hsl(155, 40%, 88%));
+    color: hsl(155, 40%, 25%);
+  }
+
+  .combo-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full;
+    background: linear-gradient(135deg, hsl(262, 50%, 92%), hsl(340, 40%, 92%));
+    color: hsl(262, 40%, 30%);
+  }
+
+  .collection-card-overlay {
+    @apply absolute inset-0 transition-all duration-500;
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.6) 0%,
+      rgba(0, 0, 0, 0.1) 50%,
+      transparent 100%
+    );
+  }
+
+  .collection-card-overlay:hover {
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.7) 0%,
+      rgba(0, 0, 0, 0.2) 60%,
+      transparent 100%
+    );
+  }
+
+  .promo-float-bar {
+    @apply fixed bottom-0 left-0 right-0 z-40;
+    background: linear-gradient(
+      135deg,
+      hsl(262, 50%, 50%) 0%,
+      hsl(280, 45%, 45%) 50%,
+      hsl(340, 40%, 50%) 100%
+    );
   }
 }
 
@@ -253,6 +321,16 @@
 @keyframes tryon-bg-shift {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
+}
+
+@keyframes combo-bg-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes promo-pulse-anim {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
 }
 
 /* ============================================

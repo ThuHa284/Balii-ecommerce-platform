@@ -1,63 +1,208 @@
-import { Product, ProductFilter, Category } from "@/types/product.types";
-import { PaginatedResponse, ApiResponse } from "@/types/api.types";
-import apiClient from "./client";
-import { MOCK_PRODUCTS } from "./mock-data";
+import apiClient from './client';
+import { mapProduct } from './adapters';
+import { Product, ProductFilter } from '@/types/product.types';
 
-const USE_MOCK = true;
+export interface ProductPayload {
+  categoryId?: string;
+  name: string;
+  slug: string;
+  description?: string;
+  basePrice: number;
+  originalPrice?: number;
+  salePrice?: number | null;
+  material?: string;
+  isActive?: boolean;
+}
 
-export async function getProducts(
-  filters?: ProductFilter
-): Promise<{ products: Product[]; meta: { page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } }> {
-  if (USE_MOCK) {
-    const page = filters?.page || 1;
-    const limit = filters?.limit || 12;
-    let filtered = [...MOCK_PRODUCTS];
-    if (filters?.search) {
-      const q = filters.search.toLowerCase();
-      filtered = filtered.filter((p) => p.name.toLowerCase().includes(q));
-    }
-    if (filters?.categorySlug) {
-      filtered = filtered.filter((p) => p.category.slug === filters.categorySlug);
-    }
-    if (filters?.sort === "price_asc") filtered.sort((a, b) => (a.salePrice || a.basePrice) - (b.salePrice || b.basePrice));
-    if (filters?.sort === "price_desc") filtered.sort((a, b) => (b.salePrice || b.basePrice) - (a.salePrice || a.basePrice));
-    return new Promise((resolve) =>
-      setTimeout(() => resolve({
-        products: filtered.slice((page - 1) * limit, page * limit),
-        meta: { page, limit, total: filtered.length, totalPages: Math.ceil(filtered.length / limit), hasNext: page * limit < filtered.length, hasPrev: page > 1 },
-      }), 600)
+export interface ProductVariantPayload {
+  id?: string;
+  sku: string;
+  price?: number;
+  stockQuantity: number;
+  reservedQuantity?: number;
+  weightGram?: number;
+  isActive?: boolean;
+  itemType?: 'TOP' | 'BOTTOM' | 'SET';
+  sizeLabel?: string;
+  colorName?: string;
+}
+
+export interface ProductImageRecord {
+  id: string;
+  productId: string;
+  variantId?: string | null;
+  url: string;
+  publicId?: string | null;
+  altText?: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+}
+
+type ProductResponse = Product;
+type ProductListResponse = ProductResponse[];
+
+export async function getProducts(filters?: ProductFilter): Promise<{
+  products: Product[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}> {
+  const { data } = await apiClient.get<ProductListResponse>('/products', {
+    params: {
+      keyword: filters?.search,
+    },
+  });
+
+  const products = data.map(mapProduct);
+  let filtered = [...products];
+
+  if (filters?.categorySlug) {
+    filtered = filtered.filter(
+      (product) => product.category?.slug === filters.categorySlug,
     );
   }
-  const { data } = await apiClient.get<PaginatedResponse<Product>>("/products", { params: filters });
-  return { products: data.data, meta: data.meta };
+  if (filters?.minPrice != null) {
+    filtered = filtered.filter(
+      (product) =>
+        (product.salePrice ?? product.basePrice) >= filters.minPrice!,
+    );
+  }
+  if (filters?.maxPrice != null) {
+    filtered = filtered.filter(
+      (product) =>
+        (product.salePrice ?? product.basePrice) <= filters.maxPrice!,
+    );
+  }
+  if (filters?.sizes?.length) {
+    filtered = filtered.filter((product) =>
+      product.variants.some((variant) => filters.sizes?.includes(variant.size)),
+    );
+  }
+
+  const page = filters?.page ?? 1;
+  const limit = filters?.limit ?? 12;
+  const start = (page - 1) * limit;
+  const paged = filtered.slice(start, start + limit);
+
+  return {
+    products: paged,
+    meta: {
+      page,
+      limit,
+      total: filtered.length,
+      totalPages: Math.max(1, Math.ceil(filtered.length / limit)),
+      hasNext: start + limit < filtered.length,
+      hasPrev: page > 1,
+    },
+  };
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
-  if (USE_MOCK) {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve(MOCK_PRODUCTS.find((p) => p.slug === slug) || null), 500)
+  try {
+    const { data } = await apiClient.get<ProductResponse>(
+      `/products/slug/${slug}`,
     );
+    return mapProduct(data);
+  } catch {
+    return null;
   }
-  const { data } = await apiClient.get<ApiResponse<Product>>(`/products/${slug}`);
-  return data.data;
+}
+
+export async function getAdminProducts(keyword?: string): Promise<Product[]> {
+  const { data } = await apiClient.get<ProductListResponse>('/products', {
+    params: keyword ? { keyword } : undefined,
+  });
+
+  return data.map(mapProduct);
+}
+
+export async function createProduct(payload: ProductPayload): Promise<Product> {
+  const { data } = await apiClient.post<ProductResponse>('/products', payload);
+  return mapProduct(data);
+}
+
+export async function updateProduct(
+  id: string,
+  payload: Partial<ProductPayload>,
+): Promise<Product> {
+  const { data } = await apiClient.patch<ProductResponse>(
+    `/products/${id}`,
+    payload,
+  );
+  return mapProduct(data);
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  await apiClient.delete(`/products/${id}`);
+}
+
+export async function createProductVariant(
+  productId: string,
+  payload: ProductVariantPayload,
+) {
+  const { data } = await apiClient.post<ProductVariantPayload>(
+    `/products/${productId}/variants`,
+    payload,
+  );
+  return data;
+}
+
+export async function updateProductVariant(
+  id: string,
+  payload: Partial<ProductVariantPayload>,
+) {
+  const { data } = await apiClient.patch<ProductVariantPayload>(
+    `/variants/${id}`,
+    payload,
+  );
+  return data;
+}
+
+export async function deleteProductVariant(id: string): Promise<void> {
+  await apiClient.delete(`/variants/${id}`);
+}
+
+export async function getProductImages(
+  productId: string,
+): Promise<ProductImageRecord[]> {
+  const { data } = await apiClient.get<ProductImageRecord[]>(
+    `/products/${productId}/images`,
+  );
+  return data;
+}
+
+export async function uploadProductImage(productId: string, file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const { data } = await apiClient.post<ProductImageRecord>(
+    `/products/${productId}/images`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    },
+  );
+
+  return data;
+}
+
+export async function deleteProductImage(id: string): Promise<void> {
+  await apiClient.delete(`/products/images/${id}`);
 }
 
 export async function getFeaturedProducts(): Promise<Product[]> {
-  if (USE_MOCK) {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve(MOCK_PRODUCTS.filter((p) => p.isFeatured)), 500)
-    );
-  }
-  const { data } = await apiClient.get<ApiResponse<Product[]>>("/products/featured");
-  return data.data;
+  const { products } = await getProducts({ page: 1, limit: 8 });
+  return products.slice(0, 6);
 }
 
 export async function getNewProducts(): Promise<Product[]> {
-  if (USE_MOCK) {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve(MOCK_PRODUCTS.filter((p) => p.isNew)), 500)
-    );
-  }
-  const { data } = await apiClient.get<ApiResponse<Product[]>>("/products/new");
-  return data.data;
+  const { products } = await getProducts({ page: 1, limit: 8 });
+  return products;
 }

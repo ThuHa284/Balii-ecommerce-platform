@@ -4,29 +4,52 @@ import { useState } from "react";
 import Image from "next/image";
 import { Star, Minus, Plus, ShoppingBag, Heart, Truck, RotateCcw, ShieldCheck, Wand2 } from "lucide-react";
 import Link from "next/link";
-import { MOCK_PRODUCTS } from "@/lib/api/mock-data";
+import { useParams } from "next/navigation";
+import { COMBO_TIERS, MOCK_COMBO_SHORTS } from "@/lib/api/mock-data";
 import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/store/cart.store";
 import ProductGrid from "@/components/product/product-grid";
-import { use } from "react";
+import ComboSelector from "@/components/product/combo-selector";
+import { useEffect } from "react";
+import { Product } from "@/types/product.types";
+import { getProductBySlug, getProducts } from "@/lib/api/products.api";
 
-export default function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
-  const product = MOCK_PRODUCTS.find((p) => p.slug === slug) || MOCK_PRODUCTS[0];
-  const [selectedSize, setSelectedSize] = useState(product.variants[0]?.size || "");
-  const [selectedColor, setSelectedColor] = useState(product.variants[0]?.color || "");
+export default function ProductDetailPage() {
+  const params = useParams<{ slug: string }>();
+  const slug = params.slug;
+  const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [selectedSize, setSelectedSize] = useState("");
+  const [selectedColor, setSelectedColor] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [mainImage, setMainImage] = useState(0);
   const { addItem, setCartDrawerOpen } = useCartStore();
 
+  useEffect(() => {
+    async function loadProduct() {
+      const data = await getProductBySlug(slug);
+      setProduct(data);
+      if (data) {
+        setSelectedSize(data.variants[0]?.size || "");
+        setSelectedColor(data.variants[0]?.color || "");
+        const list = await getProducts({ limit: 4 });
+        setRelatedProducts(list.products.filter((p) => p.id !== data.id).slice(0, 3));
+      }
+    }
+    void loadProduct();
+  }, [slug]);
+
+  if (!product) {
+    return <div className="pt-28 pb-16 text-center">Đang tải sản phẩm...</div>;
+  }
+
   const selectedVariant = product.variants.find((v) => v.size === selectedSize && v.color === selectedColor) || product.variants[0];
   const price = selectedVariant?.salePrice || selectedVariant?.price || product.salePrice || product.basePrice;
   const hasDiscount = product.salePrice !== null;
-  const relatedProducts = MOCK_PRODUCTS.filter((p) => p.id !== product.id).slice(0, 3);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!selectedVariant) return;
-    addItem({
+    await addItem({
       id: `cart_${Date.now()}`,
       productId: product.id,
       productName: product.name,
@@ -37,6 +60,63 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
       price,
       totalPrice: price * quantity,
     });
+    setCartDrawerOpen(true);
+  };
+
+  const handleSelectCombo = (
+    tier: typeof COMBO_TIERS[number],
+    shortsSize: string,
+    shortsColor: string
+  ) => {
+    if (!selectedVariant) return;
+
+    // 1. Add the main product
+    const mainItemId = `cart_${Date.now()}_main`;
+    void addItem({
+      id: mainItemId,
+      productId: product.id,
+      productName: product.name,
+      productSlug: product.slug,
+      thumbnail: product.thumbnail,
+      variant: selectedVariant,
+      quantity,
+      price,
+      totalPrice: price * quantity,
+    });
+
+    // 2. Add the combo shorts
+    const shortsColorObj =
+      MOCK_COMBO_SHORTS.colors.find((c) => c.name === shortsColor) ||
+      MOCK_COMBO_SHORTS.colors[0];
+
+    const shortsVariant = {
+      id: `var_shorts_${Date.now()}`,
+      productId: MOCK_COMBO_SHORTS.id,
+      size: shortsSize,
+      color: shortsColor,
+      colorCode: shortsColorObj.code,
+      sku: `SHORTS-${shortsSize}-${shortsColor.substring(0, 2).toUpperCase()}`,
+      price: MOCK_COMBO_SHORTS.basePrice,
+      salePrice: tier.freeShorts > 0 ? 0 : tier.shortsPrice,
+      stock: 99,
+      images: [],
+    };
+
+    const shortsQuantity = tier.freeShorts > 0 ? tier.freeShorts : 1;
+    const shortsPrice = tier.freeShorts > 0 ? 0 : tier.shortsPrice;
+
+    void addItem({
+      id: `cart_${Date.now()}_shorts`,
+      productId: MOCK_COMBO_SHORTS.id,
+      productName: `${MOCK_COMBO_SHORTS.name} (${tier.name})`,
+      productSlug: MOCK_COMBO_SHORTS.slug,
+      thumbnail: MOCK_COMBO_SHORTS.image,
+      variant: shortsVariant,
+      quantity: shortsQuantity,
+      price: shortsPrice,
+      totalPrice: shortsPrice * shortsQuantity,
+    });
+
     setCartDrawerOpen(true);
   };
 
@@ -136,6 +216,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
               <button className="p-3.5 rounded-xl border-2 border-violet-300 text-violet-600 hover:bg-violet-50 transition-all hover:scale-[1.02] active:scale-95">
                 <Heart className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Combo Selector */}
+            <div className="mb-6">
+              <ComboSelector productPrice={price} onSelectCombo={handleSelectCombo} />
             </div>
 
             {/* AI Try-On Button */}

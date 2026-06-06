@@ -1,15 +1,21 @@
 "use client";
 
+import { useEffect } from "react";
 import { useCartStore } from "@/store/cart.store";
 import { X, Plus, Minus, ShoppingBag } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatCurrency, cn } from "@/lib/utils";
+import { CartPromoSuggestions } from "@/components/product/promo-notification";
 
 export default function CartDrawer() {
-  const { items, isCartDrawerOpen, setCartDrawerOpen, removeItem, updateQuantity } = useCartStore();
+  const { items, isCartDrawerOpen, setCartDrawerOpen, removeItem, updateQuantity, hydrateCart } = useCartStore();
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  useEffect(() => {
+    void hydrateCart();
+  }, [hydrateCart]);
 
   return (
     <>
@@ -111,6 +117,9 @@ export default function CartDrawer() {
         {/* Footer */}
         {items.length > 0 && (
           <div className="p-6 border-t border-white/30 space-y-4">
+            {/* Promo Suggestions */}
+            <CartPromoSuggestions />
+
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Tạm tính:</span>
               <span className="text-lg font-bold text-foreground">{formatCurrency(subtotal)}</span>

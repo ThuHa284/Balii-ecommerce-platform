@@ -68,3 +68,29 @@ export interface ProductFilter {
   page?: number;
   limit?: number;
 }
+
+export interface Collection {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  shortDescription: string;
+  image: string;
+  bannerImage: string;
+  productIds: string[];
+  season: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ComboTier {
+  id: string;
+  name: string;
+  minItems: number;
+  freeShorts: number;
+  shortsPrice: number; // 0 = free, 119000 = discounted
+  badge: string;
+  description: string;
+  icon: string;
+}

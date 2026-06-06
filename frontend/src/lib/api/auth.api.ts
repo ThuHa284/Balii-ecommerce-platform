@@ -1,145 +1,95 @@
-import { AuthResponse, LoginCredentials, RegisterData, User, UserRole } from "@/types/user.types";
-import { ApiResponse } from "@/types/api.types";
-import apiClient from "./client";
+import apiClient from './client';
+import {
+  AuthResponse,
+  LoginCredentials,
+  RegisterData,
+  User,
+} from '@/types/user.types';
+import { mapUser } from './adapters';
+import { getMyAddresses } from './addresses.api';
 
-// ============================================
-// USE MOCK FLAG — set false when backend ready
-// ============================================
-const USE_MOCK = true;
+export async function loginApi(
+  credentials: LoginCredentials,
+): Promise<AuthResponse> {
+  const { data } = await apiClient.post('/auth/login', credentials);
 
-// ============================================
-// MOCK ACCOUNTS — hardcoded for UI testing
-// ============================================
-const MOCK_ACCOUNTS = [
-  {
-    email: "user@gmail.com",
-    password: "123456",
-    user: {
-      id: "usr_001",
-      email: "user@gmail.com",
-      fullName: "Nguyễn Văn A",
-      phone: "0901234567",
-      avatar: null,
-      role: UserRole.CUSTOMER,
-      isActive: true,
-      addresses: [],
-      createdAt: "2024-01-15T00:00:00Z",
-      updatedAt: "2024-01-15T00:00:00Z",
-    } satisfies User,
-    token: "fake-jwt-token-user-123",
-  },
-  {
-    email: "admin@gmail.com",
-    password: "123456",
-    user: {
-      id: "usr_admin_001",
-      email: "admin@gmail.com",
-      fullName: "Nguyễn Văn A",
-      phone: "0909999999",
-      avatar: null,
-      role: UserRole.ADMIN,
-      isActive: true,
-      addresses: [],
-      createdAt: "2023-06-01T00:00:00Z",
-      updatedAt: "2024-01-15T00:00:00Z",
-    } satisfies User,
-    token: "fake-jwt-token-admin-456",
-  },
-];
-
-// ============================================
-// HELPER — simulate network latency
-// ============================================
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// ============================================
-// API FUNCTIONS
-// ============================================
-
-export async function loginApi(credentials: LoginCredentials): Promise<AuthResponse> {
-  if (USE_MOCK) {
-    await delay(1000); // Simulate 1s network latency
-    const account = MOCK_ACCOUNTS.find(
-      (a) => a.email === credentials.email && a.password === credentials.password
-    );
-    if (!account) {
-      throw new Error("Email hoặc mật khẩu không chính xác");
-    }
-    return { accessToken: account.token, user: account.user };
+  if (typeof window !== 'undefined') {
+    window.__BALII_ACCESS_TOKEN__ = data.accessToken;
+    window.__BALII_REFRESH_TOKEN__ = data.refreshToken;
+    window.__BALII_USER_ID__ = data.user?.id;
   }
-  const { data } = await apiClient.post<ApiResponse<AuthResponse>>("/auth/login", credentials);
-  return data.data;
+
+  const addresses = await getMyAddresses().catch(() => []);
+
+  return {
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken,
+    user: mapUser(data.user, addresses),
+  };
 }
 
-export async function registerApi(registerData: RegisterData): Promise<AuthResponse> {
-  if (USE_MOCK) {
-    await delay(800);
-    const newUser: User = {
-      id: `usr_${Date.now()}`,
-      email: registerData.email,
-      fullName: registerData.fullName,
-      phone: registerData.phone,
-      avatar: null,
-      role: UserRole.CUSTOMER,
-      isActive: true,
-      addresses: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    return { accessToken: "fake-jwt-token-new-user", user: newUser };
-  }
-  const { data } = await apiClient.post<ApiResponse<AuthResponse>>("/auth/register", registerData);
-  return data.data;
+export async function registerApi(
+  registerData: RegisterData,
+): Promise<AuthResponse> {
+  await apiClient.post('/auth/register', registerData);
+  return loginApi({
+    email: registerData.email,
+    password: registerData.password,
+  });
 }
 
 export async function logoutApi(): Promise<void> {
-  if (USE_MOCK) {
-    await delay(300);
-    return;
-  }
-  await apiClient.post("/auth/logout");
+  await apiClient.post('/auth/logout');
 }
 
 export async function refreshTokenApi(): Promise<AuthResponse> {
-  if (USE_MOCK) {
-    await delay(300);
-    return {
-      accessToken: "fake-jwt-token-refreshed",
-      user: MOCK_ACCOUNTS[0].user,
-    };
+  if (typeof window === 'undefined') {
+    throw new Error(
+      'Không thể làm mới phiên đăng nhập trong môi trường hiện tại.',
+    );
   }
-  const { data } = await apiClient.post<ApiResponse<AuthResponse>>("/auth/refresh");
-  return data.data;
+
+  const refreshToken = window.__BALII_REFRESH_TOKEN__;
+  const userId = window.__BALII_USER_ID__;
+
+  if (!refreshToken || !userId) {
+    throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+  }
+
+  const { data } = await apiClient.post('/auth/refresh', {
+    userId,
+    refreshToken,
+  });
+
+  window.__BALII_ACCESS_TOKEN__ = data.accessToken;
+  window.__BALII_REFRESH_TOKEN__ = data.refreshToken;
+  window.__BALII_USER_ID__ = data.user?.id ?? userId;
+
+  const addresses = await getMyAddresses().catch(() => []);
+
+  return {
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken,
+    user: mapUser(data.user, addresses),
+  };
 }
 
-export async function forgotPasswordApi(email: string): Promise<{ message: string }> {
-  if (USE_MOCK) {
-    await delay(800);
-    return { message: "Đã gửi link đặt lại mật khẩu đến email của bạn" };
-  }
-  const { data } = await apiClient.post<ApiResponse<{ message: string }>>("/auth/forgot-password", {
-    email,
-  });
-  return data.data;
+export async function forgotPasswordApi(
+  email: string,
+): Promise<{ message: string }> {
+  return {
+    message: `Tính năng quên mật khẩu chưa được hỗ trợ. Vui lòng liên hệ hỗ trợ cho ${email}.`,
+  };
 }
 
-export async function resetPasswordApi(token: string, password: string): Promise<{ message: string }> {
-  if (USE_MOCK) {
-    await delay(800);
-    return { message: "Đặt lại mật khẩu thành công" };
-  }
-  const { data } = await apiClient.post<ApiResponse<{ message: string }>>("/auth/reset-password", {
-    token,
-    password,
-  });
-  return data.data;
+export async function resetPasswordApi(): Promise<{ message: string }> {
+  return {
+    message: 'Tính năng đặt lại mật khẩu chưa được hỗ trợ trên hệ thống này.',
+  };
 }
 
 export async function getProfileApi(): Promise<User> {
-  if (USE_MOCK) {
-    await delay(500);
-    return MOCK_ACCOUNTS[0].user;
-  }
-  const { data } = await apiClient.get<ApiResponse<User>>("/auth/profile");
-  return data.data;
+  const { data } = await apiClient.get('/users/me');
+  const addresses = await getMyAddresses().catch(() => []);
+  return mapUser(data, addresses);
 }

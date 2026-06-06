@@ -1,14 +1,12 @@
 -- ============================================================
--- BALII SLEEPWEAR — CẤU TRÚC DATABASE MICROSERVICES
+-- BALII ECOMMERCE PLATFORM - DATABASE INIT SCHEMA
 -- ============================================================
 
--- Bật extension hỗ trợ sinh UUID tự động 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
--- Hỗ trợ full-text search bổ sung [cite: 50]
-CREATE EXTENSION IF NOT EXISTS "pg_trgm"; 
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- ============================================================
--- 1. SCHEMA: user_service [cite: 51]
+-- 1. user_service
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS user_service;
 
@@ -44,7 +42,6 @@ CREATE TABLE user_service.oauth_accounts (
     UNIQUE (provider, provider_user_id)
 );
 
--- Tách địa chỉ hành chính thành 3 lookup tables để đạt 3NF
 CREATE TABLE user_service.provinces (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -75,7 +72,6 @@ CREATE TABLE user_service.user_addresses (
     is_default BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- Bổ sung ip_address và user_agent phục vụ Audit/Security [cite: 23]
 CREATE TABLE user_service.email_verifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES user_service.users(id) ON DELETE CASCADE,
@@ -97,7 +93,7 @@ CREATE TABLE user_service.password_resets (
 );
 
 -- ============================================================
--- 2. SCHEMA: product_service [cite: 57]
+-- 2. product_service
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS product_service;
 
@@ -118,14 +114,15 @@ CREATE TABLE product_service.products (
     slug VARCHAR(280) UNIQUE NOT NULL,
     description TEXT,
     base_price NUMERIC(12,2) NOT NULL,
+    original_price NUMERIC(12,2),
+    sale_price NUMERIC(12,2),
     material VARCHAR(100),
     is_active BOOLEAN DEFAULT TRUE,
-    es_sync_status BOOLEAN DEFAULT FALSE, -- Tracking đồng bộ Elasticsearch [cite: 21]
+    es_sync_status BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Mô hình EAV nhẹ cho biến thể [cite: 7]
 CREATE TABLE product_service.attributes (
     id SERIAL PRIMARY KEY,
     name VARCHAR(50) UNIQUE NOT NULL
@@ -147,7 +144,12 @@ CREATE TABLE product_service.product_variants (
     reserved_quantity INT DEFAULT 0,
     weight_gram INT,
     is_active BOOLEAN DEFAULT TRUE,
-    es_sync_status BOOLEAN DEFAULT FALSE -- Tracking đồng bộ Elasticsearch [cite: 21]
+    es_sync_status BOOLEAN DEFAULT FALSE,
+    item_type VARCHAR(20) NOT NULL DEFAULT 'TOP',
+    size_label VARCHAR(50),
+    color_name VARCHAR(50),
+    CONSTRAINT chk_product_variant_item_type
+        CHECK (item_type IN ('TOP', 'BOTTOM', 'SET'))
 );
 
 CREATE TABLE product_service.variant_attribute_values (
@@ -161,6 +163,7 @@ CREATE TABLE product_service.product_images (
     product_id UUID NOT NULL REFERENCES product_service.products(id) ON DELETE CASCADE,
     variant_id UUID REFERENCES product_service.product_variants(id) ON DELETE CASCADE,
     url TEXT NOT NULL,
+    public_id TEXT,
     alt_text VARCHAR(255),
     sort_order INT DEFAULT 0,
     is_primary BOOLEAN DEFAULT FALSE
@@ -169,8 +172,8 @@ CREATE TABLE product_service.product_images (
 CREATE TABLE product_service.reviews (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES product_service.products(id),
-    user_id UUID NOT NULL, 
-    order_item_id UUID, 
+    user_id UUID NOT NULL,
+    order_item_id UUID,
     rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
     title VARCHAR(150),
     body TEXT,
@@ -196,12 +199,38 @@ CREATE TABLE product_service.flash_sale_items (
     UNIQUE (flash_sale_id, variant_id)
 );
 
+CREATE TABLE product_service.bundle_options (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES product_service.products(id) ON DELETE CASCADE,
+    name VARCHAR(150) NOT NULL,
+    top_quantity INT NOT NULL DEFAULT 0,
+    bottom_quantity INT NOT NULL DEFAULT 0,
+    original_price NUMERIC(12,2) NOT NULL,
+    sale_price NUMERIC(12,2),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE product_service.collections (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(280) NOT NULL UNIQUE,
+    description TEXT,
+    short_description TEXT,
+    image_url TEXT,
+    banner_image_url TEXT,
+    product_ids UUID[] NOT NULL DEFAULT '{}',
+    season VARCHAR(100),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ============================================================
--- 3. SCHEMA: order_service [cite: 71]
+-- 3. order_service
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS order_service;
 
--- Pattern Outbox cho Order Service giao tiếp Kafka [cite: 11]
 CREATE TABLE order_service.outbox_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     aggregate_type VARCHAR(100) NOT NULL,
@@ -231,7 +260,7 @@ CREATE TABLE order_service.orders (
     user_id UUID NOT NULL,
     order_code VARCHAR(30) UNIQUE NOT NULL,
     status_id INT NOT NULL REFERENCES order_service.order_statuses(id),
-    shipping_address JSONB NOT NULL, -- Snapshot địa chỉ, tránh Foreign Key [cite: 6]
+    shipping_address JSONB NOT NULL,
     voucher_id UUID,
     subtotal NUMERIC(12,2) NOT NULL CHECK (subtotal >= 0),
     discount_amount NUMERIC(12,2) DEFAULT 0,
@@ -239,7 +268,7 @@ CREATE TABLE order_service.orders (
     total_amount NUMERIC(12,2) NOT NULL,
     note TEXT,
     shipping_method_id INT REFERENCES order_service.shipping_methods(id),
-    camunda_process_id VARCHAR(100), -- Liên kết Camunda Workflow [cite: 24, 73]
+    camunda_process_id VARCHAR(100),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -248,13 +277,15 @@ CREATE TABLE order_service.order_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     order_id UUID NOT NULL REFERENCES order_service.orders(id) ON DELETE CASCADE,
     variant_id UUID NOT NULL,
-    product_name VARCHAR(255) NOT NULL, -- Snapshot [cite: 6, 75]
+    product_name VARCHAR(255) NOT NULL,
     sku VARCHAR(100) NOT NULL,
-    variant_label VARCHAR(200), 
-    unit_price NUMERIC(12,2) NOT NULL, -- Snapshot [cite: 6, 76]
+    variant_label VARCHAR(200),
+    unit_price NUMERIC(12,2) NOT NULL,
     quantity INT NOT NULL CHECK (quantity > 0),
     subtotal NUMERIC(12,2) NOT NULL,
-    thumbnail_url TEXT
+    thumbnail_url TEXT,
+    bundle_option_id UUID,
+    selected_items JSONB
 );
 
 CREATE TABLE order_service.order_status_logs (
@@ -278,11 +309,10 @@ CREATE TABLE order_service.shipping_tracking (
 );
 
 -- ============================================================
--- 4. SCHEMA: payment_service [cite: 81]
+-- 4. payment_service
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS payment_service;
 
--- Pattern Outbox cho Payment Service giao tiếp Kafka [cite: 11]
 CREATE TABLE payment_service.outbox_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     aggregate_type VARCHAR(100) NOT NULL,
@@ -325,7 +355,7 @@ CREATE TABLE payment_service.payments (
 CREATE TABLE payment_service.payment_webhooks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     payment_id UUID REFERENCES payment_service.payments(id),
-    raw_payload JSONB NOT NULL, -- Dễ dàng Audit và chuẩn 3NF [cite: 27, 28]
+    raw_payload JSONB NOT NULL,
     signature_valid BOOLEAN,
     processed_at TIMESTAMPTZ,
     received_at TIMESTAMPTZ DEFAULT NOW()
@@ -343,7 +373,7 @@ CREATE TABLE payment_service.refunds (
 );
 
 -- ============================================================
--- 5. SCHEMA: voucher_service (Tách độc lập theo microservices)
+-- 5. voucher_service
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS voucher_service;
 
@@ -380,7 +410,7 @@ CREATE TABLE voucher_service.voucher_usages (
 );
 
 -- ============================================================
--- 6. SCHEMA: notification_service [cite: 90]
+-- 6. notification_service
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS notification_service;
 
@@ -417,7 +447,7 @@ CREATE TABLE notification_service.notifications (
 );
 
 -- ============================================================
--- 7. SCHEMA: affiliate_service 
+-- 7. affiliate_service
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS affiliate_service;
 
@@ -463,6 +493,27 @@ CREATE TABLE affiliate_service.commissions (
     paid_at TIMESTAMPTZ
 );
 
+-- ============================================================
+-- 8. market_analysis_service
+-- ============================================================
+CREATE SCHEMA IF NOT EXISTS market_analysis_service;
+
+CREATE TABLE market_analysis_service.market_products (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    platform VARCHAR(50) NOT NULL,
+    external_id VARCHAR(255),
+    keyword VARCHAR(255),
+    name TEXT NOT NULL,
+    price NUMERIC(12,2),
+    original_price NUMERIC(12,2),
+    sold_count INT,
+    rating NUMERIC(3,2),
+    shop_name VARCHAR(255),
+    image_url TEXT,
+    product_url TEXT,
+    raw_data JSONB,
+    crawled_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 CREATE INDEX IF NOT EXISTS idx_products_name_trgm
 ON product_service.products

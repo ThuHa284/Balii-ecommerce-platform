@@ -1,24 +1,32 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
-import { OrderServiceModule } from './../src/order-service.module';
+import request from 'supertest';
+import { OrderServiceController } from './../src/order-service.controller';
+import { OrderServiceService } from './../src/order-service.service';
 
 describe('OrderServiceController (e2e)', () => {
   let app: INestApplication;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [OrderServiceModule],
+      controllers: [OrderServiceController],
+      providers: [
+        {
+          provide: OrderServiceService,
+          useValue: {
+            findMyOrders: () => [],
+          },
+        },
+      ],
     }).compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('/orders (GET)', () => {
     return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+      .get('/orders')
+      .expect(200, []);
   });
 });

@@ -1,8 +1,25 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { CartServiceModule } from './cart-service.module';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(CartServiceModule);
-  await app.listen(process.env.PORT ?? 3000);
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
+
+  app.enableCors();
+
+  await app.listen(process.env.CART_SERVICE_PORT ?? 3005);
+  console.log(
+    'Cart Service running on http://localhost:' +
+      (process.env.CART_SERVICE_PORT ?? 3005),
+  );
 }
+
 bootstrap();

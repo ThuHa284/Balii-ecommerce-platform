@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Download, RotateCcw, Sparkles, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTryOnStore } from "@/store/tryon.store";
+import { toast } from "sonner";
 
 interface TryOnResultProps {
   className?: string;
@@ -26,6 +27,7 @@ export default function TryOnResult({ className }: TryOnResultProps) {
     userImage,
     garmentImage,
     reset,
+    saveToHistory,
   } = useTryOnStore();
 
   // Determine which phase label to show based on progress
@@ -42,6 +44,16 @@ export default function TryOnResult({ className }: TryOnResultProps) {
     link.href = resultImage;
     link.download = `balii-tryon-${Date.now()}.jpg`;
     link.click();
+  };
+
+  const handleSave = () => {
+    saveToHistory();
+    reset();
+  };
+
+  const handleDiscard = () => {
+    toast.info("Đã hủy bỏ ảnh thử đồ tạm thời trên hệ thống.");
+    reset();
   };
 
   // -- Generating State --
@@ -136,20 +148,27 @@ export default function TryOnResult({ className }: TryOnResultProps) {
         </div>
 
         {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-3 mt-3">
+        <div className="space-y-2 mt-3">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleSave}
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-750 text-white text-xs font-bold transition-all active:scale-95 shadow-md shadow-violet-300/25"
+            >
+              Lưu ảnh thử đồ
+            </button>
+            <button
+              onClick={handleDiscard}
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-50/50 hover:bg-red-50 border border-red-200 text-red-600 text-xs font-bold transition-all active:scale-95"
+            >
+              Không lưu
+            </button>
+          </div>
           <button
             onClick={handleDownload}
-            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-violet-500 text-white text-sm font-medium hover:bg-violet-600 transition-all active:scale-95 shadow-lg shadow-violet-300/25"
+            className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 text-slate-700 text-xs font-bold hover:bg-white transition-all active:scale-95 shadow-sm"
           >
-            <Download className="w-4 h-4" />
-            Tải ảnh
-          </button>
-          <button
-            onClick={reset}
-            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/60 border border-white/50 text-sm font-medium text-foreground hover:bg-white/80 transition-all active:scale-95"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Thử lại
+            <Download className="w-3.5 h-3.5" />
+            Tải ảnh xuống thiết bị
           </button>
         </div>
       </div>

@@ -12,8 +12,9 @@ export interface User {
 }
 
 export enum UserRole {
-  CUSTOMER = "customer",
-  ADMIN = "admin",
+  CUSTOMER = 'customer',
+  ADMIN = 'admin',
+  SUPER_ADMIN = 'super_admin',
 }
 
 export interface Address {
@@ -30,6 +31,7 @@ export interface Address {
 
 export interface AuthResponse {
   accessToken: string;
+  refreshToken?: string;
   user: User;
 }
 

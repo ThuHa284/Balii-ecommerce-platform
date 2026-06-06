@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
-import { CartServiceController } from './cart-service.controller';
-import { CartServiceService } from './cart-service.service';
+import { RedisModule } from '@app/redis';
+import { CartController } from './cart-service.controller';
+import { CartService } from './cart-service.service';
+import { HttpModule } from '@nestjs/axios';
+import { ProductClientService } from './clients/product-client.service';
 
 @Module({
-  imports: [],
-  controllers: [CartServiceController],
-  providers: [CartServiceService],
+  imports: [RedisModule, HttpModule],
+  controllers: [CartController],
+  providers: [CartService, ProductClientService],
 })
 export class CartServiceModule {}

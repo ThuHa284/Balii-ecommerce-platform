@@ -23,7 +23,11 @@
     "noFallthroughCasesInSwitch": false,
     "baseUrl": ".",
     "paths": {
-      "@app/database": ["libs/database/src"]
-    }
+      "@app/common": ["libs/common/src"],
+      "@app/database": ["libs/database/src"],
+      "@app/kafka": ["libs/kafka/src"],
+      "@app/redis": ["libs/redis/src"]
+    },
+    "types": ["node","multer"]
   }
 }

@@ -24,7 +24,7 @@ export default function AuthLayout({
         </Link>
 
         {/* Auth Form Container */}
-        <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="w-full max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700">
           {children}
         </div>
 

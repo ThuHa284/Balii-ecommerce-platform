@@ -1,22 +1,23 @@
-import Link from "next/link";
-import { Heart, Mail, Phone, MapPin, Globe, Camera } from "lucide-react";
+import Link from 'next/link';
+import { Camera, Globe, Heart, Mail, MapPin, Phone } from 'lucide-react';
 
 export default function Footer() {
   return (
     <footer className="mt-20">
-      {/* Newsletter Section */}
-      <div className="glass-card mx-4 sm:mx-8 lg:mx-auto max-w-5xl p-8 md:p-12 mb-12 text-center">
-        <h3 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-3">
+      <div className="glass-card mx-4 mb-12 max-w-5xl p-8 text-center sm:mx-8 md:p-12 lg:mx-auto">
+        <h3 className="mb-3 font-heading text-2xl font-bold text-foreground md:text-3xl">
           Đăng ký nhận tin
         </h3>
-        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-          Nhận ngay ưu đãi <span className="text-primary font-semibold">giảm 10%</span> cho đơn hàng đầu tiên và cập nhật bộ sưu tập mới nhất
+        <p className="mx-auto mb-6 max-w-md text-muted-foreground">
+          Nhận ngay ưu đãi{' '}
+          <span className="font-semibold text-primary">giảm 10%</span> cho đơn
+          hàng đầu tiên và cập nhật bộ sưu tập mới nhất
         </p>
-        <form className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+        <form className="mx-auto flex max-w-md flex-col gap-3 sm:flex-row">
           <input
             type="email"
             placeholder="Nhập email của bạn..."
-            className="flex-1 px-5 py-3 rounded-xl bg-white/70 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm placeholder:text-muted-foreground/60"
+            className="flex-1 rounded-xl border border-white/50 bg-white/70 px-5 py-3 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-violet-300"
           />
           <button type="submit" className="btn-primary whitespace-nowrap">
             Đăng ký
@@ -24,48 +25,52 @@ export default function Footer() {
         </form>
       </div>
 
-      {/* Main Footer */}
-      <div className="glass-navbar border-t-0 border-b-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-            {/* Brand */}
+      <div className="glass-navbar border-b-0 border-t-0">
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4">
             <div>
-              <Link href="/" className="inline-block mb-4">
-                <span className="font-heading text-3xl font-bold text-gradient">Balii</span>
-                <span className="block text-xs tracking-[0.3em] text-muted-foreground uppercase mt-1">
+              <Link href="/" className="mb-4 inline-block">
+                <span className="font-heading text-3xl font-bold text-gradient">
+                  Balii
+                </span>
+                <span className="mt-1 block text-xs uppercase tracking-[0.3em] text-muted-foreground">
                   Sleepwear
                 </span>
               </Link>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                Đồ ngủ lụa cao cấp dành cho những giấc ngủ ngọt ngào. 
-                Chất liệu lụa tự nhiên, thiết kế thanh lịch, 
-                giá cả hợp lý.
+              <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+                Đồ ngủ dành cho những giấc ngủ ngọt ngào. Chất liệu
+                lụa tự nhiên, thiết kế thanh lịch, giá cả hợp lý.
               </p>
               <div className="flex gap-3">
-                <a href="#" className="p-2.5 rounded-xl bg-white/50 hover:bg-violet-50 transition-colors clickable">
-                  <Globe className="w-4 h-4 text-foreground" />
+                <a
+                  href="#"
+                  className="clickable rounded-xl bg-white/50 p-2.5 transition-colors hover:bg-violet-50"
+                >
+                  <Globe className="h-4 w-4 text-foreground" />
                 </a>
-                <a href="#" className="p-2.5 rounded-xl bg-white/50 hover:bg-violet-50 transition-colors clickable">
-                  <Camera className="w-4 h-4 text-foreground" />
+                <a
+                  href="#"
+                  className="clickable rounded-xl bg-white/50 p-2.5 transition-colors hover:bg-violet-50"
+                >
+                  <Camera className="h-4 w-4 text-foreground" />
                 </a>
               </div>
             </div>
 
-            {/* Quick Links */}
             <div>
-              <h4 className="font-heading text-lg font-semibold mb-4">Sản phẩm</h4>
+              <h4 className="mb-4 font-heading text-lg font-semibold">
+                Sản phẩm
+              </h4>
               <ul className="space-y-2.5">
                 {[
-                  { href: "/categories/do-ngu-lua", label: "Đồ ngủ lụa" },
-                  { href: "/categories/pyjama", label: "Pyjama" },
-                  { href: "/categories/ao-choang", label: "Áo choàng" },
-                  { href: "/categories/dam-ngu", label: "Đầm ngủ" },
-                  { href: "/products", label: "Tất cả sản phẩm" },
+                  { href: '/categories/do-ngu', label: 'Đồ ngủ' },
+                  { href: '/categories/dam-ngu', label: 'Đầm ngủ' },
+                  { href: '/products', label: 'Tất cả sản phẩm' },
                 ].map((link) => (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                      className="text-sm text-muted-foreground transition-colors hover:text-primary"
                     >
                       {link.label}
                     </Link>
@@ -74,56 +79,64 @@ export default function Footer() {
               </ul>
             </div>
 
-            {/* Policies */}
             <div>
-              <h4 className="font-heading text-lg font-semibold mb-4">Chính sách</h4>
+              <h4 className="mb-4 font-heading text-lg font-semibold">
+                Hỗ trợ & Chính sách
+              </h4>
               <ul className="space-y-2.5">
                 {[
-                  "Chính sách đổi trả",
-                  "Chính sách vận chuyển",
-                  "Chính sách bảo mật",
-                  "Điều khoản sử dụng",
-                  "Câu hỏi thường gặp",
+                  { href: '/faq', label: 'Câu hỏi thường gặp (FAQ)' },
+                  { href: '/contact', label: 'Liên hệ trực tuyến' },
+                  { href: '#', label: 'Chính sách đổi trả' },
+                  { href: '#', label: 'Chính sách vận chuyển' },
+                  { href: '#', label: 'Chính sách bảo mật' },
                 ].map((item) => (
-                  <li key={item}>
-                    <Link href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                      {item}
+                  <li key={item.label}>
+                    <Link
+                      href={item.href}
+                      className="text-sm text-muted-foreground transition-colors hover:text-primary"
+                    >
+                      {item.label}
                     </Link>
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* Contact */}
             <div>
-              <h4 className="font-heading text-lg font-semibold mb-4">Liên hệ</h4>
+              <h4 className="mb-4 font-heading text-lg font-semibold">
+                Liên hệ
+              </h4>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
-                  <MapPin className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <span className="text-sm text-muted-foreground">
-                    123 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh
+                    Quận Gò Vấp, TP. Hồ Chí Minh
                   </span>
                 </li>
                 <li className="flex items-center gap-3">
-                  <Phone className="w-4 h-4 text-primary shrink-0" />
-                  <span className="text-sm text-muted-foreground">0901 234 567</span>
+                  <Phone className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="text-sm text-muted-foreground">
+                    0966 967 440
+                  </span>
                 </li>
                 <li className="flex items-center gap-3">
-                  <Mail className="w-4 h-4 text-primary shrink-0" />
-                  <span className="text-sm text-muted-foreground">hello@balii.vn</span>
+                  <Mail className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="text-sm text-muted-foreground">
+                    hello@balii.vn
+                  </span>
                 </li>
               </ul>
             </div>
           </div>
 
-          {/* Bottom Bar */}
-          <div className="border-t border-white/30 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
+          <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-white/30 pt-6 sm:flex-row">
             <p className="text-xs text-muted-foreground">
-              © 2024 Balii Sleepwear. Tất cả quyền được bảo lưu.
+              © 2026 Balii Sleepwear. Tất cả quyền được bảo lưu.
             </p>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span>Thiết kế với</span>
-              <Heart className="w-3 h-3 text-violet-500 fill-violet-500" />
+              <Heart className="h-3 w-3 fill-violet-500 text-violet-500" />
               <span>tại Việt Nam</span>
             </div>
           </div>

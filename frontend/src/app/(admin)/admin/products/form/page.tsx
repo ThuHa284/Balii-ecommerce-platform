@@ -1,26 +1,41 @@
-"use client";
+'use client';
 
-import { useState, useRef, useCallback, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import Image from "next/image";
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
 import {
   ArrowLeft,
-  Save,
-  Upload,
-  X,
-  Plus,
-  Trash2,
-  ImageIcon,
   GripVertical,
-} from "lucide-react";
-import Link from "next/link";
-import { MOCK_PRODUCTS, MOCK_CATEGORIES } from "@/lib/api/mock-data";
-import { SIZES, COLORS } from "@/lib/constants";
-import { formatCurrency } from "@/lib/utils";
-import { toast } from "sonner";
+  ImageIcon,
+  Plus,
+  Save,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { SIZES, COLORS } from '@/lib/constants';
+import { getCategories } from '@/lib/api/categories.api';
+import { canDeleteAdminResource } from '@/lib/api/admin.utils';
+import {
+  createProduct,
+  createProductVariant,
+  deleteProductImage,
+  deleteProductVariant,
+  getAdminProducts,
+  getProductImages,
+  ProductImageRecord,
+  updateProduct,
+  updateProductVariant,
+  uploadProductImage,
+} from '@/lib/api/products.api';
+import { formatCurrency } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth.store';
+import { Category, Product } from '@/types/product.types';
 
 interface VariantRow {
-  id: string;
+  id?: string;
+  clientId: string;
   size: string;
   color: string;
   colorCode: string;
@@ -28,163 +43,337 @@ interface VariantRow {
   price: number;
   salePrice: number | null;
   stock: number;
+  isExisting: boolean;
+}
+
+interface ImageRow {
+  id?: string;
+  url: string;
+  file?: File;
+  isExisting: boolean;
 }
 
 function ProductFormContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const editSlug = searchParams.get("edit");
-  const existingProduct = editSlug
-    ? MOCK_PRODUCTS.find((p) => p.slug === editSlug)
-    : null;
-  const isEdit = !!existingProduct;
+  const productId = searchParams.get('id');
+  const legacyEditSlug = searchParams.get('edit');
+  const userRole = useAuthStore((state) => state.user?.role);
+  const canDelete = canDeleteAdminResource(userRole);
 
-  // Form state
-  const [name, setName] = useState(existingProduct?.name || "");
-  const [slug, setSlug] = useState(existingProduct?.slug || "");
-  const [description, setDescription] = useState(
-    existingProduct?.description || ""
-  );
-  const [shortDescription, setShortDescription] = useState(
-    existingProduct?.shortDescription || ""
-  );
-  const [categoryId, setCategoryId] = useState(
-    existingProduct?.categoryId || ""
-  );
-  const [basePrice, setBasePrice] = useState(
-    existingProduct?.basePrice?.toString() || ""
-  );
-  const [salePrice, setSalePrice] = useState(
-    existingProduct?.salePrice?.toString() || ""
-  );
-  const [tags, setTags] = useState(existingProduct?.tags?.join(", ") || "");
-  const [isFeatured, setIsFeatured] = useState(
-    existingProduct?.isFeatured || false
-  );
-  const [isNew, setIsNew] = useState(existingProduct?.isNew || false);
-
-  // Images
-  const [images, setImages] = useState<string[]>(
-    existingProduct?.images || []
-  );
-  const imageInputRef = useRef<HTMLInputElement>(null);
-
-  // Variants
-  const [variants, setVariants] = useState<VariantRow[]>(
-    existingProduct?.variants?.map((v) => ({
-      id: v.id,
-      size: v.size,
-      color: v.color,
-      colorCode: v.colorCode,
-      sku: v.sku,
-      price: v.price,
-      salePrice: v.salePrice,
-      stock: v.stock,
-    })) || []
-  );
-
+  const [existingProduct, setExistingProduct] = useState<Product | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Auto-generate slug from name
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [description, setDescription] = useState('');
+  const [shortDescription, setShortDescription] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [basePrice, setBasePrice] = useState('');
+  const [salePrice, setSalePrice] = useState('');
+  const [material, setMaterial] = useState('');
+  const [images, setImages] = useState<ImageRow[]>([]);
+  const [variants, setVariants] = useState<VariantRow[]>([]);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const isEdit = !!existingProduct;
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [categoryData, productData] = await Promise.all([
+          getCategories(),
+          productId || legacyEditSlug
+            ? getAdminProducts()
+            : Promise.resolve([]),
+        ]);
+
+        setCategories(categoryData);
+
+        const matchedProduct =
+          productData.find((product) => product.id === productId) ??
+          productData.find((product) => product.slug === legacyEditSlug) ??
+          null;
+
+        if (matchedProduct) {
+          const imageData = await getProductImages(matchedProduct.id);
+          hydrateForm(matchedProduct, imageData);
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Không tải được dữ liệu sản phẩm.',
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadData();
+  }, [legacyEditSlug, productId]);
+
+  const hydrateForm = (product: Product, imageData: ProductImageRecord[]) => {
+    setExistingProduct(product);
+    setName(product.name);
+    setSlug(product.slug);
+    setDescription(product.description || '');
+    setShortDescription(product.shortDescription || '');
+    setCategoryId(product.categoryId || '');
+    setBasePrice(product.basePrice ? String(product.basePrice) : '');
+    setSalePrice(product.salePrice != null ? String(product.salePrice) : '');
+    setMaterial('');
+    setImages(
+      imageData.map((image) => ({
+        id: image.id,
+        url: image.url,
+        isExisting: true,
+      })),
+    );
+    setVariants(
+      product.variants.map((variant) => ({
+        id: variant.id,
+        clientId: variant.id,
+        size: variant.size,
+        color: variant.color,
+        colorCode: variant.colorCode,
+        sku: variant.sku,
+        price: variant.price,
+        salePrice: variant.salePrice,
+        stock: variant.stock,
+        isExisting: true,
+      })),
+    );
+  };
+
   const handleNameChange = (value: string) => {
     setName(value);
     if (!isEdit) {
       setSlug(
         value
           .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/đ/g, "d")
-          .replace(/[^a-z0-9\s]/g, "")
-          .replace(/\s+/g, "-")
-          .replace(/-+/g, "-")
-          .trim()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/đ/g, 'd')
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .trim(),
       );
     }
   };
 
-  // Image handling
-  const handleImageUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files) return;
-      const newImages: string[] = [];
-      Array.from(files).forEach((file) => {
-        if (file.size > 10 * 1024 * 1024) {
-          toast.error(`${file.name} quá lớn (tối đa 10MB)`);
-          return;
-        }
-        newImages.push(URL.createObjectURL(file));
-      });
-      setImages((prev) => [...prev, ...newImages]);
-      if (imageInputRef.current) imageInputRef.current.value = "";
-    },
-    []
-  );
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
 
-  const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
+    const nextImages: ImageRow[] = [];
+    for (const file of files) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} quá lớn (tối đa 10MB).`);
+        continue;
+      }
+
+      nextImages.push({
+        url: URL.createObjectURL(file),
+        file,
+        isExisting: false,
+      });
+    }
+
+    setImages((current) => [...current, ...nextImages]);
+    if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
-  // Variant handling
+  const removeImage = async (index: number) => {
+    const target = images[index];
+    if (!target) return;
+
+    if (target.isExisting) {
+      if (!canDelete) {
+        toast.error('Chỉ super admin mới có quyền xóa ảnh đã lưu.');
+        return;
+      }
+
+      try {
+        await deleteProductImage(target.id!);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : 'Xóa ảnh thất bại.',
+        );
+        return;
+      }
+    } else if (target.url.startsWith('blob:')) {
+      URL.revokeObjectURL(target.url);
+    }
+
+    setImages((current) =>
+      current.filter((_, currentIndex) => currentIndex !== index),
+    );
+  };
+
   const addVariant = () => {
-    setVariants((prev) => [
-      ...prev,
+    setVariants((current) => [
+      ...current,
       {
-        id: `new_var_${Date.now()}`,
-        size: "M",
-        color: "Hồng pastel",
-        colorCode: "#F8BBD0",
-        sku: "",
+        clientId: `new-${Date.now()}-${current.length}`,
+        size: 'M',
+        color: 'Hồng pastel',
+        colorCode: '#F8BBD0',
+        sku: '',
         price: Number(basePrice) || 0,
         salePrice: salePrice ? Number(salePrice) : null,
         stock: 0,
+        isExisting: false,
       },
     ]);
   };
 
-  const updateVariant = (
+  const updateVariantField = (
     index: number,
     field: keyof VariantRow,
-    value: string | number | null
+    value: string | number | null | boolean,
   ) => {
-    setVariants((prev) =>
-      prev.map((v, i) => (i === index ? { ...v, [field]: value } : v))
+    setVariants((current) =>
+      current.map((variant, currentIndex) =>
+        currentIndex === index ? { ...variant, [field]: value } : variant,
+      ),
     );
   };
 
-  const removeVariant = (index: number) => {
-    setVariants((prev) => prev.filter((_, i) => i !== index));
+  const removeVariant = async (index: number) => {
+    const target = variants[index];
+    if (!target) return;
+
+    if (target.isExisting) {
+      if (!canDelete) {
+        toast.error('Chỉ super admin mới có quyền xóa biến thể đã lưu.');
+        return;
+      }
+
+      try {
+        await deleteProductVariant(target.id!);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : 'Xóa biến thể thất bại.',
+        );
+        return;
+      }
+    }
+
+    setVariants((current) =>
+      current.filter((_, currentIndex) => currentIndex !== index),
+    );
   };
 
-  // Save
-  const handleSave = async () => {
+  const validateForm = () => {
     if (!name.trim()) {
-      toast.error("Vui lòng nhập tên sản phẩm");
-      return;
+      toast.error('Vui lòng nhập tên sản phẩm.');
+      return false;
+    }
+    if (!slug.trim()) {
+      toast.error('Vui lòng nhập slug.');
+      return false;
     }
     if (!categoryId) {
-      toast.error("Vui lòng chọn danh mục");
-      return;
+      toast.error('Vui lòng chọn danh mục.');
+      return false;
     }
     if (!basePrice) {
-      toast.error("Vui lòng nhập giá gốc");
-      return;
+      toast.error('Vui lòng nhập giá gốc.');
+      return false;
     }
-
-    setIsSaving(true);
-    // Simulate API call
-    await new Promise((r) => setTimeout(r, 1500));
-    setIsSaving(false);
-    toast.success(
-      isEdit ? "Cập nhật sản phẩm thành công!" : "Thêm sản phẩm thành công!"
-    );
-    router.push("/admin/products");
+    if (variants.some((variant) => !variant.sku.trim())) {
+      toast.error('Mỗi biến thể phải có SKU.');
+      return false;
+    }
+    return true;
   };
+
+  const syncVariants = async (savedProductId: string) => {
+    for (const variant of variants) {
+      const payload = {
+        sku: variant.sku.trim(),
+        price: variant.price || Number(basePrice),
+        stockQuantity: variant.stock,
+        itemType: 'SET' as const,
+        sizeLabel: variant.size,
+        colorName: variant.color,
+      };
+
+      if (variant.isExisting && variant.id) {
+        await updateProductVariant(variant.id, payload);
+      } else {
+        await createProductVariant(savedProductId, payload);
+      }
+    }
+  };
+
+  const syncImages = async (savedProductId: string) => {
+    for (const image of images) {
+      if (image.file) {
+        await uploadProductImage(savedProductId, image.file);
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) return;
+
+    try {
+      setIsSaving(true);
+
+      const payload = {
+        categoryId,
+        name: name.trim(),
+        slug: slug.trim(),
+        description: description.trim(),
+        basePrice: Number(basePrice),
+        originalPrice: Number(basePrice),
+        salePrice: salePrice ? Number(salePrice) : null,
+        material: material.trim() || undefined,
+        isActive: true,
+      };
+
+      const savedProduct =
+        isEdit && existingProduct
+          ? await updateProduct(existingProduct.id, payload)
+          : await createProduct(payload);
+
+      await syncVariants(savedProduct.id);
+      await syncImages(savedProduct.id);
+
+      toast.success(
+        isEdit ? 'Cập nhật sản phẩm thành công.' : 'Thêm sản phẩm thành công.',
+      );
+      router.push('/admin/products');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Lưu sản phẩm thất bại.',
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const previewPrice = useMemo(
+    () => formatCurrency(Number(salePrice) || Number(basePrice) || 0),
+    [basePrice, salePrice],
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-10 h-10 border-2 border-violet-300 border-t-violet-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <Link
@@ -195,17 +384,17 @@ function ProductFormContent() {
           </Link>
           <div>
             <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground">
-              {isEdit ? "Sửa sản phẩm" : "Thêm sản phẩm"}
+              {isEdit ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}
             </h1>
-            {isEdit && (
+            {isEdit && existingProduct ? (
               <p className="text-sm text-muted-foreground mt-0.5">
-                {existingProduct?.name}
+                {existingProduct.name}
               </p>
-            )}
+            ) : null}
           </div>
         </div>
         <button
-          onClick={handleSave}
+          onClick={() => void handleSave()}
           disabled={isSaving}
           className="btn-primary flex items-center gap-2 disabled:opacity-50"
         >
@@ -214,14 +403,12 @@ function ProductFormContent() {
           ) : (
             <Save className="w-4 h-4" />
           )}
-          {isSaving ? "Đang lưu..." : isEdit ? "Cập nhật" : "Tạo sản phẩm"}
+          {isSaving ? 'Đang lưu...' : isEdit ? 'Cập nhật' : 'Tạo sản phẩm'}
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column — Main info */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Basic Info */}
           <div className="glass-card p-6">
             <h2 className="font-heading text-lg font-semibold text-foreground mb-5">
               Thông tin cơ bản
@@ -277,7 +464,6 @@ function ProductFormContent() {
             </div>
           </div>
 
-          {/* Images */}
           <div className="glass-card p-6">
             <h2 className="font-heading text-lg font-semibold text-foreground mb-5">
               Hình ảnh sản phẩm
@@ -291,26 +477,31 @@ function ProductFormContent() {
               className="hidden"
             />
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {images.map((img, i) => (
+              {images.map((img, index) => (
                 <div
-                  key={i}
+                  key={`${img.id ?? 'new'}-${img.url}-${index}`}
                   className="relative aspect-square rounded-xl overflow-hidden glass-card group"
                 >
                   <Image
-                    src={img}
-                    alt={`Ảnh ${i + 1}`}
+                    src={img.url}
+                    alt={`Ảnh ${index + 1}`}
                     fill
                     className="object-cover"
                     sizes="200px"
                   />
-                  {i === 0 && (
+                  {index === 0 ? (
                     <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-violet-500 text-white text-[10px] font-bold">
                       Chính
                     </span>
-                  )}
+                  ) : null}
                   <button
-                    onClick={() => removeImage(i)}
+                    onClick={() => void removeImage(index)}
                     className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500/90 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 active:scale-90"
+                    title={
+                      img.isExisting && !canDelete
+                        ? 'Chỉ super admin mới được xóa ảnh đã lưu'
+                        : 'Xóa ảnh'
+                    }
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -319,8 +510,6 @@ function ProductFormContent() {
                   </div>
                 </div>
               ))}
-
-              {/* Add button */}
               <button
                 onClick={() => imageInputRef.current?.click()}
                 className="aspect-square rounded-xl border-2 border-dashed border-violet-300/50 hover:border-violet-400 flex flex-col items-center justify-center gap-2 transition-all hover:bg-white/40 active:scale-95"
@@ -333,7 +522,6 @@ function ProductFormContent() {
             </div>
           </div>
 
-          {/* Variants */}
           <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-heading text-lg font-semibold text-foreground">
@@ -361,18 +549,23 @@ function ProductFormContent() {
               </div>
             ) : (
               <div className="space-y-3">
-                {variants.map((variant, idx) => (
+                {variants.map((variant, index) => (
                   <div
-                    key={variant.id}
+                    key={variant.clientId}
                     className="p-4 rounded-xl bg-white/40 border border-white/30"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Biến thể #{idx + 1}
+                        Biến thể #{index + 1}
                       </span>
                       <button
-                        onClick={() => removeVariant(idx)}
+                        onClick={() => void removeVariant(index)}
                         className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                        title={
+                          variant.isExisting && !canDelete
+                            ? 'Chỉ super admin mới được xóa biến thể đã lưu'
+                            : 'Xóa biến thể'
+                        }
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -385,13 +578,13 @@ function ProductFormContent() {
                         <select
                           value={variant.size}
                           onChange={(e) =>
-                            updateVariant(idx, "size", e.target.value)
+                            updateVariantField(index, 'size', e.target.value)
                           }
                           className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                         >
-                          {SIZES.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
+                          {SIZES.map((size) => (
+                            <option key={size} value={size}>
+                              {size}
                             </option>
                           ))}
                         </select>
@@ -404,17 +597,21 @@ function ProductFormContent() {
                           value={variant.color}
                           onChange={(e) => {
                             const color = COLORS.find(
-                              (c) => c.name === e.target.value
+                              (item) => item.name === e.target.value,
                             );
-                            updateVariant(idx, "color", e.target.value);
+                            updateVariantField(index, 'color', e.target.value);
                             if (color)
-                              updateVariant(idx, "colorCode", color.value);
+                              updateVariantField(
+                                index,
+                                'colorCode',
+                                color.value,
+                              );
                           }}
                           className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                         >
-                          {COLORS.map((c) => (
-                            <option key={c.name} value={c.name}>
-                              {c.name}
+                          {COLORS.map((color) => (
+                            <option key={color.name} value={color.name}>
+                              {color.name}
                             </option>
                           ))}
                         </select>
@@ -427,7 +624,7 @@ function ProductFormContent() {
                           type="text"
                           value={variant.sku}
                           onChange={(e) =>
-                            updateVariant(idx, "sku", e.target.value)
+                            updateVariantField(index, 'sku', e.target.value)
                           }
                           placeholder="BDN-HP-M"
                           className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
@@ -441,7 +638,11 @@ function ProductFormContent() {
                           type="number"
                           value={variant.stock}
                           onChange={(e) =>
-                            updateVariant(idx, "stock", Number(e.target.value))
+                            updateVariantField(
+                              index,
+                              'stock',
+                              Number(e.target.value),
+                            )
                           }
                           min={0}
                           className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
@@ -455,7 +656,11 @@ function ProductFormContent() {
                           type="number"
                           value={variant.price}
                           onChange={(e) =>
-                            updateVariant(idx, "price", Number(e.target.value))
+                            updateVariantField(
+                              index,
+                              'price',
+                              Number(e.target.value),
+                            )
                           }
                           className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                         />
@@ -466,12 +671,12 @@ function ProductFormContent() {
                         </label>
                         <input
                           type="number"
-                          value={variant.salePrice ?? ""}
+                          value={variant.salePrice ?? ''}
                           onChange={(e) =>
-                            updateVariant(
-                              idx,
-                              "salePrice",
-                              e.target.value ? Number(e.target.value) : null
+                            updateVariantField(
+                              index,
+                              'salePrice',
+                              e.target.value ? Number(e.target.value) : null,
                             )
                           }
                           placeholder="Bỏ trống nếu không sale"
@@ -486,9 +691,7 @@ function ProductFormContent() {
           </div>
         </div>
 
-        {/* Right Column — Sidebar */}
         <div className="space-y-6">
-          {/* Category & Price */}
           <div className="glass-card p-6">
             <h2 className="font-heading text-lg font-semibold text-foreground mb-5">
               Phân loại & Giá
@@ -504,9 +707,9 @@ function ProductFormContent() {
                   className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
                 >
                   <option value="">Chọn danh mục</option>
-                  {MOCK_CATEGORIES.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
                     </option>
                   ))}
                 </select>
@@ -535,76 +738,33 @@ function ProductFormContent() {
                   className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
                 />
               </div>
-              {basePrice && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Chất liệu
+                </label>
+                <input
+                  type="text"
+                  value={material}
+                  onChange={(e) => setMaterial(e.target.value)}
+                  placeholder="VD: Lụa satin"
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
+                />
+              </div>
+              {basePrice ? (
                 <div className="p-3 rounded-xl bg-violet-50/50">
                   <p className="text-xs text-muted-foreground mb-1">
                     Hiển thị:
                   </p>
                   <p className="text-lg font-bold text-primary">
-                    {formatCurrency(
-                      Number(salePrice) || Number(basePrice)
-                    )}
+                    {previewPrice}
                   </p>
-                  {salePrice && (
+                  {salePrice ? (
                     <p className="text-xs text-muted-foreground line-through">
                       {formatCurrency(Number(basePrice))}
                     </p>
-                  )}
+                  ) : null}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Tags & Flags */}
-          <div className="glass-card p-6">
-            <h2 className="font-heading text-lg font-semibold text-foreground mb-5">
-              Tags & Đánh dấu
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Tags (cách nhau bằng dấu phẩy)
-                </label>
-                <input
-                  type="text"
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
-                  placeholder="lụa, cao cấp, hồng"
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
-                />
-              </div>
-              <label className="flex items-center gap-3 p-3 rounded-xl bg-white/40 cursor-pointer hover:bg-white/60 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={isFeatured}
-                  onChange={(e) => setIsFeatured(e.target.checked)}
-                  className="w-4 h-4 rounded border-violet-300 text-violet-500 focus:ring-violet-300"
-                />
-                <div>
-                  <span className="text-sm font-medium text-foreground">
-                    Sản phẩm nổi bật
-                  </span>
-                  <p className="text-xs text-muted-foreground">
-                    Hiển thị trên trang chủ
-                  </p>
-                </div>
-              </label>
-              <label className="flex items-center gap-3 p-3 rounded-xl bg-white/40 cursor-pointer hover:bg-white/60 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={isNew}
-                  onChange={(e) => setIsNew(e.target.checked)}
-                  className="w-4 h-4 rounded border-violet-300 text-violet-500 focus:ring-violet-300"
-                />
-                <div>
-                  <span className="text-sm font-medium text-foreground">
-                    Hàng mới về
-                  </span>
-                  <p className="text-xs text-muted-foreground">
-                    Badge &quot;Mới&quot; trên card
-                  </p>
-                </div>
-              </label>
+              ) : null}
             </div>
           </div>
         </div>

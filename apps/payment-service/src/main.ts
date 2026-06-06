@@ -1,8 +1,17 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { PaymentServiceModule } from './payment-service.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(PaymentServiceModule);
-  await app.listen(process.env.PORT ?? 3000);
+  app.enableCors();
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
+  await app.listen(process.env.PAYMENT_SERVICE_PORT ?? 3005);
 }
 bootstrap();

@@ -13,7 +13,7 @@ export default function ChatWidget() {
     {
       id: "welcome",
       role: "assistant",
-      content: "Xin chào! Tôi là trợ lý AI của Balii Sleepwear 💕\nBạn cần tư vấn gì về đồ ngủ lụa không?",
+      content: "Xin chào! Tôi là trợ lý AI của Balii Sleepwear 💕\nBạn cần tư vấn gì về đồ ngủ không?",
       timestamp: new Date().toISOString(),
     },
   ]);

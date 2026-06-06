@@ -1,15 +1,44 @@
-import { PaymentResponse } from "@/types/payment.types";
-import { ApiResponse } from "@/types/api.types";
-import apiClient from "./client";
+import apiClient from './client';
 
-const USE_MOCK = true;
+type PaymentApiResponse = {
+  id: string;
+  paymentUrl?: string | null;
+  providerRef?: string | null;
+  paymentCode?: string | null;
+  transactionId?: string | null;
+};
 
-export async function createPayment(orderId: string, method: string, returnUrl: string): Promise<PaymentResponse> {
-  if (USE_MOCK) {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve({ paymentUrl: "/checkout/success", transactionId: "txn_mock_001" }), 800)
-    );
-  }
-  const { data } = await apiClient.post<ApiResponse<PaymentResponse>>("/payment/create", { orderId, method, returnUrl });
-  return data.data;
+export type PaymentResponse = {
+  id: string;
+  paymentUrl: string;
+  transactionId: string;
+};
+
+export async function createPayment(
+  orderId: string,
+  method: string,
+  returnUrl: string,
+): Promise<PaymentResponse> {
+  const { data } = await apiClient.post<PaymentApiResponse>('/payments', {
+    orderId,
+    method: method === 'cod' ? 'cod' : 'mock_online',
+    returnUrl,
+  });
+
+  return {
+    id: data.id,
+    paymentUrl: data.paymentUrl ?? returnUrl,
+    transactionId:
+      data.transactionId ?? data.providerRef ?? data.paymentCode ?? data.id,
+  };
+}
+
+export async function completePayment(
+  paymentId: string,
+): Promise<PaymentApiResponse> {
+  const { data } = await apiClient.post<PaymentApiResponse>(
+    `/payments/${paymentId}/complete`,
+    {},
+  );
+  return data;
 }

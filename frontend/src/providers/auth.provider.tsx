@@ -5,7 +5,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { refreshTokenApi } from "@/lib/api/auth.api";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setLoading } = useAuthStore();
+  const { setUser, setLoading, hydrateAddresses } = useAuthStore();
 
   useEffect(() => {
     async function hydrateAuth() {
@@ -16,8 +16,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(result.user);
         useAuthStore.setState({
           token: result.accessToken,
+          refreshToken: result.refreshToken ?? null,
           isAuthenticated: true,
         });
+        if (typeof window !== "undefined") {
+          window.__BALII_ACCESS_TOKEN__ = result.accessToken;
+          window.__BALII_REFRESH_TOKEN__ = result.refreshToken;
+          window.__BALII_USER_ID__ = result.user.id;
+        }
+        await hydrateAddresses();
       } catch {
         // Not authenticated, that's fine
       } finally {
@@ -25,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     hydrateAuth();
-  }, [setUser, setLoading]);
+  }, [setUser, setLoading, hydrateAddresses]);
 
   return <>{children}</>;
 }

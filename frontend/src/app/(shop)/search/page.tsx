@@ -1,19 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import ProductGrid from "@/components/product/product-grid";
-import { MOCK_PRODUCTS } from "@/lib/api/mock-data";
 import { useSearchParams } from "next/navigation";
+import { Product } from "@/types/product.types";
+import { getProducts } from "@/lib/api/products.api";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") || "";
   const [searchInput, setSearchInput] = useState(query);
+  const [results, setResults] = useState<Product[]>([]);
 
-  const results = MOCK_PRODUCTS.filter(
-    (p) => p.name.toLowerCase().includes(query.toLowerCase()) || p.description.toLowerCase().includes(query.toLowerCase())
-  );
+  useEffect(() => {
+    async function loadResults() {
+      const response = await getProducts({ search: query, limit: 100 });
+      setResults(response.products);
+    }
+
+    if (query) {
+      void loadResults();
+    } else {
+      setResults([]);
+    }
+  }, [query]);
 
   return (
     <div className="pt-28 pb-16">

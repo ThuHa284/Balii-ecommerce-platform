@@ -150,7 +150,7 @@ export class MarketAnalysisServiceService {
     const keyword = parsed.keyword || 'đồ mặc nhà nữ';
     const sources = parsed.sources?.length
       ? parsed.sources
-      : ['canifa', 'sunfly'];
+      : ['canifa', 'sunfly', 'shopee', 'tiktok_shop_public'];
 
     if (parsed.action === 'analyze_price') {
       const analysis = await this.advancedAnalyze(keyword, sources);

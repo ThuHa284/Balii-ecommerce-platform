@@ -1,24 +1,17 @@
-import { Category } from "@/types/product.types";
-import { ApiResponse } from "@/types/api.types";
 import apiClient from "./client";
-import { MOCK_CATEGORIES } from "./mock-data";
-
-const USE_MOCK = true;
+import { mapCategory } from "./adapters";
+import { Category } from "@/types/product.types";
 
 export async function getCategories(): Promise<Category[]> {
-  if (USE_MOCK) {
-    return new Promise((resolve) => setTimeout(() => resolve(MOCK_CATEGORIES), 400));
-  }
-  const { data } = await apiClient.get<ApiResponse<Category[]>>("/categories");
-  return data.data;
+  const { data } = await apiClient.get("/categories");
+  return (data as any[]).map(mapCategory);
 }
 
 export async function getCategoryBySlug(slug: string): Promise<Category | null> {
-  if (USE_MOCK) {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve(MOCK_CATEGORIES.find((c) => c.slug === slug) || null), 400)
-    );
+  try {
+    const { data } = await apiClient.get(`/categories/slug/${slug}`);
+    return mapCategory(data);
+  } catch {
+    return null;
   }
-  const { data } = await apiClient.get<ApiResponse<Category>>(`/categories/${slug}`);
-  return data.data;
 }

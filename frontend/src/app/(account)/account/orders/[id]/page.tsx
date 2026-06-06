@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, PAYMENT_METHOD_LABELS } from "@/lib/constants";
 import { getOrderById } from "@/lib/api/orders.api";
 import { Order, OrderStatus } from "@/types/order.types";
 import Link from "next/link";
 import Image from "next/image";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft, Package, CheckCircle2, Truck, Clock,
   XCircle, RotateCcw, MapPin, CreditCard, ClipboardList,
@@ -27,8 +28,9 @@ function getStepIndex(status: string) {
   return idx;
 }
 
-export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function OrderDetailPage() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
 

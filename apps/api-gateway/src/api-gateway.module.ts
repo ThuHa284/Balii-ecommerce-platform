@@ -1,10 +1,31 @@
-import { Module } from '@nestjs/common';
-import { ApiGatewayController } from './api-gateway.controller';
-import { ApiGatewayService } from './api-gateway.service';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { ApiGatewayProxyMiddleware } from './api-gateway.proxy.middleware';
+import { GatewayAuthContextMiddleware } from './gateway-auth-context.middleware';
+import { GatewayHealthController } from './gateway-health.controller';
+import { GatewayHealthService } from './gateway-health.service';
+import { GatewayRouteService } from './gateway-route.service';
 
 @Module({
-  imports: [],
-  controllers: [ApiGatewayController],
-  providers: [ApiGatewayService],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), JwtModule.register({})],
+  controllers: [GatewayHealthController],
+  providers: [
+    ApiGatewayProxyMiddleware,
+    GatewayAuthContextMiddleware,
+    GatewayHealthService,
+    GatewayRouteService,
+  ],
 })
-export class ApiGatewayModule {}
+export class ApiGatewayModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(GatewayAuthContextMiddleware, ApiGatewayProxyMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}

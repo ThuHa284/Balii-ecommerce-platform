@@ -1,15 +1,17 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/auth.store";
-import { UserRole } from "@/types/user.types";
-import { Loader2 } from "lucide-react";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/auth.store';
+import { UserRole } from '@/types/user.types';
+import { Loader2 } from 'lucide-react';
 
 interface AuthGuardProps {
   children: React.ReactNode;
   /** If provided, checks that the user has this role. Unauthorized users are redirected. */
   requiredRole?: UserRole;
+  /** If provided, accepts any role in the list. */
+  allowedRoles?: UserRole[];
   /** Where to redirect unauthenticated users. Defaults to /login */
   redirectTo?: string;
 }
@@ -21,7 +23,8 @@ interface AuthGuardProps {
 export default function AuthGuard({
   children,
   requiredRole,
-  redirectTo = "/login",
+  allowedRoles,
+  redirectTo = '/login',
 }: AuthGuardProps) {
   const router = useRouter();
   const { isAuthenticated, user, isLoading } = useAuthStore();
@@ -36,10 +39,28 @@ export default function AuthGuard({
     }
 
     // Role check — if admin route is accessed by a non-admin, send them home
-    if (requiredRole && user?.role !== requiredRole) {
-      router.replace(user?.role === UserRole.ADMIN ? "/admin/dashboard" : "/");
+    const hasRoleAccess = requiredRole
+      ? user?.role === requiredRole
+      : allowedRoles
+        ? !!user?.role && allowedRoles.includes(user.role)
+        : true;
+
+    if (!hasRoleAccess) {
+      router.replace(
+        user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN
+          ? '/admin/dashboard'
+          : '/',
+      );
     }
-  }, [isAuthenticated, isLoading, requiredRole, redirectTo, router, user?.role]);
+  }, [
+    allowedRoles,
+    isAuthenticated,
+    isLoading,
+    requiredRole,
+    redirectTo,
+    router,
+    user?.role,
+  ]);
 
   // Show a minimal loading state while Zustand rehydrates from localStorage
   if (isLoading) {
@@ -55,7 +76,13 @@ export default function AuthGuard({
 
   // Don't render children until authentication is confirmed
   if (!isAuthenticated) return null;
-  if (requiredRole && user?.role !== requiredRole) return null;
+  const hasRoleAccess = requiredRole
+    ? user?.role === requiredRole
+    : allowedRoles
+      ? !!user?.role && allowedRoles.includes(user.role)
+      : true;
+
+  if (!hasRoleAccess) return null;
 
   return <>{children}</>;
 }

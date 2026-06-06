@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, Suspense } from "react";
+import { useEffect, useCallback, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Sparkles,
@@ -11,10 +11,14 @@ import {
   User,
   Shirt,
   ImageIcon,
+  History,
+  Trash2,
+  Maximize2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTryOnStore } from "@/store/tryon.store";
-import { MOCK_PRODUCTS } from "@/lib/api/mock-data";
+import { getProductBySlug } from "@/lib/api/products.api";
 import { generateTryOn } from "@/lib/api/tryon.api";
 import TryOnUpload from "@/components/ai/try-on-upload";
 import TryOnGarmentPicker from "@/components/ai/try-on-garment-picker";
@@ -44,22 +48,24 @@ function TryOnContent() {
 
   // Pre-fill garment from query param (?product=slug)
   useEffect(() => {
-    const productSlug = searchParams.get("product");
-    if (productSlug) {
-      const product = MOCK_PRODUCTS.find((p) => p.slug === productSlug);
+    async function loadProductFromQuery() {
+      const productSlug = searchParams.get("product");
+
+      if (!productSlug) {
+        return;
+      }
+
+      const product = await getProductBySlug(productSlug);
+
       if (product) {
         setGarmentImage(product.thumbnail, product);
       }
     }
+
+    void loadProductFromQuery();
   }, [searchParams, setGarmentImage]);
 
-  // Show guide on first visit
-  useEffect(() => {
-    const dismissed = localStorage.getItem("balii-tryon-guide-dismissed");
-    if (!dismissed) {
-      setShowGuide(true);
-    }
-  }, [setShowGuide]);
+
 
   const canGenerate = !!userImage && !!garmentImage && !isGenerating && !resultImage;
 
@@ -145,13 +151,19 @@ function TryOnContent() {
             tức!
           </p>
           <button
-            onClick={() => setShowGuide(true)}
+            onClick={() => setShowGuide(!showGuide)}
             className="fade-in-up fade-in-up-delay-3 inline-flex items-center gap-1.5 mt-3 text-sm text-violet-500 hover:text-violet-600 transition-colors"
           >
             <HelpCircle className="w-4 h-4" />
-            Hướng dẫn sử dụng
+            {showGuide ? "Ẩn hướng dẫn" : "Hướng dẫn sử dụng"}
           </button>
         </div>
+
+        {/* Inline Guide Section */}
+        <TryOnGuidePopup
+          open={showGuide}
+          onClose={() => setShowGuide(!showGuide)}
+        />
 
         {/* ========================================
             MOBILE STEPPER (< md)
@@ -305,13 +317,97 @@ function TryOnContent() {
             <TryOnGarmentPicker />
           </div>
         </div>
+
+        {/* History Carousel Section */}
+        <TryOnHistoryCarousel />
+      </div>
+    </div>
+  );
+}
+
+function TryOnHistoryCarousel() {
+  const { history, removeFromHistory, clearHistory } = useTryOnStore();
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  if (history.length === 0) return null;
+
+  return (
+    <div className="mt-16 pt-8 border-t border-violet-100/50 space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <History className="w-5 h-5 text-violet-500" />
+          <h2 className="font-heading text-lg font-bold text-slate-800">Lịch sử mặc thử đồ ({history.length})</h2>
+        </div>
+        <button
+          onClick={clearHistory}
+          className="text-xs font-bold text-red-500 hover:text-red-600 flex items-center gap-1 hover:underline"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Xoá tất cả lịch sử
+        </button>
       </div>
 
-      {/* Guide Popup */}
-      <TryOnGuidePopup
-        open={showGuide}
-        onClose={() => setShowGuide(false)}
-      />
+      {/* Horizontal Carousel */}
+      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth">
+        {history.map((item) => (
+          <div
+            key={item.id}
+            className="relative flex flex-col bg-white/40 border border-white/60 p-2.5 rounded-2xl shrink-0 w-44 hover:shadow-lg transition-all group"
+          >
+            {/* Image Container */}
+            <div
+              className="relative aspect-[3/4] rounded-xl overflow-hidden cursor-pointer"
+              onClick={() => setPreviewImage(item.resultImage)}
+            >
+              <img src={item.resultImage} alt="Thử đồ" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <span className="text-[10px] text-white font-bold bg-violet-600/80 px-2.5 py-1 rounded-full flex items-center gap-1 shadow">
+                  <Maximize2 className="w-3 h-3" /> Xem lại
+                </span>
+              </div>
+            </div>
+
+            {/* Garment Badge Info */}
+            <div className="mt-2.5 space-y-1.5">
+              <div className="flex items-center gap-1.5 bg-slate-50/50 p-1.5 rounded-xl border border-slate-100/50">
+                <div className="relative w-6 h-8 rounded-lg overflow-hidden shrink-0">
+                  <img src={item.garmentThumbnail} alt="" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] font-bold text-slate-800 truncate">{item.garmentName}</p>
+                </div>
+              </div>
+
+              {/* Timestamp & Delete */}
+              <div className="flex items-center justify-between text-[9px] text-muted-foreground pt-1">
+                <span>{item.createdAt}</span>
+                <button
+                  onClick={() => removeFromHistory(item.id)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  title="Xoá lịch sử"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setPreviewImage(null)} />
+          <div className="relative bg-white rounded-2xl overflow-hidden max-w-sm w-full border border-white/20 shadow-2xl z-10 animate-scale-up aspect-[3/4]">
+            <img src={previewImage} alt="Kết quả mặc thử" className="w-full h-full object-cover" />
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-3 right-3 p-2 rounded-full bg-black/55 hover:bg-black/85 text-white shadow-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

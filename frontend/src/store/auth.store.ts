@@ -1,62 +1,69 @@
-import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import { User, UserRole, Address } from "@/types/user.types";
-import { loginApi } from "@/lib/api/auth.api";
-import { LoginCredentials } from "@/types/user.types";
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { User, UserRole, Address } from '@/types/user.types';
+import { loginApi, logoutApi } from '@/lib/api/auth.api';
+import { LoginCredentials } from '@/types/user.types';
+import {
+  createAddress,
+  deleteAddress,
+  getMyAddresses,
+  updateAddress as updateAddressApi,
+} from '@/lib/api/addresses.api';
 
-// ============================================
-// State & Action Types
-// ============================================
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-
-  // Address management (max 5 addresses per user)
   addresses: Address[];
   selectedAddressId: string | null;
-
-  // Auth Actions
   login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   setUser: (user: User) => void;
   setLoading: (loading: boolean) => void;
-
-  // Address Actions
-  addAddress: (address: Omit<Address, "id" | "userId">) => Address;
-  updateAddress: (id: string, data: Partial<Omit<Address, "id" | "userId">>) => void;
-  removeAddress: (id: string) => void;
+  hydrateAddresses: () => Promise<void>;
+  addAddress: (address: Omit<Address, 'id' | 'userId'>) => Promise<Address>;
+  updateAddress: (
+    id: string,
+    data: Partial<Omit<Address, 'id' | 'userId'>>,
+  ) => Promise<void>;
+  removeAddress: (id: string) => Promise<void>;
   setSelectedAddress: (id: string) => void;
   setDefaultAddress: (id: string) => void;
 }
 
-// ============================================
-// Zustand Store with persist middleware
-// Saves token + user + addresses to localStorage
-// ============================================
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
       addresses: [],
       selectedAddressId: null,
 
-      // ── Auth ──────────────────────────────────────────────────────────────
+      // Auth
       login: async (credentials: LoginCredentials) => {
         set({ isLoading: true });
         try {
           const result = await loginApi(credentials);
-          if (typeof window !== "undefined") {
-            (window as unknown as Record<string, unknown>).__BALII_ACCESS_TOKEN__ =
-              result.accessToken;
+          if (typeof window !== 'undefined') {
+            (
+              window as unknown as Record<string, unknown>
+            ).__BALII_ACCESS_TOKEN__ = result.accessToken;
+            (
+              window as unknown as Record<string, unknown>
+            ).__BALII_REFRESH_TOKEN__ = result.refreshToken;
+            (window as unknown as Record<string, unknown>).__BALII_USER_ID__ =
+              result.user.id;
           }
           set({
             user: result.user,
             token: result.accessToken,
+            refreshToken: result.refreshToken ?? null,
+            addresses: result.user.addresses ?? [],
             isAuthenticated: true,
             isLoading: false,
           });
@@ -66,13 +73,22 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
-        if (typeof window !== "undefined") {
-          (window as unknown as Record<string, unknown>).__BALII_ACCESS_TOKEN__ = undefined;
+      logout: async () => {
+        await logoutApi().catch(() => undefined);
+        if (typeof window !== 'undefined') {
+          (
+            window as unknown as Record<string, unknown>
+          ).__BALII_ACCESS_TOKEN__ = undefined;
+          (
+            window as unknown as Record<string, unknown>
+          ).__BALII_REFRESH_TOKEN__ = undefined;
+          (window as unknown as Record<string, unknown>).__BALII_USER_ID__ =
+            undefined;
         }
         set({
           user: null,
           token: null,
+          refreshToken: null,
           isAuthenticated: false,
           isLoading: false,
           addresses: [],
@@ -82,25 +98,47 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: (user: User) => set({ user }),
       setLoading: (isLoading: boolean) => set({ isLoading }),
+      hydrateAddresses: async () => {
+        const addresses = await getMyAddresses();
+        set((state) => ({
+          addresses,
+          selectedAddressId:
+            state.selectedAddressId &&
+            addresses.some((item) => item.id === state.selectedAddressId)
+              ? state.selectedAddressId
+              : (addresses.find((item) => item.isDefault)?.id ??
+                addresses[0]?.id ??
+                null),
+        }));
+      },
 
-      // ── Address ───────────────────────────────────────────────────────────
-      addAddress: (addressData) => {
+      // Address
+      addAddress: async (addressData) => {
         const { addresses, user } = get();
         if (addresses.length >= 5) {
-          throw new Error("Bạn đã đạt giới hạn 5 địa chỉ. Vui lòng xóa bớt để thêm mới.");
+          throw new Error(
+            'Bạn đã đạt giới hạn 5 địa chỉ. Vui lòng xóa bớt để thêm mới.',
+          );
         }
-        const newAddress: Address = {
-          ...addressData,
-          id: `addr_${Date.now()}`,
-          userId: user?.id ?? "guest",
-          isDefault: addresses.length === 0, // first address is auto-default
-        };
-        const updatedAddresses = addressData.isDefault
-          ? [
-              ...addresses.map((a) => ({ ...a, isDefault: false })),
-              newAddress,
-            ]
-          : [...addresses, newAddress];
+        if (!user) {
+          throw new Error('Bạn cần đăng nhập để thêm địa chỉ.');
+        }
+        const newAddress = await createAddress({
+          recipientName: addressData.fullName,
+          phone: addressData.phone,
+          provinceId: extractNumericId(addressData.province),
+          districtId: extractNumericId(addressData.district),
+          wardId: extractNumericId(addressData.ward),
+          streetAddress: addressData.street,
+          isDefault: addressData.isDefault ?? addresses.length === 0,
+        });
+        const updatedAddresses =
+          (addressData.isDefault ?? false)
+            ? [
+                ...addresses.map((a) => ({ ...a, isDefault: false })),
+                newAddress,
+              ]
+            : [...addresses, newAddress];
 
         set({
           addresses: updatedAddresses,
@@ -109,21 +147,34 @@ export const useAuthStore = create<AuthState>()(
         return newAddress;
       },
 
-      updateAddress: (id, data) => {
+      updateAddress: async (id, data) => {
+        await updateAddressApi(id, {
+          recipientName: data.fullName,
+          phone: data.phone,
+          provinceId: data.province
+            ? extractNumericId(data.province)
+            : undefined,
+          districtId: data.district
+            ? extractNumericId(data.district)
+            : undefined,
+          wardId: data.ward ? extractNumericId(data.ward) : undefined,
+          streetAddress: data.street,
+          isDefault: data.isDefault,
+        });
         set({
           addresses: get().addresses.map((a) =>
-            a.id === id ? { ...a, ...data } : a
+            a.id === id ? { ...a, ...data } : a,
           ),
         });
       },
 
-      removeAddress: (id) => {
+      removeAddress: async (id) => {
+        await deleteAddress(id);
         const { addresses, selectedAddressId } = get();
         const filtered = addresses.filter((a) => a.id !== id);
-        // If removed address was selected, fall back to default or first
         const newSelected =
           selectedAddressId === id
-            ? filtered.find((a) => a.isDefault)?.id ?? filtered[0]?.id ?? null
+            ? (filtered.find((a) => a.isDefault)?.id ?? filtered[0]?.id ?? null)
             : selectedAddressId;
         set({ addresses: filtered, selectedAddressId: newSelected });
       },
@@ -140,24 +191,35 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: "balii-auth-storage",
+      name: 'balii-auth-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         user: state.user,
         token: state.token,
+        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
         addresses: state.addresses,
         selectedAddressId: state.selectedAddressId,
       }),
-    }
-  )
+    },
+  ),
 );
 
-// ============================================
-// Convenience selector hooks
-// ============================================
 export const useCurrentUser = () => useAuthStore((s) => s.user);
 export const useIsAuthenticated = () => useAuthStore((s) => s.isAuthenticated);
-export const useIsAdmin = () => useAuthStore((s) => s.user?.role === UserRole.ADMIN);
+export const useIsAdmin = () =>
+  useAuthStore(
+    (s) =>
+      s.user?.role === UserRole.ADMIN || s.user?.role === UserRole.SUPER_ADMIN,
+  );
+export const useIsSuperAdmin = () =>
+  useAuthStore((s) => s.user?.role === UserRole.SUPER_ADMIN);
 export const useSelectedAddress = () =>
-  useAuthStore((s) => s.addresses.find((a) => a.id === s.selectedAddressId) ?? null);
+  useAuthStore(
+    (s) => s.addresses.find((a) => a.id === s.selectedAddressId) ?? null,
+  );
+
+function extractNumericId(label: string) {
+  const matched = label.match(/(\d+)/);
+  return matched ? Number(matched[1]) : 0;
+}

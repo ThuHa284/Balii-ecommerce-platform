@@ -1,14 +1,31 @@
 "use client";
 
 import Image from "next/image";
-import { MOCK_CATEGORIES, MOCK_PRODUCTS } from "@/lib/api/mock-data";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import ProductGrid from "@/components/product/product-grid";
-import { use } from "react";
+import { getCategoryBySlug } from "@/lib/api/categories.api";
+import { getProducts } from "@/lib/api/products.api";
+import { Category, Product } from "@/types/product.types";
 
-export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
-  const category = MOCK_CATEGORIES.find((c) => c.slug === slug);
-  const products = MOCK_PRODUCTS.filter((p) => p.category.slug === slug);
+export default function CategoryPage() {
+  const params = useParams<{ slug: string }>();
+  const slug = params.slug;
+  const [category, setCategory] = useState<Category | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    async function loadData() {
+      const [categoryData, productResponse] = await Promise.all([
+        getCategoryBySlug(slug),
+        getProducts({ categorySlug: slug, limit: 100 }),
+      ]);
+      setCategory(categoryData);
+      setProducts(productResponse.products);
+    }
+
+    void loadData();
+  }, [slug]);
 
   if (!category) {
     return (
