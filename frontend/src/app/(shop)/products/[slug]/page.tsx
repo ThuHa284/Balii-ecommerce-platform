@@ -43,9 +43,17 @@ export default function ProductDetailPage() {
     return <div className="pt-28 pb-16 text-center">Đang tải sản phẩm...</div>;
   }
 
-  const selectedVariant = product.variants.find((v) => v.size === selectedSize && v.color === selectedColor) || product.variants[0];
+  const selectedVariant =
+    product.variants.find((v) => v.size === selectedSize && v.color === selectedColor) ||
+    product.variants.find((v) => v.size === selectedSize) ||
+    product.variants[0];
   const price = selectedVariant?.salePrice || selectedVariant?.price || product.salePrice || product.basePrice;
   const hasDiscount = product.salePrice !== null;
+  const galleryImages = selectedVariant?.images?.length
+    ? selectedVariant.images
+    : product.images.length
+      ? product.images
+      : [product.thumbnail];
 
   const handleAddToCart = async () => {
     if (!selectedVariant) return;
@@ -121,7 +129,6 @@ export default function ProductDetailPage() {
   };
 
   const uniqueSizes = [...new Set(product.variants.map((v) => v.size))];
-  const uniqueColors = [...new Set(product.variants.map((v) => v.color))];
 
   return (
     <div className="pt-28 pb-16">
@@ -129,19 +136,26 @@ export default function ProductDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-20">
           {/* Image Gallery */}
           <div className="space-y-4">
-            <div className="glass-card overflow-hidden aspect-[3/4] relative rounded-2xl">
-              <Image src={product.images[mainImage] || product.thumbnail} alt={product.name} fill className="object-cover" priority />
+            <div className="glass-card relative aspect-[4/5] overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-rose-50">
+              <Image
+                src={galleryImages[mainImage] || product.thumbnail}
+                alt={product.name}
+                fill
+                className="object-contain p-4 sm:p-6"
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                priority
+              />
               {hasDiscount && (
                 <span className="absolute top-4 left-4 px-3 py-1.5 text-xs font-bold bg-red-500 text-white rounded-full">
                   -{Math.round(((product.basePrice - product.salePrice!) / product.basePrice) * 100)}%
                 </span>
               )}
             </div>
-            {product.images.length > 1 && (
-              <div className="flex gap-3">
-                {product.images.map((img, i) => (
-                  <button key={i} onClick={() => setMainImage(i)} className={`relative w-20 h-24 rounded-xl overflow-hidden border-2 transition-all ${mainImage === i ? "border-primary" : "border-transparent opacity-60 hover:opacity-100"}`}>
-                    <Image src={img} alt="" fill className="object-cover" />
+            {galleryImages.length > 1 && (
+              <div className="flex flex-wrap gap-3">
+                {galleryImages.map((img, i) => (
+                  <button key={i} onClick={() => setMainImage(i)} className={`relative h-24 w-20 overflow-hidden rounded-xl border-2 bg-white transition-all ${mainImage === i ? "border-primary shadow-md shadow-violet-200/60" : "border-transparent opacity-70 hover:opacity-100"}`}>
+                    <Image src={img} alt="" fill className="object-contain p-1.5" sizes="80px" />
                   </button>
                 ))}
               </div>
@@ -174,7 +188,7 @@ export default function ProductDetailPage() {
             {/* Size Selector */}
             <div className="mb-6">
               <p className="text-sm font-medium text-foreground mb-3">Kích thước: <span className="text-primary">{selectedSize}</span></p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {uniqueSizes.map((size) => (
                   <button key={size} onClick={() => setSelectedSize(size)} className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${selectedSize === size ? "bg-violet-500 text-white shadow-lg shadow-violet-300/25" : "bg-white/60 border border-white/50 text-foreground hover:bg-white/80"} hover:scale-[1.02] active:scale-95`}>
                     {size}

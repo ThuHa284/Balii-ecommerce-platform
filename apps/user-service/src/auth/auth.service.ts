@@ -16,6 +16,8 @@ import { User } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
 import { RegisterDto } from './dto/register.dto';
 import { EmailVerification } from '../entities/email-verification.entity';
+import { PasswordReset } from '../entities/password-reset.entity';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 @Injectable()
 export class AuthService {
   private redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -27,6 +29,8 @@ export class AuthService {
     private userRepo: Repository<User>,
     @InjectRepository(Role)
     private roleRepo: Repository<Role>,
+    @InjectRepository(PasswordReset)
+    private passwordResetRepo: Repository<PasswordReset>,
     private jwtService: JwtService,
   ) {}
   async register(dto: RegisterDto) {
@@ -107,10 +111,11 @@ export class AuthService {
     return user;
   }
   async login(user: User) {
+    const hydratedUser = user.role ? user : await this.loadUserWithRole(user.id);
     const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role.name,
+      sub: hydratedUser.id,
+      email: hydratedUser.email,
+      role: hydratedUser.role.name,
     };
     const accessToken = this.jwtService.sign(payload, {
       secret: process.env.JWT_SECRET || 'secret',
@@ -122,19 +127,20 @@ export class AuthService {
       expiresIn: '7d',
     });
     await this.redis.set(
-      `refresh_token:${user.id}`,
+      `refresh_token:${hydratedUser.id}`,
       refreshToken,
       'EX',
       7 * 24 * 60 * 60,
     );
-    const checkRedisToken = await this.redis.get(`refresh_token:${user.id}`);
-    console.log('LOGIN USER ID:', user.id);
+    const checkRedisToken = await this.redis.get(`refresh_token:${hydratedUser.id}`);
+    console.log('LOGIN USER ID:', hydratedUser.id);
     console.log('LOGIN REFRESH TOKEN:', refreshToken);
     console.log('REDIS SAVED TOKEN:', checkRedisToken);
     console.log('SAVE MATCH:', checkRedisToken === refreshToken);
     return {
       accessToken,
       refreshToken,
+      user: this.serializeUser(hydratedUser),
     };
   }
   async refresh(userId: string, refreshToken: string) {
@@ -238,6 +244,80 @@ export class AuthService {
     };
   }
 
+  async forgotPassword(
+    email: string,
+    ipAddress?: string,
+    userAgent?: string | string[],
+  ) {
+    const user = await this.userRepo.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      return {
+        message:
+          'Neu email ton tai trong he thong, chung toi da gui huong dan dat lai mat khau.',
+      };
+    }
+
+    await this.passwordResetRepo
+      .createQueryBuilder()
+      .update()
+      .set({
+        usedAt: new Date(),
+      })
+      .where('user_id = :userId', { userId: user.id })
+      .andWhere('used_at IS NULL')
+      .execute();
+
+    const token = randomBytes(32).toString('hex');
+    await this.passwordResetRepo.save({
+      userId: user.id,
+      token,
+      ipAddress,
+      userAgent: Array.isArray(userAgent) ? userAgent.join(', ') : userAgent,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+
+    return {
+      message:
+        'Neu email ton tai trong he thong, chung toi da gui huong dan dat lai mat khau.',
+      resetToken: token,
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const record = await this.passwordResetRepo.findOne({
+      where: { token: dto.token },
+      relations: { user: true },
+    });
+
+    if (!record) {
+      throw new BadRequestException('Token dat lai mat khau khong hop le');
+    }
+
+    if (record.usedAt) {
+      throw new BadRequestException('Token dat lai mat khau da duoc su dung');
+    }
+
+    if (record.expiresAt < new Date()) {
+      throw new BadRequestException('Token dat lai mat khau da het han');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.userRepo.update(record.userId, {
+      passwordHash,
+    });
+
+    record.usedAt = new Date();
+    await this.passwordResetRepo.save(record);
+    await this.redis.del(`refresh_token:${record.userId}`);
+
+    return {
+      message: 'Dat lai mat khau thanh cong',
+    };
+  }
+
   private async sendVerificationEmail(email: string, token: string) {
     const transporter = nodemailer.createTransport({
       host: process.env.MAIL_HOST,
@@ -279,5 +359,32 @@ export class AuthService {
       process.env.MAIL_USER &&
       process.env.MAIL_PASS,
     );
+  }
+
+  private async loadUserWithRole(userId: string): Promise<User> {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: { role: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Nguoi dung khong ton tai');
+    }
+
+    return user;
+  }
+
+  private serializeUser(user: User) {
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      phone: user.phone,
+      avatarUrl: user.avatarUrl,
+      role: user.role?.name ?? null,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 }

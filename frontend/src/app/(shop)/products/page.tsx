@@ -9,8 +9,6 @@ import { getCategories } from "@/lib/api/categories.api";
 import { getProducts } from "@/lib/api/products.api";
 import { Category, Product } from "@/types/product.types";
 
-const SIZES = ["S", "M", "L", "XL"];
-
 const PRICE_RANGES = [
   { label: "Tất cả mức giá", value: "all" },
   { label: "Dưới 800.000đ", value: "under-800" },
@@ -55,6 +53,11 @@ export default function ProductsPage() {
   };
 
   const isFiltered = selectedCategory !== null || selectedPriceRange !== "all" || selectedSizes.length > 0;
+  const availableSizes = Array.from(
+    new Set(
+      products.flatMap((product) => product.variants.map((variant) => variant.size)).filter(Boolean)
+    )
+  );
 
   // 1. Filter logic
   const filteredProducts = products.filter((product) => {
@@ -181,7 +184,7 @@ export default function ProductsPage() {
             <div className="glass-card p-5">
               <h3 className="font-heading text-sm font-bold text-foreground mb-4">Kích Thước</h3>
               <div className="grid grid-cols-4 gap-2">
-                {SIZES.map((size) => {
+                {availableSizes.map((size) => {
                   const isSelected = selectedSizes.includes(size);
                   return (
                     <button
@@ -273,7 +276,7 @@ export default function ProductsPage() {
                 )}
                 {selectedSizes.map((size) => (
                   <span key={size} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-50 text-violet-600 border border-violet-200 text-xs font-medium">
-                    Size: {size}
+                    {size}
                     <button onClick={() => toggleSize(size)} className="hover:text-violet-800">
                       <X className="w-3 h-3" />
                     </button>
@@ -391,7 +394,7 @@ export default function ProductsPage() {
               <div>
                 <h4 className="font-heading text-sm font-bold text-foreground mb-3">Kích Thước</h4>
                 <div className="grid grid-cols-4 gap-2">
-                  {SIZES.map((size) => {
+                  {availableSizes.map((size) => {
                     const isSelected = selectedSizes.includes(size);
                     return (
                       <button

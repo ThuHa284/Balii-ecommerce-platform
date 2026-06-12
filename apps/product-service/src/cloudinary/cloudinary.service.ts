@@ -10,11 +10,10 @@ export class CloudinaryService {
     private readonly cloudinary: typeof Cloudinary,
   ) {}
 
-  async uploadProductImage(
+  async uploadImage(
     file: Express.Multer.File,
+    folder: string,
   ): Promise<UploadApiResponse> {
-    const folder = process.env.CLOUDINARY_PRODUCT_FOLDER || 'balii/products';
-
     return new Promise((resolve, reject) => {
       const uploadStream = this.cloudinary.uploader.upload_stream(
         {
@@ -29,6 +28,13 @@ export class CloudinaryService {
 
       Readable.from(file.buffer).pipe(uploadStream);
     });
+  }
+
+  async uploadProductImage(
+    file: Express.Multer.File,
+  ): Promise<UploadApiResponse> {
+    const folder = process.env.CLOUDINARY_PRODUCT_FOLDER || 'balii/products';
+    return this.uploadImage(file, folder);
   }
 
   async deleteImage(publicId: string): Promise<void> {

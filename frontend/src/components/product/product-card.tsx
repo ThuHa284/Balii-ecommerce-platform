@@ -29,6 +29,9 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discountPercent = hasDiscount
     ? Math.round(((product.basePrice - product.salePrice!) / product.basePrice) * 100)
     : 0;
+  const availableSizes = Array.from(
+    new Set(product.variants.map((variant) => variant.size).filter(Boolean)),
+  );
 
   const handleToggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -86,13 +89,13 @@ export default function ProductCard({ product }: ProductCardProps) {
   return (
     <div className="group glass-card-hover overflow-hidden">
       {/* Image Container */}
-      <div className="relative aspect-[3/4] overflow-hidden rounded-t-2xl">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-t-2xl bg-gradient-to-br from-slate-50 via-white to-rose-50">
         <Link href={`/products/${product.slug}`} className="block w-full h-full relative">
           <Image
             src={product.thumbnail}
             alt={product.name}
             fill
-            className="object-cover transition-transform duration-700 group-hover:scale-110"
+            className="object-contain p-4 transition-transform duration-500 group-hover:scale-105 sm:p-5"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
           />
         </Link>
@@ -150,7 +153,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
  
         {/* Hover overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/8 via-transparent to-white/10 opacity-0 transition-opacity duration-300 pointer-events-none group-hover:opacity-100" />
       </div>
  
       {/* Info */}
@@ -180,6 +183,18 @@ export default function ProductCard({ product }: ProductCardProps) {
             </span>
           )}
         </div>
+        {availableSizes.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {availableSizes.slice(0, 4).map((size) => (
+              <span
+                key={size}
+                className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700"
+              >
+                {size}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

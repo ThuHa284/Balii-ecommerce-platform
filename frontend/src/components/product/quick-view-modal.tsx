@@ -5,91 +5,129 @@ import { useCartStore } from "@/store/cart.store";
 import { useWishlistStore } from "@/store/wishlist.store";
 import { X, ShoppingBag, Heart, Star, Check, HelpCircle } from "lucide-react";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
+
+function parseSizeRange(sizeLabel: string) {
+  const matched = sizeLabel.match(
+    /(\d+(?:[.,]\d+)?)\s*(?:kg)?\s*[-–]\s*(\d+(?:[.,]\d+)?)\s*(?:kg)?/i,
+  );
+
+  if (!matched) {
+    return null;
+  }
+
+  return {
+    min: Number(matched[1].replace(",", ".")),
+    max: Number(matched[2].replace(",", ".")),
+  };
+}
 
 export default function QuickViewModal() {
   const { isOpen, selectedProduct, closeQuickView } = useQuickViewStore();
   const { addItem, setCartDrawerOpen } = useCartStore();
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
-  const [selectedSize, setSelectedSize] = useState<string>("");
-  const [selectedColor, setSelectedColor] = useState<string>("");
-  const [quantity, setQuantity] = useState<number>(1);
-  const [weightInput, setWeightInput] = useState<string>("");
-  const [suggestedSize, setSuggestedSize] = useState<string>("");
-  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+  const [selectedSize, setSelectedSize] = useState("");
+  const [selectedColor, setSelectedColor] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [weightInput, setWeightInput] = useState("");
+  const [suggestedSize, setSuggestedSize] = useState("");
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
-    if (selectedProduct) {
-      // Default to first variant
+    if (!selectedProduct) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
       const defaultVariant = selectedProduct.variants[0];
       if (defaultVariant) {
         setSelectedSize(defaultVariant.size);
         setSelectedColor(defaultVariant.color);
       }
+
       setQuantity(1);
       setWeightInput("");
       setSuggestedSize("");
       setActiveImageIndex(0);
-    }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [selectedProduct]);
 
-  if (!isOpen || !selectedProduct) return null;
+  if (!isOpen || !selectedProduct) {
+    return null;
+  }
 
   const isFavorite = isInWishlist(selectedProduct.id);
-
-  // Filter unique sizes and colors
-  const sizes = Array.from(new Set(selectedProduct.variants.map((v) => v.size)));
+  const sizes = Array.from(
+    new Set(selectedProduct.variants.map((variant) => variant.size).filter(Boolean)),
+  );
   const colors = Array.from(
-    new Map(selectedProduct.variants.map((v) => [v.color, v.colorCode])).entries()
+    new Map(
+      selectedProduct.variants.map((variant) => [variant.color, variant.colorCode]),
+    ).entries(),
   );
 
-  // Weight advisor logic
-  const handleWeightChange = (val: string) => {
-    setWeightInput(val);
-    const w = parseFloat(val);
-    if (isNaN(w) || w <= 0) {
+  const handleWeightChange = (value: string) => {
+    setWeightInput(value);
+    const weight = parseFloat(value);
+
+    if (Number.isNaN(weight) || weight <= 0) {
       setSuggestedSize("");
       return;
     }
 
-    let recSize = "";
-    if (w >= 40 && w <= 47) recSize = "S";
-    else if (w >= 48 && w <= 53) recSize = "M";
-    else if (w >= 54 && w <= 60) recSize = "L";
-    else if (w >= 61 && w <= 70) recSize = "XL";
+    const recommendedSize =
+      sizes.find((sizeLabel) => {
+        const range = parseSizeRange(sizeLabel);
+        return range ? weight >= range.min && weight <= range.max : false;
+      }) ?? "";
 
-    setSuggestedSize(recSize);
-    if (recSize && sizes.includes(recSize)) {
-      setSelectedSize(recSize);
+    setSuggestedSize(recommendedSize);
+    if (recommendedSize) {
+      setSelectedSize(recommendedSize);
     }
   };
 
-  // Find currently selected variant based on size & color selection
-  const currentVariant = selectedProduct.variants.find(
-    (v) =>
-      v.size === selectedSize &&
-      (colors.length === 0 || v.color === selectedColor)
-  ) || selectedProduct.variants.find((v) => v.size === selectedSize) || selectedProduct.variants[0];
+  const currentVariant =
+    selectedProduct.variants.find(
+      (variant) =>
+        variant.size === selectedSize &&
+        (colors.length === 0 || variant.color === selectedColor),
+    ) ??
+    selectedProduct.variants.find((variant) => variant.size === selectedSize) ??
+    selectedProduct.variants[0];
 
-  const price = currentVariant?.salePrice || currentVariant?.price || selectedProduct.salePrice || selectedProduct.basePrice;
+  const price =
+    currentVariant?.salePrice ||
+    currentVariant?.price ||
+    selectedProduct.salePrice ||
+    selectedProduct.basePrice;
   const originalPrice = currentVariant?.price || selectedProduct.basePrice;
-  const hasDiscount = currentVariant ? (currentVariant.salePrice !== null && currentVariant.salePrice < currentVariant.price) : (selectedProduct.salePrice !== null && selectedProduct.salePrice < selectedProduct.basePrice);
+  const hasDiscount = currentVariant
+    ? currentVariant.salePrice !== null &&
+      currentVariant.salePrice < currentVariant.price
+    : selectedProduct.salePrice !== null &&
+      selectedProduct.salePrice < selectedProduct.basePrice;
 
-  const imagesToDisplay = currentVariant && currentVariant.images.length > 0 
-    ? currentVariant.images 
-    : selectedProduct.images.length > 0 ? selectedProduct.images : [selectedProduct.thumbnail];
+  const imagesToDisplay =
+    currentVariant && currentVariant.images.length > 0
+      ? currentVariant.images
+      : selectedProduct.images.length > 0
+        ? selectedProduct.images
+        : [selectedProduct.thumbnail];
 
   const handleAddToCart = async () => {
     if (!currentVariant) {
-      toast.error("Vui lòng chọn kích cỡ và màu sắc hợp lệ!");
+      toast.error("Vui long chon kich co va mau sac hop le.");
       return;
     }
 
     if (currentVariant.stock <= 0) {
-      toast.error("Phiên bản này đã hết hàng!");
+      toast.error("Phien ban nay da het hang.");
       return;
     }
 
@@ -100,12 +138,14 @@ export default function QuickViewModal() {
       productSlug: selectedProduct.slug,
       thumbnail: imagesToDisplay[activeImageIndex] || selectedProduct.thumbnail,
       variant: currentVariant,
-      quantity: quantity,
-      price: price,
+      quantity,
+      price,
       totalPrice: price * quantity,
     });
 
-    toast.success(`Đã thêm ${quantity} x "${selectedProduct.name}" (Size ${currentVariant.size}) vào giỏ hàng!`);
+    toast.success(
+      `Da them ${quantity} x "${selectedProduct.name}" (${currentVariant.size}) vao gio hang!`,
+    );
     closeQuickView();
     setCartDrawerOpen(true);
   };
@@ -113,91 +153,86 @@ export default function QuickViewModal() {
   const handleToggleWishlist = () => {
     toggleWishlist(selectedProduct.id);
     if (!isFavorite) {
-      toast.success(`Đã thêm "${selectedProduct.name}" vào danh sách yêu thích!`, {
-        icon: "❤️",
+      toast.success(`Da them "${selectedProduct.name}" vao danh sach yeu thich!`, {
+        icon: "♥",
       });
-    } else {
-      toast.info(`Đã xoá "${selectedProduct.name}" khỏi danh sách yêu thích.`);
+      return;
     }
+
+    toast.info(`Da xoa "${selectedProduct.name}" khoi danh sach yeu thich.`);
   };
 
   return (
     <>
-      {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-md transition-opacity duration-300 animate-fade-in"
+        className="fixed inset-0 z-50 animate-fade-in bg-black/40 backdrop-blur-md transition-opacity duration-300"
         onClick={closeQuickView}
       />
 
-      {/* Modal Container */}
-      <div className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 z-50 w-auto max-w-4xl sm:w-11/12 md:w-full glass-card max-h-[90vh] flex flex-col md:flex-row overflow-hidden border border-white/40 shadow-2xl rounded-2xl animate-scale-up">
-        {/* Close Button */}
+      <div className="fixed inset-4 z-50 flex w-auto max-w-4xl animate-scale-up flex-col overflow-hidden rounded-2xl border border-white/40 shadow-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-11/12 sm:-translate-x-1/2 sm:-translate-y-1/2 md:w-full md:flex-row glass-card max-h-[90vh]">
         <button
           onClick={closeQuickView}
-          className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/60 hover:bg-white text-slate-800 hover:text-black shadow-md transition-colors"
+          className="absolute right-4 top-4 z-20 rounded-full bg-white/60 p-2 text-slate-800 shadow-md transition-colors hover:bg-white hover:text-black"
         >
-          <X className="w-5 h-5" />
+          <X className="h-5 w-5" />
         </button>
 
-        {/* Left Column: Image Slider */}
-        <div className="w-full md:w-1/2 flex flex-col bg-slate-50/20 p-4 sm:p-6 justify-between border-b md:border-b-0 md:border-r border-white/20">
-          <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden shadow-inner">
+        <div className="flex w-full flex-col justify-between border-b border-white/20 bg-slate-50/20 p-4 md:w-1/2 md:border-b-0 md:border-r sm:p-6">
+          <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 via-white to-rose-50 shadow-inner">
             <Image
               src={imagesToDisplay[activeImageIndex] || selectedProduct.thumbnail}
               alt={selectedProduct.name}
               fill
-              className="object-cover transition-all duration-300"
+              className="object-contain p-4 transition-all duration-300"
             />
             {hasDiscount && (
-              <span className="absolute top-3 left-3 px-2.5 py-1 text-xs font-bold bg-red-500 text-white rounded-full shadow">
-                GIẢM GIÁ
+              <span className="absolute left-3 top-3 rounded-full bg-red-500 px-2.5 py-1 text-xs font-bold text-white shadow">
+                GIAM GIA
               </span>
             )}
           </div>
 
-          {/* Thumbnails */}
           {imagesToDisplay.length > 1 && (
-            <div className="flex gap-2 mt-4 overflow-x-auto pb-1 scrollbar-thin">
-              {imagesToDisplay.map((img, idx) => (
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+              {imagesToDisplay.map((image, index) => (
                 <button
-                  key={idx}
-                  onClick={() => setActiveImageIndex(idx)}
-                  className={`relative w-14 h-16 rounded-lg overflow-hidden shrink-0 border-2 transition-all ${
-                    idx === activeImageIndex ? "border-violet-500 scale-105" : "border-transparent opacity-70 hover:opacity-100"
+                  key={index}
+                  onClick={() => setActiveImageIndex(index)}
+                  className={`relative h-16 w-14 shrink-0 overflow-hidden rounded-lg border-2 bg-white transition-all ${
+                    index === activeImageIndex
+                      ? "scale-105 border-violet-500"
+                      : "border-transparent opacity-70 hover:opacity-100"
                   }`}
                 >
-                  <Image src={img} alt="" fill className="object-cover" />
+                  <Image src={image} alt="" fill className="object-contain p-1" />
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {/* Right Column: Product Detail Form */}
-        <div className="w-full md:w-1/2 p-6 flex flex-col overflow-y-auto max-h-[50vh] md:max-h-[90vh] space-y-5">
-          {/* Title & Category */}
+        <div className="flex max-h-[50vh] w-full flex-col space-y-5 overflow-y-auto p-6 md:max-h-[90vh] md:w-1/2">
           <div>
-            <span className="text-xs font-semibold tracking-wider text-violet-600 uppercase">
-              {selectedProduct.category?.name || "Đồ ngủ thiết kế"}
+            <span className="text-xs font-semibold uppercase tracking-wider text-violet-600">
+              {selectedProduct.category?.name || "Do ngu thiet ke"}
             </span>
-            <h2 className="font-heading text-xl md:text-2xl font-extrabold text-slate-900 mt-1">
+            <h2 className="mt-1 font-heading text-xl font-extrabold text-slate-900 md:text-2xl">
               {selectedProduct.name}
             </h2>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="mt-2 flex items-center gap-2">
               <div className="flex items-center gap-0.5">
-                <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                 <span className="text-sm font-semibold text-slate-800">
                   {selectedProduct.averageRating}
                 </span>
               </div>
               <span className="text-xs text-muted-foreground">
-                ({selectedProduct.totalReviews} đánh giá)
+                ({selectedProduct.totalReviews} danh gia)
               </span>
             </div>
           </div>
 
-          {/* Pricing */}
-          <div className="flex items-baseline gap-3 p-3 rounded-xl bg-violet-500/5 border border-violet-100/50">
+          <div className="flex items-baseline gap-3 rounded-xl border border-violet-100/50 bg-violet-500/5 p-3">
             <span className="text-2xl font-bold text-violet-700">
               {formatCurrency(price)}
             </span>
@@ -208,15 +243,15 @@ export default function QuickViewModal() {
             )}
           </div>
 
-          {/* Weight to Size Advisor */}
-          <div className="p-4 rounded-xl border border-violet-200/50 bg-gradient-to-r from-violet-500/5 to-purple-500/5 space-y-3">
+          <div className="space-y-3 rounded-xl border border-violet-200/50 bg-gradient-to-r from-violet-500/5 to-purple-500/5 p-4">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <HelpCircle className="w-4 h-4 text-violet-500" /> Gợi ý chọn Size thông minh
+              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <HelpCircle className="h-4 w-4 text-violet-500" />
+                Goi y chon size theo can nang
               </label>
               {suggestedSize && (
-                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  Gợi ý: Size {suggestedSize}
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-600">
+                  Goi y: {suggestedSize}
                 </span>
               )}
             </div>
@@ -224,64 +259,65 @@ export default function QuickViewModal() {
               <input
                 type="number"
                 value={weightInput}
-                onChange={(e) => handleWeightChange(e.target.value)}
-                placeholder="Nhập cân nặng của bạn (kg)... ví dụ: 52"
-                className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                onChange={(event) => handleWeightChange(event.target.value)}
+                placeholder="Nhap can nang cua ban (kg), vi du 52"
+                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
               />
             </div>
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
-              * Dựa trên cân nặng thực tế: S (40-47kg), M (48-53kg), L (54-60kg), XL (61-70kg).
+            <p className="text-[10px] leading-relaxed text-muted-foreground">
+              He thong se doi chieu can nang voi khoang kg co san trong tung size
+              cua san pham.
             </p>
           </div>
 
-          {/* Size Selector */}
           <div className="space-y-2">
             <span className="text-xs font-bold text-slate-800">
-              Kích thước: <span className="font-semibold text-violet-600">{selectedSize}</span>
+              Kich thuoc:{" "}
+              <span className="font-semibold text-violet-600">{selectedSize}</span>
             </span>
             <div className="flex flex-wrap gap-2">
-              {sizes.map((sz) => {
-                const isSuggested = sz === suggestedSize;
+              {sizes.map((sizeLabel) => {
+                const isSuggested = sizeLabel === suggestedSize;
                 return (
                   <button
-                    key={sz}
-                    onClick={() => setSelectedSize(sz)}
-                    className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${
-                      selectedSize === sz
-                        ? "bg-violet-600 text-white border-violet-600 shadow-md scale-105"
+                    key={sizeLabel}
+                    onClick={() => setSelectedSize(sizeLabel)}
+                    className={`rounded-lg border px-4 py-2 text-xs font-bold transition-all ${
+                      selectedSize === sizeLabel
+                        ? "scale-105 border-violet-600 bg-violet-600 text-white shadow-md"
                         : isSuggested
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-300 ring-2 ring-emerald-200"
-                        : "bg-white/60 hover:bg-white text-slate-700 border-slate-200"
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-200"
+                          : "border-slate-200 bg-white/60 text-slate-700 hover:bg-white"
                     }`}
                   >
-                    Size {sz} {isSuggested && "✨"}
+                    {sizeLabel} {isSuggested && "✨"}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Color Selector */}
           {colors.length > 0 && (
             <div className="space-y-2">
               <span className="text-xs font-bold text-slate-800">
-                Màu sắc: <span className="font-semibold text-violet-600">{selectedColor}</span>
+                Mau sac:{" "}
+                <span className="font-semibold text-violet-600">{selectedColor}</span>
               </span>
               <div className="flex flex-wrap gap-3">
                 {colors.map(([colorName, colorCode]) => (
                   <button
                     key={colorName}
                     onClick={() => setSelectedColor(colorName)}
-                    className={`relative w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center ${
+                    className={`relative flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all ${
                       selectedColor === colorName
-                        ? "border-violet-600 scale-110 shadow-md"
+                        ? "scale-110 border-violet-600 shadow-md"
                         : "border-transparent hover:scale-105"
                     }`}
                     style={{ backgroundColor: colorCode || "#ccc" }}
                     title={colorName}
                   >
                     {selectedColor === colorName && (
-                      <Check className="w-4 h-4 text-white drop-shadow mix-blend-difference" />
+                      <Check className="h-4 w-4 text-white drop-shadow mix-blend-difference" />
                     )}
                   </button>
                 ))}
@@ -289,54 +325,54 @@ export default function QuickViewModal() {
             </div>
           )}
 
-          {/* Stock Info */}
           <div className="text-xs font-medium">
-            Tình trạng:{" "}
+            Tinh trang:{" "}
             {currentVariant && currentVariant.stock > 0 ? (
-              <span className="text-emerald-600 font-bold">Còn hàng ({currentVariant.stock})</span>
+              <span className="font-bold text-emerald-600">
+                Con hang ({currentVariant.stock})
+              </span>
             ) : (
-              <span className="text-rose-500 font-bold">Hết hàng</span>
+              <span className="font-bold text-rose-500">Het hang</span>
             )}
           </div>
 
-          {/* Quantity Selector & Add to Cart */}
-          <div className="flex items-center gap-3 pt-3 border-t border-white/20">
-            {/* Quantity */}
+          <div className="flex items-center gap-3 border-t border-white/20 pt-3">
             <div className="flex items-center rounded-xl border border-slate-200 bg-white/60 p-1">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-8 h-8 flex items-center justify-center text-slate-600 hover:text-black rounded-lg hover:bg-slate-100 font-bold"
+                className="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-slate-600 hover:bg-slate-100 hover:text-black"
               >
                 -
               </button>
-              <span className="w-10 text-center text-sm font-semibold text-slate-800">{quantity}</span>
+              <span className="w-10 text-center text-sm font-semibold text-slate-800">
+                {quantity}
+              </span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="w-8 h-8 flex items-center justify-center text-slate-600 hover:text-black rounded-lg hover:bg-slate-100 font-bold"
+                className="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-slate-600 hover:bg-slate-100 hover:text-black"
               >
                 +
               </button>
             </div>
 
-            {/* Add to Cart */}
             <button
               onClick={handleAddToCart}
               disabled={!currentVariant || currentVariant.stock <= 0}
-              className="flex-1 btn-primary py-3 flex items-center justify-center gap-2 font-bold shadow-lg shadow-violet-500/10 hover:shadow-violet-500/20 transition-all text-sm"
+              className="btn-primary flex-1 py-3 text-sm font-bold shadow-lg shadow-violet-500/10 transition-all hover:shadow-violet-500/20 flex items-center justify-center gap-2"
             >
-              <ShoppingBag className="w-4 h-4" /> Thêm vào giỏ
+              <ShoppingBag className="h-4 w-4" />
+              Them vao gio
             </button>
 
-            {/* Favorite */}
             <button
               onClick={handleToggleWishlist}
-              className={`p-3 rounded-xl border transition-all ${
+              className={`rounded-xl border p-3 transition-all ${
                 isFavorite
-                  ? "bg-rose-50 border-rose-200 text-rose-500 shadow-sm"
-                  : "bg-white/60 border-slate-200 text-slate-600 hover:bg-white hover:text-rose-500"
+                  ? "border-rose-200 bg-rose-50 text-rose-500 shadow-sm"
+                  : "border-slate-200 bg-white/60 text-slate-600 hover:bg-white hover:text-rose-500"
               }`}
             >
-              <Heart className={`w-5 h-5 ${isFavorite ? "fill-rose-500" : ""}`} />
+              <Heart className={`h-5 w-5 ${isFavorite ? "fill-rose-500" : ""}`} />
             </button>
           </div>
         </div>

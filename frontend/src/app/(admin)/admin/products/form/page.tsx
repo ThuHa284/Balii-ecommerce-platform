@@ -14,8 +14,10 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { SIZES, COLORS } from '@/lib/constants';
-import { getCategories } from '@/lib/api/categories.api';
+import {
+  createCategory,
+  getCategories,
+} from '@/lib/api/categories.api';
 import { canDeleteAdminResource } from '@/lib/api/admin.utils';
 import {
   createProduct,
@@ -53,6 +55,35 @@ interface ImageRow {
   isExisting: boolean;
 }
 
+const WEIGHT_SIZE_PRESETS = [
+  '43-49kg',
+  '50-56kg',
+  '57-63kg',
+  '64-70kg',
+  '71-78kg',
+];
+
+function buildInitials(value: string) {
+  return value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+function normalizeSkuPart(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function ProductFormContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -71,6 +102,10 @@ function ProductFormContent() {
   const [description, setDescription] = useState('');
   const [shortDescription, setShortDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [showCategoryCreator, setShowCategoryCreator] = useState(false);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategorySlug, setNewCategorySlug] = useState('');
   const [basePrice, setBasePrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [material, setMaterial] = useState('');
@@ -151,6 +186,12 @@ function ProductFormContent() {
 
   const handleNameChange = (value: string) => {
     setName(value);
+    setVariants((current) =>
+      current.map((variant) => ({
+        ...variant,
+        sku: generateVariantSku(value, variant.color, variant.size),
+      })),
+    );
     if (!isEdit) {
       setSlug(
         value
@@ -164,6 +205,32 @@ function ProductFormContent() {
           .trim(),
       );
     }
+  };
+
+  const handleCategoryNameChange = (value: string) => {
+    setNewCategoryName(value);
+    setNewCategorySlug(
+      value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+      .trim(),
+    );
+  };
+
+  const generateVariantSku = (
+    productName: string,
+    color: string,
+    size: string,
+  ) => {
+    const productPart = buildInitials(productName || 'SP');
+    const colorPart = buildInitials(color || 'MAU');
+    const sizePart = normalizeSkuPart(size || 'SIZE');
+    return [productPart || 'SP', colorPart || 'MAU', sizePart || 'SIZE'].join('-');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -220,10 +287,10 @@ function ProductFormContent() {
       ...current,
       {
         clientId: `new-${Date.now()}-${current.length}`,
-        size: 'M',
+        size: WEIGHT_SIZE_PRESETS[0],
         color: 'Hồng pastel',
-        colorCode: '#F8BBD0',
-        sku: '',
+        colorCode: '#f8b4c7',
+        sku: generateVariantSku(name, 'Hồng pastel', WEIGHT_SIZE_PRESETS[0]),
         price: Number(basePrice) || 0,
         salePrice: salePrice ? Number(salePrice) : null,
         stock: 0,
@@ -232,15 +299,54 @@ function ProductFormContent() {
     ]);
   };
 
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim() || !newCategorySlug.trim()) {
+      toast.error('Vui lòng nhập tên và slug danh mục mới.');
+      return;
+    }
+
+    try {
+      setCreatingCategory(true);
+      const created = await createCategory({
+        name: newCategoryName.trim(),
+        slug: newCategorySlug.trim(),
+        isActive: true,
+      });
+
+      setCategories((current) => [...current, created]);
+      setCategoryId(created.id);
+      setShowCategoryCreator(false);
+      setNewCategoryName('');
+      setNewCategorySlug('');
+      toast.success('Đã tạo danh mục mới.');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Tạo danh mục thất bại.',
+      );
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
   const updateVariantField = (
     index: number,
     field: keyof VariantRow,
     value: string | number | null | boolean,
   ) => {
     setVariants((current) =>
-      current.map((variant, currentIndex) =>
-        currentIndex === index ? { ...variant, [field]: value } : variant,
-      ),
+      current.map((variant, currentIndex) => {
+        if (currentIndex !== index) {
+          return variant;
+        }
+
+        const nextVariant = { ...variant, [field]: value } as VariantRow;
+        nextVariant.sku = generateVariantSku(
+          name,
+          nextVariant.color,
+          nextVariant.size,
+        );
+        return nextVariant;
+      }),
     );
   };
 
@@ -534,6 +640,9 @@ function ProductFormContent() {
                 <Plus className="w-3.5 h-3.5" /> Thêm biến thể
               </button>
             </div>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Mỗi biến thể có tồn kho riêng và SKU riêng. SKU được tự sinh từ tên sản phẩm, màu và size.
+            </p>
 
             {variants.length === 0 ? (
               <div className="text-center py-8">
@@ -570,64 +679,85 @@ function ProductFormContent() {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {WEIGHT_SIZE_PRESETS.map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => updateVariantField(index, 'size', preset)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                            variant.size === preset
+                              ? 'bg-violet-500 text-white'
+                              : 'bg-white/60 text-slate-700 hover:bg-white'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">
-                          Size
+                          Khoảng cân nặng / size
                         </label>
-                        <select
+                        <input
+                          type="text"
                           value={variant.size}
                           onChange={(e) =>
                             updateVariantField(index, 'size', e.target.value)
                           }
+                          placeholder="VD: 43-49kg"
                           className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
-                        >
-                          {SIZES.map((size) => (
-                            <option key={size} value={size}>
-                              {size}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </div>
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">
                           Màu
                         </label>
-                        <select
+                        <input
+                          type="text"
                           value={variant.color}
-                          onChange={(e) => {
-                            const color = COLORS.find(
-                              (item) => item.name === e.target.value,
-                            );
-                            updateVariantField(index, 'color', e.target.value);
-                            if (color)
-                              updateVariantField(
-                                index,
-                                'colorCode',
-                                color.value,
-                              );
-                          }}
+                          onChange={(e) =>
+                            updateVariantField(index, 'color', e.target.value)
+                          }
+                          placeholder="VD: Hồng phấn"
                           className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
-                        >
-                          {COLORS.map((color) => (
-                            <option key={color.name} value={color.name}>
-                              {color.name}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </div>
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">
-                          SKU
+                          Mã màu
+                        </label>
+                        <div className="flex items-center gap-2 rounded-lg border border-white/50 bg-white/60 px-3 py-2">
+                          <input
+                            type="color"
+                            value={variant.colorCode || '#f8b4c7'}
+                            onChange={(e) =>
+                              updateVariantField(index, 'colorCode', e.target.value)
+                            }
+                            className="h-8 w-10 rounded border-0 bg-transparent p-0"
+                          />
+                          <input
+                            type="text"
+                            value={variant.colorCode}
+                            onChange={(e) =>
+                              updateVariantField(index, 'colorCode', e.target.value)
+                            }
+                            placeholder="#f8b4c7"
+                            className="w-full bg-transparent text-sm focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">
+                          SKU biến thể
                         </label>
                         <input
                           type="text"
                           value={variant.sku}
-                          onChange={(e) =>
-                            updateVariantField(index, 'sku', e.target.value)
-                          }
-                          placeholder="BDN-HP-M"
-                          className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                          readOnly
+                          placeholder="Tự sinh theo tên + màu + size"
+                          className="w-full cursor-not-allowed px-3 py-2 rounded-lg bg-slate-100 border border-white/50 text-sm text-slate-600 focus:outline-none"
                         />
                       </div>
                       <div>
@@ -713,6 +843,44 @@ function ProductFormContent() {
                     </option>
                   ))}
                 </select>
+                <div className="mt-3 rounded-xl border border-white/40 bg-white/30 p-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryCreator((current) => !current)}
+                    className="text-sm font-medium text-violet-600 hover:text-violet-700"
+                  >
+                    {showCategoryCreator
+                      ? 'Ẩn tạo danh mục mới'
+                      : '+ Tạo danh mục ngay tại đây'}
+                  </button>
+
+                  {showCategoryCreator ? (
+                    <div className="mt-3 space-y-3">
+                      <input
+                        type="text"
+                        value={newCategoryName}
+                        onChange={(e) => handleCategoryNameChange(e.target.value)}
+                        placeholder="Tên danh mục mới"
+                        className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                      />
+                      <input
+                        type="text"
+                        value={newCategorySlug}
+                        onChange={(e) => setNewCategorySlug(e.target.value)}
+                        placeholder="slug-danh-muc"
+                        className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleCreateCategory()}
+                        disabled={creatingCategory}
+                        className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {creatingCategory ? 'Đang tạo...' : 'Lưu danh mục'}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">

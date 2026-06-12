@@ -24,7 +24,9 @@ type BackendVariant = {
   id: string;
   productId: string;
   size?: string;
+  sizeLabel?: string;
   color?: string;
+  colorName?: string;
   colorCode?: string;
   sku: string;
   price: number;
@@ -171,8 +173,8 @@ export function mapProductVariant(input: BackendVariant): ProductVariant {
   return {
     id: input.id,
     productId: input.productId,
-    size: input.size ?? '',
-    color: input.color ?? '',
+    size: input.sizeLabel ?? input.size ?? '',
+    color: input.colorName ?? input.color ?? '',
     colorCode: input.colorCode ?? '#E5E7EB',
     sku: input.sku,
     price: Number(input.price ?? 0),

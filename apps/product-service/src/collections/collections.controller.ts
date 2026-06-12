@@ -6,8 +6,12 @@ import {
   Param,
   Patch,
   Post,
+  Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CollectionsService } from './collections.service';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
@@ -21,6 +25,19 @@ export class CollectionsController {
   @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   create(@Body() dto: CreateCollectionDto) {
     return this.collectionsService.create(dto);
+  }
+
+  @Post('images')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  @UseInterceptors(FileInterceptor('file'))
+  uploadImage(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('kind') kind?: 'cover' | 'banner',
+  ) {
+    return this.collectionsService.uploadImage(
+      file,
+      kind === 'banner' ? 'banner' : 'cover',
+    );
   }
 
   @Get()

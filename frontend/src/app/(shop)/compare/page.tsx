@@ -2,17 +2,18 @@
 
 import { useCompareStore } from "@/store/compare.store";
 import { useCartStore } from "@/store/cart.store";
-import { X, ShoppingBag, ArrowRightLeft, Star, Heart, Check } from "lucide-react";
+import { X, ShoppingBag, ArrowRightLeft, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
+import { Product } from "@/types/product.types";
 
 export default function ComparePage() {
   const { compareItems, removeItem, clearCompare } = useCompareStore();
   const { addItem, setCartDrawerOpen } = useCartStore();
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = (product: Product) => {
     const defaultVariant = product.variants[0];
     if (!defaultVariant) {
       toast.error("Sản phẩm tạm thời hết hàng!");
@@ -22,7 +23,7 @@ export default function ComparePage() {
     const price = defaultVariant.salePrice || defaultVariant.price || product.salePrice || product.basePrice;
 
     addItem({
-      id: `cart_${Date.now()}`,
+      id: defaultVariant.id,
       productId: product.id,
       productName: product.name,
       productSlug: product.slug,
@@ -55,14 +56,6 @@ export default function ComparePage() {
       </div>
     );
   }
-
-  // Weight advisor sizing helper
-  const sizeRanges = [
-    { size: "S", range: "40kg - 47kg" },
-    { size: "M", range: "48kg - 53kg" },
-    { size: "L", range: "54kg - 60kg" },
-    { size: "XL", range: "61kg - 70kg" },
-  ];
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8 min-h-[80vh]">
@@ -191,10 +184,10 @@ export default function ComparePage() {
               {compareItems.map((product) => (
                 <td key={product.id} className="p-6">
                   <div className="space-y-1 bg-violet-50/30 p-3 rounded-xl border border-violet-100 text-[10px] font-semibold text-slate-700">
-                    {sizeRanges.map((r) => (
-                      <div key={r.size} className="flex justify-between border-b border-slate-100/50 pb-0.5 last:border-b-0">
-                        <span>Size {r.size}:</span>
-                        <span className="text-violet-600">{r.range}</span>
+                    {Array.from(new Set(product.variants.map((variant) => variant.size))).map((sizeLabel) => (
+                      <div key={sizeLabel} className="flex justify-between border-b border-slate-100/50 pb-0.5 last:border-b-0">
+                        <span>Size:</span>
+                        <span className="text-violet-600">{sizeLabel}</span>
                       </div>
                     ))}
                   </div>

@@ -1,6 +1,8 @@
 import apiClient from './client';
 import { mapOrder } from './adapters';
 import { Order } from '@/types/order.types';
+import { User } from '@/types/user.types';
+import { mapUser } from './adapters';
 
 export interface AdminRevenuePoint {
   month: string;
@@ -32,6 +34,11 @@ export interface AdminOrderStatusPoint {
 export interface AdminOrder extends Order {
   customerName: string;
   customerEmail: string | null;
+}
+
+export interface AdminUser extends User {
+  orderCount: number | null;
+  totalSpent: number | null;
 }
 
 export interface AdminDashboardStats {
@@ -83,5 +90,16 @@ export async function getAdminOrders(): Promise<AdminOrder[]> {
     ...mapOrder(item),
     customerName: item.customerName,
     customerEmail: item.customerEmail ?? null,
+  }));
+}
+
+type BackendAdminUser = Parameters<typeof mapUser>[0];
+
+export async function getAdminUsers(): Promise<AdminUser[]> {
+  const { data } = await apiClient.get<BackendAdminUser[]>('/users');
+  return data.map((item) => ({
+    ...mapUser(item, []),
+    orderCount: null,
+    totalSpent: null,
   }));
 }

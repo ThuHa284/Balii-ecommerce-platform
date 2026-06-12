@@ -17,6 +17,26 @@ export interface CollectionPayload {
 type CollectionResponse = Collection;
 type CollectionListResponse = CollectionResponse[];
 
+export async function uploadCollectionImage(
+  file: File,
+  kind: 'cover' | 'banner' = 'cover',
+): Promise<{ url: string; publicId: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const { data } = await apiClient.post<{ url: string; publicId: string }>(
+    `/collections/images?kind=${kind}`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    },
+  );
+
+  return data;
+}
+
 export async function getCollections(): Promise<Collection[]> {
   const { data } = await apiClient.get<CollectionListResponse>('/collections');
   return data.map(mapCollection);

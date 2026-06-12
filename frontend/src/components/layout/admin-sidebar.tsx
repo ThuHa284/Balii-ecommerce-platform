@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Package, ShoppingCart, Users, BarChart3, LogOut, Settings, Ticket, Library, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
 
 const adminLinks = [
   { href: "/admin/dashboard", label: "Tổng quan", icon: LayoutDashboard },
@@ -18,6 +19,13 @@ const adminLinks = [
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const logout = useAuthStore((state) => state.logout);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+  };
 
   return (
     <aside className="w-64 min-h-screen glass-card rounded-none border-t-0 border-b-0 border-l-0 p-6 hidden lg:block">
@@ -65,7 +73,10 @@ export default function AdminSidebar() {
           <Settings className="w-5 h-5" />
           Cài đặt
         </Link>
-        <button className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-all w-full">
+        <button
+          onClick={() => void handleLogout()}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-all w-full"
+        >
           <LogOut className="w-5 h-5" />
           Đăng xuất
         </button>

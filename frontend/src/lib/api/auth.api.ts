@@ -93,3 +93,13 @@ export async function getProfileApi(): Promise<User> {
   const addresses = await getMyAddresses().catch(() => []);
   return mapUser(data, addresses);
 }
+
+export async function updateProfileApi(payload: {
+  fullName: string;
+  phone: string;
+  avatarUrl?: string;
+}): Promise<User> {
+  const { data } = await apiClient.patch('/users/me', payload);
+  const addresses = await getMyAddresses().catch(() => []);
+  return mapUser(data, addresses);
+}

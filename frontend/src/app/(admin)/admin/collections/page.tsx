@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Check, Library, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ import {
   deleteCollection,
   getCollections,
   updateCollection,
+  uploadCollectionImage,
 } from '@/lib/api/collections.api';
 import { getAdminProducts } from '@/lib/api/products.api';
 import { formatCurrency } from '@/lib/utils';
@@ -38,7 +39,11 @@ export default function AdminCollectionsPage() {
   const [shortDescription, setShortDescription] = useState('');
   const [image, setImage] = useState('');
   const [bannerImage, setBannerImage] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -104,6 +109,8 @@ export default function AdminCollectionsPage() {
     setShortDescription('');
     setImage('');
     setBannerImage('');
+    setImageFile(null);
+    setBannerImageFile(null);
     setSelectedProductIds([]);
   }
 
@@ -121,8 +128,32 @@ export default function AdminCollectionsPage() {
     setShortDescription(collection.shortDescription);
     setImage(collection.image);
     setBannerImage(collection.bannerImage);
+    setImageFile(null);
+    setBannerImageFile(null);
     setSelectedProductIds(collection.productIds);
     setShowModal(true);
+  }
+
+  function handleImageFileChange(
+    file: File | null,
+    kind: 'cover' | 'banner',
+  ) {
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Ảnh quá lớn, tối đa 10MB.');
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    if (kind === 'cover') {
+      setImageFile(file);
+      setImage(previewUrl);
+      return;
+    }
+
+    setBannerImageFile(file);
+    setBannerImage(previewUrl);
   }
 
   function toggleProductSelection(productId: string) {
@@ -143,14 +174,21 @@ export default function AdminCollectionsPage() {
 
     try {
       setSaving(true);
+      const uploadedImageUrl = imageFile
+        ? (await uploadCollectionImage(imageFile, 'cover')).url
+        : image.trim();
+      const uploadedBannerUrl = bannerImageFile
+        ? (await uploadCollectionImage(bannerImageFile, 'banner')).url
+        : bannerImage.trim();
+
       const payload = {
         name: name.trim(),
         slug: slug.trim(),
         season: season.trim(),
         description: description.trim(),
         shortDescription: shortDescription.trim(),
-        imageUrl: image.trim(),
-        bannerImageUrl: bannerImage.trim(),
+        imageUrl: uploadedImageUrl,
+        bannerImageUrl: uploadedBannerUrl,
         productIds: selectedProductIds,
         isActive: true,
       };
@@ -546,6 +584,27 @@ export default function AdminCollectionsPage() {
                     onChange={(e) => setImage(e.target.value)}
                     className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                   />
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      handleImageFileChange(e.target.files?.[0] ?? null, 'cover')
+                    }
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    className="mt-2 rounded-xl border border-dashed border-violet-300/60 bg-white/30 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white/50"
+                  >
+                    Tải ảnh đại diện lên
+                  </button>
+                  {image ? (
+                    <div className="relative mt-3 h-28 overflow-hidden rounded-xl">
+                      <Image src={image} alt="Ảnh đại diện" fill className="object-cover" />
+                    </div>
+                  ) : null}
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">
@@ -557,6 +616,27 @@ export default function AdminCollectionsPage() {
                     onChange={(e) => setBannerImage(e.target.value)}
                     className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                   />
+                  <input
+                    ref={bannerInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      handleImageFileChange(e.target.files?.[0] ?? null, 'banner')
+                    }
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="mt-2 rounded-xl border border-dashed border-violet-300/60 bg-white/30 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white/50"
+                  >
+                    Tải ảnh banner lên
+                  </button>
+                  {bannerImage ? (
+                    <div className="relative mt-3 h-28 overflow-hidden rounded-xl">
+                      <Image src={bannerImage} alt="Ảnh banner" fill className="object-cover" />
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

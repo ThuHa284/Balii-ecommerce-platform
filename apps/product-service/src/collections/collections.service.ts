@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Collection } from '../entities/collection.entity';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
@@ -10,6 +11,7 @@ export class CollectionsService {
   constructor(
     @InjectRepository(Collection)
     private readonly collectionRepo: Repository<Collection>,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   create(dto: CreateCollectionDto) {
@@ -84,6 +86,21 @@ export class CollectionsService {
     return {
       success: true,
       message: 'Collection deleted successfully',
+    };
+  }
+
+  async uploadImage(file: Express.Multer.File, kind: 'cover' | 'banner') {
+    const folder =
+      kind === 'banner'
+        ? process.env.CLOUDINARY_COLLECTION_BANNER_FOLDER ||
+          'balii/collections/banners'
+        : process.env.CLOUDINARY_COLLECTION_FOLDER || 'balii/collections';
+
+    const uploaded = await this.cloudinaryService.uploadImage(file, folder);
+
+    return {
+      url: uploaded.secure_url,
+      publicId: uploaded.public_id,
     };
   }
 
