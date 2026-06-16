@@ -30,7 +30,9 @@ export class GatewayHealthService {
       })),
     );
 
-    const status = upstreams.every((item) => item.reachable) ? 'ok' : 'degraded';
+    const status = upstreams.every((item) => item.reachable)
+      ? 'ok'
+      : 'degraded';
 
     return {
       service: 'api-gateway',

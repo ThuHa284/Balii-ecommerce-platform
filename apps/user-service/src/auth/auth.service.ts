@@ -1,51 +1,57 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import {
+  BadRequestException,
   Injectable,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import Redis from 'ioredis';
 import { randomBytes } from 'crypto';
+import Redis from 'ioredis';
 import nodemailer = require('nodemailer');
+import { Repository } from 'typeorm';
 
-import { User } from '../entities/user.entity';
-import { Role } from '../entities/role.entity';
-import { RegisterDto } from './dto/register.dto';
 import { EmailVerification } from '../entities/email-verification.entity';
 import { PasswordReset } from '../entities/password-reset.entity';
+import { Role } from '../entities/role.entity';
+import { User } from '../entities/user.entity';
+import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+
 @Injectable()
 export class AuthService {
   private redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
   constructor(
     @InjectRepository(EmailVerification)
-    private emailVerificationRepo: Repository<EmailVerification>,
+    private readonly emailVerificationRepo: Repository<EmailVerification>,
     @InjectRepository(User)
-    private userRepo: Repository<User>,
+    private readonly userRepo: Repository<User>,
     @InjectRepository(Role)
-    private roleRepo: Repository<Role>,
+    private readonly roleRepo: Repository<Role>,
     @InjectRepository(PasswordReset)
-    private passwordResetRepo: Repository<PasswordReset>,
-    private jwtService: JwtService,
+    private readonly passwordResetRepo: Repository<PasswordReset>,
+    private readonly jwtService: JwtService,
   ) {}
+
   async register(dto: RegisterDto) {
     const existed = await this.userRepo.findOne({
       where: { email: dto.email },
     });
+
     if (existed) {
       throw new BadRequestException('Email da ton tai');
     }
+
     const customerRole = await this.roleRepo.findOne({
       where: { name: 'CUSTOMER' },
     });
+
     if (!customerRole) {
       throw new BadRequestException('Khong tim thay vai tro CUSTOMER');
     }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = this.userRepo.create({
       email: dto.email,
@@ -87,9 +93,11 @@ export class AuthService {
       where: { email },
       relations: { role: true },
     });
+
     if (!user) {
       throw new UnauthorizedException('Email hoac mat khau khong dung');
     }
+
     if (!user.passwordHash) {
       throw new UnauthorizedException('Tai khoan nay dang nhap bang Google');
     }
@@ -108,58 +116,79 @@ export class AuthService {
         'Vui long xac thuc email truoc khi dang nhap',
       );
     }
+
     return user;
   }
+
   async login(user: User) {
-    const hydratedUser = user.role ? user : await this.loadUserWithRole(user.id);
+    const hydratedUser = user.role
+      ? user
+      : await this.loadUserWithRole(user.id);
     const payload = {
       sub: hydratedUser.id,
       email: hydratedUser.email,
       role: hydratedUser.role.name,
     };
+
     const accessToken = this.jwtService.sign(payload, {
       secret: process.env.JWT_SECRET || 'secret',
       expiresIn: '15m',
     });
-    console.log('LOGIN ACCESS TOKEN:', accessToken);
     const refreshToken = await this.jwtService.signAsync(payload, {
       secret: process.env.JWT_REFRESH_SECRET || 'refresh_secret',
       expiresIn: '7d',
     });
+
     await this.redis.set(
       `refresh_token:${hydratedUser.id}`,
       refreshToken,
       'EX',
       7 * 24 * 60 * 60,
     );
-    const checkRedisToken = await this.redis.get(`refresh_token:${hydratedUser.id}`);
-    console.log('LOGIN USER ID:', hydratedUser.id);
-    console.log('LOGIN REFRESH TOKEN:', refreshToken);
-    console.log('REDIS SAVED TOKEN:', checkRedisToken);
-    console.log('SAVE MATCH:', checkRedisToken === refreshToken);
+
     return {
       accessToken,
       refreshToken,
       user: this.serializeUser(hydratedUser),
     };
   }
+
   async refresh(userId: string, refreshToken: string) {
     const savedToken = await this.redis.get(`refresh_token:${userId}`);
+
     if (!savedToken || savedToken !== refreshToken) {
       throw new UnauthorizedException('Refresh token khong hop le');
     }
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      relations: { role: true },
-    });
-    if (!user) {
-      throw new UnauthorizedException('Nguoi dung khong ton tai');
-    }
+
+    const user = await this.loadUserWithRole(userId);
     return this.login(user);
   }
+
+  async refreshToken(userId: string, refreshToken: string) {
+    try {
+      const payload = await this.jwtService.verifyAsync<{ sub: string }>(
+        refreshToken,
+        {
+          secret: process.env.JWT_REFRESH_SECRET || 'refresh_secret',
+        },
+      );
+
+      if (payload.sub !== userId) {
+        throw new UnauthorizedException('Refresh token khong hop le');
+      }
+
+      return this.refresh(userId, refreshToken);
+    } catch {
+      throw new UnauthorizedException('Refresh token khong hop le');
+    }
+  }
+
   async logout(userId: string, accessToken: string) {
     await this.redis.del(`refresh_token:${userId}`);
-    await this.redis.set(`blacklist:${accessToken}`, '1', 'EX', 15 * 60);
+
+    if (accessToken) {
+      await this.redis.set(`blacklist:${accessToken}`, '1', 'EX', 15 * 60);
+    }
 
     return { message: 'Dang xuat thanh cong' };
   }
@@ -190,57 +219,6 @@ export class AuthService {
 
     return {
       message: 'Xac thuc email thanh cong',
-    };
-  }
-
-  async resendVerificationEmail(email: string) {
-    const user = await this.userRepo.findOne({
-      where: { email },
-    });
-
-    if (!user) {
-      throw new BadRequestException('Email chua duoc dang ky');
-    }
-
-    if (user.emailVerifiedAt) {
-      return {
-        message: 'Email nay da duoc xac thuc',
-      };
-    }
-
-    if (!this.isEmailVerificationEnabled()) {
-      await this.userRepo.update(user.id, {
-        emailVerifiedAt: new Date(),
-      });
-
-      return {
-        message: 'Moi truong local dang tat xac thuc email.',
-      };
-    }
-
-    await this.emailVerificationRepo
-      .createQueryBuilder()
-      .update()
-      .set({
-        usedAt: new Date(),
-      })
-      .where('user_id = :userId', {
-        userId: user.id,
-      })
-      .andWhere('used_at IS NULL')
-      .execute();
-
-    const token = randomBytes(32).toString('hex');
-    await this.emailVerificationRepo.save({
-      userId: user.id,
-      token,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-    });
-
-    await this.sendVerificationEmail(user.email, token);
-
-    return {
-      message: 'Da gui lai email xac thuc.',
     };
   }
 
@@ -315,6 +293,57 @@ export class AuthService {
 
     return {
       message: 'Dat lai mat khau thanh cong',
+    };
+  }
+
+  async resendVerificationEmail(email: string) {
+    const user = await this.userRepo.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Email chua duoc dang ky');
+    }
+
+    if (user.emailVerifiedAt) {
+      return {
+        message: 'Email nay da duoc xac thuc',
+      };
+    }
+
+    if (!this.isEmailVerificationEnabled()) {
+      await this.userRepo.update(user.id, {
+        emailVerifiedAt: new Date(),
+      });
+
+      return {
+        message: 'Moi truong local dang tat xac thuc email.',
+      };
+    }
+
+    await this.emailVerificationRepo
+      .createQueryBuilder()
+      .update()
+      .set({
+        usedAt: new Date(),
+      })
+      .where('user_id = :userId', {
+        userId: user.id,
+      })
+      .andWhere('used_at IS NULL')
+      .execute();
+
+    const token = randomBytes(32).toString('hex');
+    await this.emailVerificationRepo.save({
+      userId: user.id,
+      token,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+
+    await this.sendVerificationEmail(user.email, token);
+
+    return {
+      message: 'Da gui lai email xac thuc.',
     };
   }
 

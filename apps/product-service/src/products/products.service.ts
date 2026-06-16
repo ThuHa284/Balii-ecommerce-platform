@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, ILike, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -155,6 +157,8 @@ export class ProductsService {
         p.base_price AS "basePrice",
         p.original_price AS "originalPrice",
         p.sale_price AS "salePrice",
+        p.target_gender AS "targetGender",
+        p.recommended_age_groups AS "recommendedAgeGroups",
         p.category_id AS "categoryId",
         p.created_at AS "createdAt",
         p.updated_at AS "updatedAt",
@@ -229,6 +233,8 @@ export class ProductsService {
       shortDescription: row.shortDescription,
       basePrice: Number(row.basePrice ?? 0),
       salePrice: row.salePrice != null ? Number(row.salePrice) : null,
+      targetGender: row.targetGender ?? 'female',
+      recommendedAgeGroups: row.recommendedAgeGroups ?? [],
       categoryId: row.categoryId,
       category: row.category_id_ref
         ? {
@@ -259,5 +265,68 @@ export class ProductsService {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     }));
+  }
+
+  async recommendProducts(gender?: string, ageGroup?: string) {
+    const params: string[] = [];
+    let whereClause = 'WHERE p.is_active = TRUE';
+    const normalizedGender = gender?.trim().toLowerCase();
+    const normalizedAgeGroup = ageGroup?.trim();
+
+    if (normalizedGender) {
+      params.push(normalizedGender);
+      whereClause += ` AND (p.target_gender = $${params.length} OR p.target_gender = 'unisex')`;
+    }
+
+    if (normalizedAgeGroup) {
+      params.push(normalizedAgeGroup);
+      whereClause += ` AND $${params.length} = ANY(p.recommended_age_groups)`;
+    }
+
+    const result = await this.dataSource.query(
+      `
+    SELECT
+      p.id,
+      p.name,
+      p.slug,
+      p.description,
+      p.base_price AS "basePrice",
+      p.original_price AS "originalPrice",
+      p.sale_price AS "salePrice",
+      p.target_gender AS "targetGender",
+      p.recommended_age_groups AS "recommendedAgeGroups",
+      COALESCE(
+        (
+          SELECT img.url
+          FROM product_service.product_images img
+          WHERE img.product_id = p.id
+          ORDER BY img.is_primary DESC, img.sort_order ASC
+          LIMIT 1
+        ),
+        ''
+      ) AS thumbnail
+    FROM product_service.products p
+    ${whereClause}
+    ORDER BY p.created_at DESC
+    `,
+      params,
+    );
+
+    return {
+      success: true,
+      data: result.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        description: row.description ?? '',
+        basePrice: Number(row.basePrice ?? 0),
+        originalPrice:
+          row.originalPrice != null ? Number(row.originalPrice) : null,
+        salePrice: row.salePrice != null ? Number(row.salePrice) : null,
+        targetGender: row.targetGender,
+        recommendedAgeGroups: row.recommendedAgeGroups ?? [],
+        thumbnail: row.thumbnail ?? '',
+      })),
+    };
   }
 }

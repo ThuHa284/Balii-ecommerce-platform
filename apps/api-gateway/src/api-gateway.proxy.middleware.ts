@@ -41,7 +41,8 @@ export class ApiGatewayProxyMiddleware implements NestMiddleware {
     }
 
     const targetUrl = new URL(`${target}${req.originalUrl}`);
-    const transport = targetUrl.protocol === 'https:' ? httpsRequest : httpRequest;
+    const transport =
+      targetUrl.protocol === 'https:' ? httpsRequest : httpRequest;
     const shouldStream = this.shouldStreamRequest(req);
     const payload = shouldStream ? null : this.serializeBody(req);
 
@@ -56,7 +57,11 @@ export class ApiGatewayProxyMiddleware implements NestMiddleware {
         res.status(proxyRes.statusCode ?? 502);
 
         Object.entries(proxyRes.headers).forEach(([key, value]) => {
-          if (ApiGatewayProxyMiddleware.blockedResponseHeaders.has(key.toLowerCase())) {
+          if (
+            ApiGatewayProxyMiddleware.blockedResponseHeaders.has(
+              key.toLowerCase(),
+            )
+          ) {
             return;
           }
 
@@ -70,7 +75,10 @@ export class ApiGatewayProxyMiddleware implements NestMiddleware {
     );
 
     proxyReq.on('error', (error: Error) => {
-      this.logger.error(`Proxy ${req.method} ${req.originalUrl} failed`, error.stack);
+      this.logger.error(
+        `Proxy ${req.method} ${req.originalUrl} failed`,
+        error.stack,
+      );
 
       if (!res.headersSent) {
         const status = new ServiceUnavailableException({

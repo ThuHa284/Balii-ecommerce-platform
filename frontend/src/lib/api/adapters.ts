@@ -43,6 +43,8 @@ type BackendProduct = {
   shortDescription?: string;
   basePrice: number;
   salePrice?: number | null;
+  targetGender?: 'male' | 'female' | 'unisex';
+  recommendedAgeGroups?: string[];
   categoryId?: string | null;
   category?: BackendCategory | null;
   images?: string[];
@@ -156,6 +158,33 @@ function safeString(value: unknown) {
   return typeof value === 'string' ? value : '';
 }
 
+function resolveColorCode(colorName: string, colorCode?: string) {
+  if (colorCode && colorCode.trim()) {
+    return colorCode;
+  }
+
+  const normalized = colorName
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (normalized.includes('trang')) return '#F8FAFC';
+  if (normalized.includes('den')) return '#111827';
+  if (normalized.includes('hong')) return '#F9A8D4';
+  if (normalized.includes('do')) return '#EF4444';
+  if (normalized.includes('xanh mint')) return '#A7F3D0';
+  if (normalized.includes('xanh duong')) return '#60A5FA';
+  if (normalized.includes('xanh')) return '#93C5FD';
+  if (normalized.includes('tim')) return '#C4B5FD';
+  if (normalized.includes('vang')) return '#FDE68A';
+  if (normalized.includes('be')) return '#E7D3BE';
+  if (normalized.includes('nau')) return '#A16207';
+  if (normalized.includes('xam')) return '#9CA3AF';
+
+  return '#E5E7EB';
+}
+
 export function mapCategory(input: BackendCategory): Category {
   return {
     id: input.id,
@@ -175,7 +204,10 @@ export function mapProductVariant(input: BackendVariant): ProductVariant {
     productId: input.productId,
     size: input.sizeLabel ?? input.size ?? '',
     color: input.colorName ?? input.color ?? '',
-    colorCode: input.colorCode ?? '#E5E7EB',
+    colorCode: resolveColorCode(
+      input.colorName ?? input.color ?? '',
+      input.colorCode,
+    ),
     sku: input.sku,
     price: Number(input.price ?? 0),
     salePrice: input.salePrice != null ? Number(input.salePrice) : null,
@@ -206,6 +238,8 @@ export function mapProduct(input: BackendProduct): Product {
     shortDescription: input.shortDescription ?? input.description ?? '',
     basePrice: Number(input.basePrice ?? 0),
     salePrice: input.salePrice != null ? Number(input.salePrice) : null,
+    targetGender: input.targetGender ?? 'female',
+    recommendedAgeGroups: input.recommendedAgeGroups ?? [],
     categoryId: input.categoryId ?? category.id,
     category,
     images: input.images ?? (input.thumbnail ? [input.thumbnail] : []),

@@ -6,6 +6,8 @@ export interface Product {
   shortDescription: string;
   basePrice: number;
   salePrice: number | null;
+  targetGender?: 'male' | 'female' | 'unisex';
+  recommendedAgeGroups?: string[];
   categoryId: string;
   category: Category;
   images: string[];

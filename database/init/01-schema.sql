@@ -409,6 +409,14 @@ CREATE TABLE voucher_service.voucher_usages (
     used_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE voucher_service.user_vouchers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    voucher_id UUID NOT NULL REFERENCES voucher_service.vouchers(id),
+    user_id UUID NOT NULL,
+    saved_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (voucher_id, user_id)
+);
+
 -- ============================================================
 -- 6. notification_service
 -- ============================================================

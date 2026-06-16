@@ -1,36 +1,34 @@
-"use client";
+'use client';
 
-import { useMemo } from "react";
-import { Download, RotateCcw, Sparkles, Wand2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useTryOnStore } from "@/store/tryon.store";
-import { toast } from "sonner";
+import { useMemo } from 'react';
+import Link from 'next/link';
+import { Download, ExternalLink, Sparkles, Wand2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useTryOnStore } from '@/store/tryon.store';
 
 interface TryOnResultProps {
   className?: string;
 }
 
 const PHASE_LABELS: Record<string, string> = {
-  analyzing: "Đang phân tích ảnh...",
-  mapping: "Đang xử lý quần áo...",
-  rendering: "Đang render kết quả...",
-  finalizing: "Đang hoàn thiện...",
+  analyzing: 'Đang phân tích ảnh...',
+  mapping: 'Đang xử lý quần áo...',
+  rendering: 'Đang render kết quả...',
+  finalizing: 'Đang hoàn thiện...',
 };
 
 export default function TryOnResult({ className }: TryOnResultProps) {
   const {
     resultImage,
+    resultUrl,
     isGenerating,
     generationProgress,
-    generatingPhase,
     confidence,
     userImage,
     garmentImage,
     reset,
-    saveToHistory,
   } = useTryOnStore();
 
-  // Determine which phase label to show based on progress
   const phaseLabel = useMemo(() => {
     if (generationProgress < 25) return PHASE_LABELS.analyzing;
     if (generationProgress < 50) return PHASE_LABELS.mapping;
@@ -40,86 +38,78 @@ export default function TryOnResult({ className }: TryOnResultProps) {
 
   const handleDownload = () => {
     if (!resultImage) return;
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.href = resultImage;
     link.download = `balii-tryon-${Date.now()}.jpg`;
     link.click();
   };
 
-  const handleSave = () => {
-    saveToHistory();
-    reset();
-  };
-
-  const handleDiscard = () => {
-    toast.info("Đã hủy bỏ ảnh thử đồ tạm thời trên hệ thống.");
-    reset();
-  };
-
-  // -- Generating State --
   if (isGenerating) {
     return (
-      <div className={cn("", className)}>
-        <div className="relative aspect-[3/4] rounded-2xl overflow-hidden glass-card ai-glow-ring">
-          {/* Blended background from user + garment images */}
+      <div className={cn('', className)}>
+        <div className="relative aspect-[3/4] overflow-hidden rounded-2xl glass-card ai-glow-ring">
           <div className="absolute inset-0">
             {userImage && (
               <img
                 src={userImage}
                 alt=""
-                className="absolute inset-0 w-full h-full object-cover opacity-40 blur-[2px]"
+                className="absolute inset-0 h-full w-full object-cover opacity-40 blur-[2px]"
               />
             )}
             {garmentImage && (
               <img
                 src={garmentImage}
                 alt=""
-                className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-overlay"
+                className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-overlay"
                 style={{
-                  animation: `ai-morph-reveal 2s ease-in-out infinite alternate`,
+                  animation:
+                    'ai-morph-reveal 2s ease-in-out infinite alternate',
                 }}
               />
             )}
           </div>
-
-          {/* Shimmer overlay */}
           <div className="ai-shimmer absolute inset-0" />
-
-          {/* Scanning line */}
-          <div className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-violet-400 to-transparent animate-ai-scan z-10" />
-
-          {/* Floating particles */}
+          <div className="absolute left-0 right-0 z-10 h-1 bg-gradient-to-r from-transparent via-violet-400 to-transparent animate-ai-scan" />
           <div className="absolute inset-0 z-10">
-            <span className="ai-particle" style={{ left: "10%", bottom: "20%" }} />
-            <span className="ai-particle" style={{ left: "20%", bottom: "40%" }} />
-            <span className="ai-particle" style={{ left: "50%", bottom: "60%" }} />
-            <span className="ai-particle" style={{ left: "75%", bottom: "30%" }} />
-            <span className="ai-particle" style={{ left: "90%", bottom: "50%" }} />
-            <span className="ai-particle" style={{ left: "35%", bottom: "70%" }} />
+            <span
+              className="ai-particle"
+              style={{ left: '10%', bottom: '20%' }}
+            />
+            <span
+              className="ai-particle"
+              style={{ left: '20%', bottom: '40%' }}
+            />
+            <span
+              className="ai-particle"
+              style={{ left: '50%', bottom: '60%' }}
+            />
+            <span
+              className="ai-particle"
+              style={{ left: '75%', bottom: '30%' }}
+            />
+            <span
+              className="ai-particle"
+              style={{ left: '90%', bottom: '50%' }}
+            />
+            <span
+              className="ai-particle"
+              style={{ left: '35%', bottom: '70%' }}
+            />
           </div>
-
-          {/* Rotating ring deco */}
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <div className="w-28 h-28 md:w-36 md:h-36 rounded-full border-2 border-dashed border-violet-300/40 animate-ai-spin-slow" />
-          </div>
-
-          {/* Center content */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
-            <div className="p-4 rounded-full bg-white/20 backdrop-blur-md mb-4">
-              <Wand2 className="w-8 h-8 text-violet-500 animate-pulse" />
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center">
+            <div className="mb-4 rounded-full bg-white/20 p-4 backdrop-blur-md">
+              <Wand2 className="h-8 w-8 animate-pulse text-violet-500" />
             </div>
-            <p className="text-sm font-medium text-foreground/80 mb-2">
+            <p className="mb-2 text-sm font-medium text-foreground/80">
               {phaseLabel}
             </p>
-
-            {/* Progress bar */}
-            <div className="w-48 h-2 rounded-full bg-white/30 overflow-hidden mb-2">
+            <div className="mb-2 h-2 w-48 overflow-hidden rounded-full bg-white/30">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-violet-400 to-purple-500 transition-all duration-300 ease-out"
                 style={{ width: `${generationProgress}%` }}
               />
             </div>
-            <p className="text-xs text-muted-foreground font-medium">
+            <p className="text-xs font-medium text-muted-foreground">
               {generationProgress}%
             </p>
           </div>
@@ -128,62 +118,78 @@ export default function TryOnResult({ className }: TryOnResultProps) {
     );
   }
 
-  // -- Result State --
   if (resultImage) {
     return (
-      <div className={cn("", className)}>
-        <div className="relative aspect-[3/4] rounded-2xl overflow-hidden glass-card ai-morph-in">
+      <div className={cn('space-y-4', className)}>
+        <div className="relative aspect-[3/4] overflow-hidden rounded-2xl glass-card ai-morph-in">
           <img
             src={resultImage}
             alt="Kết quả mặc thử"
-            className="w-full h-full object-cover"
+            className="h-full w-full object-cover"
           />
-          {/* Confidence badge */}
-          {confidence && (
-            <div className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/90 backdrop-blur-sm text-white text-xs font-medium shadow-lg">
-              <Sparkles className="w-3 h-3" />
+          {confidence ? (
+            <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-green-500/90 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
+              <Sparkles className="h-3 w-3" />
               Độ chính xác: {confidence}%
             </div>
-          )}
+          ) : null}
         </div>
 
-        {/* Action buttons */}
-        <div className="space-y-2 mt-3">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={handleSave}
-              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-750 text-white text-xs font-bold transition-all active:scale-95 shadow-md shadow-violet-300/25"
-            >
-              Lưu ảnh thử đồ
-            </button>
-            <button
-              onClick={handleDiscard}
-              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-50/50 hover:bg-red-50 border border-red-200 text-red-600 text-xs font-bold transition-all active:scale-95"
-            >
-              Không lưu
-            </button>
+        <div className="glass-card space-y-3 p-4">
+          <div className="rounded-xl bg-white/50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Cloudinary URL
+            </p>
+            {resultUrl ? (
+              <a
+                href={resultUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-flex items-center gap-1.5 break-all text-sm text-violet-600 hover:text-violet-700"
+              >
+                {resultUrl}
+                <ExternalLink className="h-4 w-4 shrink-0" />
+              </a>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">Chưa có URL.</p>
+            )}
           </div>
+        </div>
+
+        <button
+          onClick={handleDownload}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition-all hover:bg-white"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Tải ảnh xuống thiết bị
+        </button>
+
+        <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={handleDownload}
-            className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 text-slate-700 text-xs font-bold hover:bg-white transition-all active:scale-95 shadow-sm"
+            onClick={reset}
+            className="rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-xs font-bold text-foreground transition-all hover:bg-white"
           >
-            <Download className="w-3.5 h-3.5" />
-            Tải ảnh xuống thiết bị
+            Thử lại
           </button>
+          <Link
+            href="/account/try-on-history"
+            className="btn-primary flex items-center justify-center py-2.5 text-xs"
+          >
+            Xem lịch sử
+          </Link>
         </div>
       </div>
     );
   }
 
-  // -- Idle State (placeholder) --
   return (
-    <div className={cn("", className)}>
-      <div className="aspect-[3/4] rounded-2xl glass-card border-2 border-dashed border-violet-200/40 flex flex-col items-center justify-center gap-4">
-        <div className="w-20 h-20 rounded-full bg-violet-50 flex items-center justify-center">
-          <Sparkles className="w-10 h-10 text-violet-300" />
+    <div className={cn('', className)}>
+      <div className="flex aspect-[3/4] flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-violet-200/40 glass-card">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-violet-50">
+          <Sparkles className="h-10 w-10 text-violet-300" />
         </div>
-        <div className="text-center px-4">
-          <p className="text-sm font-medium text-foreground/60 mb-1">
+        <div className="px-4 text-center">
+          <p className="mb-1 text-sm font-medium text-foreground/60">
             Kết quả AI
           </p>
           <p className="text-xs text-muted-foreground">

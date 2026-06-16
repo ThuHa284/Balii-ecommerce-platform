@@ -29,6 +29,14 @@ export class ProductsController {
     return this.productsService.findAll(keyword);
   }
 
+  @Get('recommend')
+  recommendProducts(
+    @Query('gender') gender?: string,
+    @Query('ageGroup') ageGroup?: string,
+  ) {
+    return this.productsService.recommendProducts(gender, ageGroup);
+  }
+
   @Get('slug/:slug')
   findBySlug(@Param('slug') slug: string) {
     return this.productsService.findBySlug(slug);

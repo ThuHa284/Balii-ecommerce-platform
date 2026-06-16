@@ -14,10 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  createCategory,
-  getCategories,
-} from '@/lib/api/categories.api';
+import { createCategory, getCategories } from '@/lib/api/categories.api';
 import { canDeleteAdminResource } from '@/lib/api/admin.utils';
 import {
   createProduct,
@@ -27,6 +24,7 @@ import {
   getAdminProducts,
   getProductImages,
   ProductImageRecord,
+  updateProductImage,
   updateProduct,
   updateProductVariant,
   uploadProductImage,
@@ -53,6 +51,10 @@ interface ImageRow {
   url: string;
   file?: File;
   isExisting: boolean;
+  variantId?: string;
+  isPrimary?: boolean;
+  altText?: string;
+  sortOrder: number;
 }
 
 const WEIGHT_SIZE_PRESETS = [
@@ -62,6 +64,19 @@ const WEIGHT_SIZE_PRESETS = [
   '64-70kg',
   '71-78kg',
 ];
+
+const PRODUCT_GENDER_OPTIONS = [
+  { value: 'female', label: 'Nữ' },
+  { value: 'male', label: 'Nam' },
+  { value: 'unisex', label: 'Unisex' },
+] as const;
+
+const PRODUCT_AGE_OPTIONS = [
+  { value: 'under_18', label: 'Dưới 18' },
+  { value: '18_25', label: '18_25' },
+  { value: '26_35', label: '26_35' },
+  { value: '36_plus', label: '36_plus' },
+] as const;
 
 function buildInitials(value: string) {
   return value
@@ -109,6 +124,14 @@ function ProductFormContent() {
   const [basePrice, setBasePrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [material, setMaterial] = useState('');
+  const [targetGender, setTargetGender] = useState<
+    'male' | 'female' | 'unisex'
+  >('female');
+  const [recommendedAgeGroups, setRecommendedAgeGroups] = useState<string[]>([
+    'under_18',
+    '18_25',
+    '26_35',
+  ]);
   const [images, setImages] = useState<ImageRow[]>([]);
   const [variants, setVariants] = useState<VariantRow[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -161,11 +184,21 @@ function ProductFormContent() {
     setBasePrice(product.basePrice ? String(product.basePrice) : '');
     setSalePrice(product.salePrice != null ? String(product.salePrice) : '');
     setMaterial('');
+    setTargetGender(product.targetGender ?? 'female');
+    setRecommendedAgeGroups(
+      product.recommendedAgeGroups?.length
+        ? product.recommendedAgeGroups
+        : ['under_18', '18_25', '26_35'],
+    );
     setImages(
-      imageData.map((image) => ({
+      imageData.map((image, index) => ({
         id: image.id,
         url: image.url,
         isExisting: true,
+        variantId: image.variantId ?? undefined,
+        isPrimary: image.isPrimary,
+        altText: image.altText ?? '',
+        sortOrder: image.sortOrder ?? index,
       })),
     );
     setVariants(
@@ -218,7 +251,7 @@ function ProductFormContent() {
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
         .replace(/-+/g, '-')
-      .trim(),
+        .trim(),
     );
   };
 
@@ -230,7 +263,9 @@ function ProductFormContent() {
     const productPart = buildInitials(productName || 'SP');
     const colorPart = buildInitials(color || 'MAU');
     const sizePart = normalizeSkuPart(size || 'SIZE');
-    return [productPart || 'SP', colorPart || 'MAU', sizePart || 'SIZE'].join('-');
+    return [productPart || 'SP', colorPart || 'MAU', sizePart || 'SIZE'].join(
+      '-',
+    );
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,6 +283,10 @@ function ProductFormContent() {
         url: URL.createObjectURL(file),
         file,
         isExisting: false,
+        variantId: undefined,
+        isPrimary: images.length + nextImages.length === 0,
+        altText: '',
+        sortOrder: images.length + nextImages.length,
       });
     }
 
@@ -299,6 +338,27 @@ function ProductFormContent() {
     ]);
   };
 
+  const updateImageField = (
+    index: number,
+    field: keyof ImageRow,
+    value: string | number | boolean | undefined,
+  ) => {
+    setImages((current) =>
+      current.map((image, currentIndex) =>
+        currentIndex === index ? { ...image, [field]: value } : image,
+      ),
+    );
+  };
+
+  const setPrimaryImage = (index: number) => {
+    setImages((current) =>
+      current.map((image, currentIndex) => ({
+        ...image,
+        isPrimary: currentIndex === index,
+      })),
+    );
+  };
+
   const handleCreateCategory = async () => {
     if (!newCategoryName.trim() || !newCategorySlug.trim()) {
       toast.error('Vui lòng nhập tên và slug danh mục mới.');
@@ -328,6 +388,14 @@ function ProductFormContent() {
     }
   };
 
+  const toggleRecommendedAgeGroup = (ageGroup: string) => {
+    setRecommendedAgeGroups((current) =>
+      current.includes(ageGroup)
+        ? current.filter((item) => item !== ageGroup)
+        : [...current, ageGroup],
+    );
+  };
+
   const updateVariantField = (
     index: number,
     field: keyof VariantRow,
@@ -339,7 +407,7 @@ function ProductFormContent() {
           return variant;
         }
 
-        const nextVariant = { ...variant, [field]: value } as VariantRow;
+        const nextVariant = { ...variant, [field]: value };
         nextVariant.sku = generateVariantSku(
           name,
           nextVariant.color,
@@ -392,6 +460,10 @@ function ProductFormContent() {
       toast.error('Vui lòng nhập giá gốc.');
       return false;
     }
+    if (!recommendedAgeGroups.length) {
+      toast.error('Vui lòng chọn ít nhất một nhóm tuổi phù hợp.');
+      return false;
+    }
     if (variants.some((variant) => !variant.sku.trim())) {
       toast.error('Mỗi biến thể phải có SKU.');
       return false;
@@ -419,9 +491,19 @@ function ProductFormContent() {
   };
 
   const syncImages = async (savedProductId: string) => {
-    for (const image of images) {
+    for (let index = 0; index < images.length; index += 1) {
+      const image = images[index];
+      const payload = {
+        variantId: image.variantId || undefined,
+        altText: image.altText?.trim() || undefined,
+        sortOrder: index,
+        isPrimary: image.isPrimary ?? index === 0,
+      };
+
       if (image.file) {
-        await uploadProductImage(savedProductId, image.file);
+        await uploadProductImage(savedProductId, image.file, payload);
+      } else if (image.id) {
+        await updateProductImage(image.id, payload);
       }
     }
   };
@@ -441,6 +523,8 @@ function ProductFormContent() {
         originalPrice: Number(basePrice),
         salePrice: salePrice ? Number(salePrice) : null,
         material: material.trim() || undefined,
+        targetGender,
+        recommendedAgeGroups,
         isActive: true,
       };
 
@@ -586,33 +670,70 @@ function ProductFormContent() {
               {images.map((img, index) => (
                 <div
                   key={`${img.id ?? 'new'}-${img.url}-${index}`}
-                  className="relative aspect-square rounded-xl overflow-hidden glass-card group"
+                  className="glass-card group rounded-xl p-2"
                 >
-                  <Image
-                    src={img.url}
-                    alt={`Ảnh ${index + 1}`}
-                    fill
-                    className="object-cover"
-                    sizes="200px"
-                  />
-                  {index === 0 ? (
-                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-violet-500 text-white text-[10px] font-bold">
-                      Chính
-                    </span>
-                  ) : null}
-                  <button
-                    onClick={() => void removeImage(index)}
-                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500/90 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 active:scale-90"
-                    title={
-                      img.isExisting && !canDelete
-                        ? 'Chỉ super admin mới được xóa ảnh đã lưu'
-                        : 'Xóa ảnh'
-                    }
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                  <div className="absolute bottom-2 left-2 p-1 rounded bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                    <GripVertical className="w-3 h-3" />
+                  <div className="relative aspect-square overflow-hidden rounded-xl">
+                    <Image
+                      src={img.url}
+                      alt={`Ảnh ${index + 1}`}
+                      fill
+                      className="object-cover"
+                      sizes="200px"
+                    />
+                    {img.isPrimary ? (
+                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-violet-500 text-white text-[10px] font-bold">
+                        Chính
+                      </span>
+                    ) : null}
+                    <button
+                      onClick={() => void removeImage(index)}
+                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500/90 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 active:scale-90"
+                      title={
+                        img.isExisting && !canDelete
+                          ? 'Chỉ super admin mới được xóa ảnh đã lưu'
+                          : 'Xóa ảnh'
+                      }
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    <div className="absolute bottom-2 left-2 p-1 rounded bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                      <GripVertical className="w-3 h-3" />
+                    </div>
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setPrimaryImage(index)}
+                      className={`w-full rounded-lg px-2 py-1 text-xs font-medium transition ${
+                        img.isPrimary
+                          ? 'bg-violet-500 text-white'
+                          : 'bg-white/70 text-slate-700 hover:bg-white'
+                      }`}
+                    >
+                      {img.isPrimary
+                        ? 'Đang là ảnh chính'
+                        : 'Đặt làm ảnh chính'}
+                    </button>
+                    <select
+                      value={img.variantId ?? ''}
+                      onChange={(e) =>
+                        updateImageField(
+                          index,
+                          'variantId',
+                          e.target.value || undefined,
+                        )
+                      }
+                      className="w-full rounded-lg border border-white/50 bg-white/80 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
+                    >
+                      <option value="">Ảnh dùng chung cho mọi màu</option>
+                      {variants
+                        .filter((variant) => Boolean(variant.id))
+                        .map((variant) => (
+                          <option key={variant.clientId} value={variant.id}>
+                            {variant.color || 'Chưa đặt màu'} - {variant.size}
+                          </option>
+                        ))}
+                    </select>
                   </div>
                 </div>
               ))}
@@ -641,7 +762,8 @@ function ProductFormContent() {
               </button>
             </div>
             <p className="mb-4 text-xs text-muted-foreground">
-              Mỗi biến thể có tồn kho riêng và SKU riêng. SKU được tự sinh từ tên sản phẩm, màu và size.
+              Mỗi biến thể có tồn kho riêng và SKU riêng. SKU được tự sinh từ
+              tên sản phẩm, màu và size.
             </p>
 
             {variants.length === 0 ? (
@@ -684,7 +806,9 @@ function ProductFormContent() {
                         <button
                           key={preset}
                           type="button"
-                          onClick={() => updateVariantField(index, 'size', preset)}
+                          onClick={() =>
+                            updateVariantField(index, 'size', preset)
+                          }
                           className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                             variant.size === preset
                               ? 'bg-violet-500 text-white'
@@ -733,7 +857,11 @@ function ProductFormContent() {
                             type="color"
                             value={variant.colorCode || '#f8b4c7'}
                             onChange={(e) =>
-                              updateVariantField(index, 'colorCode', e.target.value)
+                              updateVariantField(
+                                index,
+                                'colorCode',
+                                e.target.value,
+                              )
                             }
                             className="h-8 w-10 rounded border-0 bg-transparent p-0"
                           />
@@ -741,7 +869,11 @@ function ProductFormContent() {
                             type="text"
                             value={variant.colorCode}
                             onChange={(e) =>
-                              updateVariantField(index, 'colorCode', e.target.value)
+                              updateVariantField(
+                                index,
+                                'colorCode',
+                                e.target.value,
+                              )
                             }
                             placeholder="#f8b4c7"
                             className="w-full bg-transparent text-sm focus:outline-none"
@@ -846,7 +978,9 @@ function ProductFormContent() {
                 <div className="mt-3 rounded-xl border border-white/40 bg-white/30 p-3">
                   <button
                     type="button"
-                    onClick={() => setShowCategoryCreator((current) => !current)}
+                    onClick={() =>
+                      setShowCategoryCreator((current) => !current)
+                    }
                     className="text-sm font-medium text-violet-600 hover:text-violet-700"
                   >
                     {showCategoryCreator
@@ -859,7 +993,9 @@ function ProductFormContent() {
                       <input
                         type="text"
                         value={newCategoryName}
-                        onChange={(e) => handleCategoryNameChange(e.target.value)}
+                        onChange={(e) =>
+                          handleCategoryNameChange(e.target.value)
+                        }
                         placeholder="Tên danh mục mới"
                         className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                       />
@@ -917,6 +1053,48 @@ function ProductFormContent() {
                   placeholder="VD: Lụa satin"
                   className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
                 />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-foreground">
+                  Giới tính phù hợp
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PRODUCT_GENDER_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setTargetGender(option.value)}
+                      className={`rounded-xl px-3 py-2 text-sm font-medium transition-all ${
+                        targetGender === option.value
+                          ? 'bg-violet-500 text-white'
+                          : 'bg-white/60 text-foreground hover:bg-white'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-foreground">
+                  Độ tuổi phù hợp
+                </label>
+                <div className="space-y-2">
+                  {PRODUCT_AGE_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex items-center gap-3 rounded-xl bg-white/50 px-3 py-2 text-sm text-foreground"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={recommendedAgeGroups.includes(option.value)}
+                        onChange={() => toggleRecommendedAgeGroup(option.value)}
+                        className="h-4 w-4 rounded border-white/50 text-violet-500 focus:ring-violet-300"
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
               {basePrice ? (
                 <div className="p-3 rounded-xl bg-violet-50/50">

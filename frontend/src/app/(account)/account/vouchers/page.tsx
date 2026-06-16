@@ -1,15 +1,32 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Ticket, Tag, Clock, CheckCircle2, Gift, Percent, Banknote, Sparkles } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { getAvailableVouchers, getMyVouchers, saveVoucher } from "@/lib/api/vouchers.api";
-import { Voucher, UserVoucher, VoucherDiscountType } from "@/types/voucher.types";
+import { useState, useEffect } from 'react';
+import {
+  Ticket,
+  Tag,
+  Clock,
+  CheckCircle2,
+  Gift,
+  Percent,
+  Banknote,
+  Sparkles,
+} from 'lucide-react';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import {
+  getAvailableVouchers,
+  getMyVouchers,
+  saveVoucher,
+} from '@/lib/api/vouchers.api';
+import {
+  Voucher,
+  UserVoucher,
+  VoucherDiscountType,
+} from '@/types/voucher.types';
 
-type Tab = "available" | "saved";
+type Tab = 'available' | 'saved';
 
 export default function VouchersPage() {
-  const [tab, setTab] = useState<Tab>("available");
+  const [tab, setTab] = useState<Tab>('available');
   const [availableVouchers, setAvailableVouchers] = useState<Voucher[]>([]);
   const [myVouchers, setMyVouchers] = useState<UserVoucher[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,10 +40,15 @@ export default function VouchersPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [available, saved] = await Promise.all([
+      const [availableResult, savedResult] = await Promise.allSettled([
         getAvailableVouchers(),
         getMyVouchers(),
       ]);
+
+      const available =
+        availableResult.status === 'fulfilled' ? availableResult.value : [];
+      const saved = savedResult.status === 'fulfilled' ? savedResult.value : [];
+
       setAvailableVouchers(available);
       setMyVouchers(saved);
       setSavedCodes(new Set(saved.map((uv) => uv.voucher.code)));
@@ -54,13 +76,18 @@ export default function VouchersPage() {
   }
 
   function getRemainingPercent(voucher: Voucher) {
-    return Math.max(0, ((voucher.usageLimit - voucher.usedCount) / voucher.usageLimit) * 100);
+    return Math.max(
+      0,
+      ((voucher.usageLimit - voucher.usedCount) / voucher.usageLimit) * 100,
+    );
   }
 
   if (loading) {
     return (
       <div>
-        <h1 className="font-heading text-2xl font-bold text-foreground mb-6">Voucher của tôi</h1>
+        <h1 className="font-heading text-2xl font-bold text-foreground mb-6">
+          Voucher của tôi
+        </h1>
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="glass-card p-6 animate-pulse">
@@ -81,42 +108,52 @@ export default function VouchersPage() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-foreground mb-6">Voucher của tôi</h1>
+      <h1 className="font-heading text-2xl font-bold text-foreground mb-6">
+        Voucher của tôi
+      </h1>
 
       {/* Tabs */}
       <div className="glass-card p-1.5 mb-6 inline-flex rounded-xl">
         <button
-          onClick={() => setTab("available")}
+          onClick={() => setTab('available')}
           className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            tab === "available"
-              ? "bg-violet-500 text-white shadow-lg shadow-violet-300/25"
-              : "text-foreground/70 hover:text-foreground"
+            tab === 'available'
+              ? 'bg-violet-500 text-white shadow-lg shadow-violet-300/25'
+              : 'text-foreground/70 hover:text-foreground'
           }`}
         >
           <span className="flex items-center gap-2">
             <Gift className="w-4 h-4" />
             Voucher có sẵn
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              tab === "available" ? "bg-white/20" : "bg-violet-100 text-violet-600"
-            }`}>
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded-full ${
+                tab === 'available'
+                  ? 'bg-white/20'
+                  : 'bg-violet-100 text-violet-600'
+              }`}
+            >
               {availableVouchers.length}
             </span>
           </span>
         </button>
         <button
-          onClick={() => setTab("saved")}
+          onClick={() => setTab('saved')}
           className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            tab === "saved"
-              ? "bg-violet-500 text-white shadow-lg shadow-violet-300/25"
-              : "text-foreground/70 hover:text-foreground"
+            tab === 'saved'
+              ? 'bg-violet-500 text-white shadow-lg shadow-violet-300/25'
+              : 'text-foreground/70 hover:text-foreground'
           }`}
         >
           <span className="flex items-center gap-2">
             <Ticket className="w-4 h-4" />
             Đã thu thập
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              tab === "saved" ? "bg-white/20" : "bg-violet-100 text-violet-600"
-            }`}>
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded-full ${
+                tab === 'saved'
+                  ? 'bg-white/20'
+                  : 'bg-violet-100 text-violet-600'
+              }`}
+            >
               {myVouchers.length}
             </span>
           </span>
@@ -124,7 +161,7 @@ export default function VouchersPage() {
       </div>
 
       {/* Available Vouchers */}
-      {tab === "available" && (
+      {tab === 'available' && (
         <div className="space-y-4">
           {availableVouchers.length === 0 ? (
             <div className="glass-card p-12 text-center">
@@ -147,7 +184,8 @@ export default function VouchersPage() {
                         <Sparkles className="w-20 h-20 absolute -top-2 -right-2 text-white" />
                       </div>
                       <div className="text-white text-center relative z-10">
-                        {voucher.discountType === VoucherDiscountType.PERCENT ? (
+                        {voucher.discountType ===
+                        VoucherDiscountType.PERCENT ? (
                           <Percent className="w-5 h-5 mx-auto mb-1 opacity-80" />
                         ) : (
                           <Banknote className="w-5 h-5 mx-auto mb-1 opacity-80" />
@@ -157,7 +195,9 @@ export default function VouchersPage() {
                             ? `${voucher.discountValue}%`
                             : `${Math.round(voucher.discountValue / 1000)}K`}
                         </p>
-                        <p className="text-[10px] uppercase tracking-wider opacity-80 mt-1">Giảm giá</p>
+                        <p className="text-[10px] uppercase tracking-wider opacity-80 mt-1">
+                          Giảm giá
+                        </p>
                       </div>
                       {/* Coupon notches */}
                       <div className="absolute top-1/2 -right-3 w-6 h-6 bg-background rounded-full -translate-y-1/2" />
@@ -171,7 +211,9 @@ export default function VouchersPage() {
                             <h3 className="font-heading font-semibold text-foreground group-hover:text-primary transition-colors">
                               {voucher.name}
                             </h3>
-                            <p className="text-sm text-muted-foreground mt-0.5">{voucher.description}</p>
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                              {voucher.description}
+                            </p>
                           </div>
                           <span className="shrink-0 text-xs font-mono bg-violet-50 text-violet-600 px-2.5 py-1 rounded-lg border border-violet-200">
                             {voucher.code}
@@ -182,7 +224,8 @@ export default function VouchersPage() {
                           {voucher.minOrderValue > 0 && (
                             <span className="flex items-center gap-1">
                               <Tag className="w-3 h-3" />
-                              Đơn tối thiểu {formatCurrency(voucher.minOrderValue)}
+                              Đơn tối thiểu{' '}
+                              {formatCurrency(voucher.minOrderValue)}
                             </span>
                           )}
                           {voucher.maxDiscount && (
@@ -202,7 +245,9 @@ export default function VouchersPage() {
                         {/* Usage progress */}
                         <div className="flex-1 mr-4">
                           <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
-                            <span>Đã dùng {voucher.usedCount}/{voucher.usageLimit}</span>
+                            <span>
+                              Đã dùng {voucher.usedCount}/{voucher.usageLimit}
+                            </span>
                             <span>{Math.round(remaining)}% còn lại</span>
                           </div>
                           <div className="h-1.5 bg-white/50 rounded-full overflow-hidden">
@@ -225,7 +270,9 @@ export default function VouchersPage() {
                             disabled={savingCode === voucher.code}
                             className="btn-primary text-xs px-4 py-2 disabled:opacity-50"
                           >
-                            {savingCode === voucher.code ? "Đang lưu..." : "Thu thập"}
+                            {savingCode === voucher.code
+                              ? 'Đang lưu...'
+                              : 'Thu thập'}
                           </button>
                         )}
                       </div>
@@ -239,13 +286,18 @@ export default function VouchersPage() {
       )}
 
       {/* My Vouchers */}
-      {tab === "saved" && (
+      {tab === 'saved' && (
         <div className="space-y-4">
           {myVouchers.length === 0 ? (
             <div className="glass-card p-12 text-center">
               <Ticket className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">Bạn chưa thu thập voucher nào</p>
-              <button onClick={() => setTab("available")} className="btn-primary inline-block text-sm">
+              <p className="text-muted-foreground mb-4">
+                Bạn chưa thu thập voucher nào
+              </p>
+              <button
+                onClick={() => setTab('available')}
+                className="btn-primary inline-block text-sm"
+              >
                 Xem voucher có sẵn
               </button>
             </div>
@@ -258,18 +310,21 @@ export default function VouchersPage() {
                 <div
                   key={uv.id}
                   className={`glass-card overflow-hidden transition-all duration-300 ${
-                    uv.isUsed || isExpired ? "opacity-60" : "hover:bg-white/75"
+                    uv.isUsed || isExpired ? 'opacity-60' : 'hover:bg-white/75'
                   }`}
                 >
                   <div className="flex">
                     {/* Left — Discount Badge */}
-                    <div className={`w-32 sm:w-36 shrink-0 flex flex-col items-center justify-center p-4 relative ${
-                      uv.isUsed || isExpired
-                        ? "bg-gradient-to-br from-gray-400 to-gray-500"
-                        : "bg-gradient-to-br from-violet-500 to-purple-600"
-                    }`}>
+                    <div
+                      className={`w-32 sm:w-36 shrink-0 flex flex-col items-center justify-center p-4 relative ${
+                        uv.isUsed || isExpired
+                          ? 'bg-gradient-to-br from-gray-400 to-gray-500'
+                          : 'bg-gradient-to-br from-violet-500 to-purple-600'
+                      }`}
+                    >
                       <div className="text-white text-center">
-                        {voucher.discountType === VoucherDiscountType.PERCENT ? (
+                        {voucher.discountType ===
+                        VoucherDiscountType.PERCENT ? (
                           <Percent className="w-5 h-5 mx-auto mb-1 opacity-80" />
                         ) : (
                           <Banknote className="w-5 h-5 mx-auto mb-1 opacity-80" />
@@ -279,13 +334,15 @@ export default function VouchersPage() {
                             ? `${voucher.discountValue}%`
                             : `${Math.round(voucher.discountValue / 1000)}K`}
                         </p>
-                        <p className="text-[10px] uppercase tracking-wider opacity-80 mt-1">Giảm giá</p>
+                        <p className="text-[10px] uppercase tracking-wider opacity-80 mt-1">
+                          Giảm giá
+                        </p>
                       </div>
                       {/* Overlay for used/expired */}
                       {(uv.isUsed || isExpired) && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                           <span className="text-white text-xs font-bold uppercase tracking-wider bg-black/40 px-3 py-1 rounded-full">
-                            {uv.isUsed ? "Đã dùng" : "Hết hạn"}
+                            {uv.isUsed ? 'Đã dùng' : 'Hết hạn'}
                           </span>
                         </div>
                       )}
@@ -296,8 +353,12 @@ export default function VouchersPage() {
                     <div className="flex-1 p-5">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div>
-                          <h3 className="font-heading font-semibold text-foreground">{voucher.name}</h3>
-                          <p className="text-sm text-muted-foreground mt-0.5">{voucher.description}</p>
+                          <h3 className="font-heading font-semibold text-foreground">
+                            {voucher.name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {voucher.description}
+                          </p>
                         </div>
                         <span className="shrink-0 text-xs font-mono bg-violet-50 text-violet-600 px-2.5 py-1 rounded-lg border border-violet-200">
                           {voucher.code}
@@ -308,7 +369,8 @@ export default function VouchersPage() {
                         {voucher.minOrderValue > 0 && (
                           <span className="flex items-center gap-1">
                             <Tag className="w-3 h-3" />
-                            Đơn tối thiểu {formatCurrency(voucher.minOrderValue)}
+                            Đơn tối thiểu{' '}
+                            {formatCurrency(voucher.minOrderValue)}
                           </span>
                         )}
                         <span className="flex items-center gap-1">
@@ -324,21 +386,27 @@ export default function VouchersPage() {
                             <div
                               className={`h-full rounded-full transition-all duration-500 ${
                                 uv.isUsed || isExpired
-                                  ? "bg-gray-400"
-                                  : "bg-gradient-to-r from-violet-400 to-purple-500"
+                                  ? 'bg-gray-400'
+                                  : 'bg-gradient-to-r from-violet-400 to-purple-500'
                               }`}
                               style={{ width: `${remaining}%` }}
                             />
                           </div>
                         </div>
-                        <span className={`text-xs font-medium px-3 py-1.5 rounded-xl ${
-                          uv.isUsed
-                            ? "bg-gray-100 text-gray-500"
+                        <span
+                          className={`text-xs font-medium px-3 py-1.5 rounded-xl ${
+                            uv.isUsed
+                              ? 'bg-gray-100 text-gray-500'
+                              : isExpired
+                                ? 'bg-orange-50 text-orange-500'
+                                : 'bg-emerald-50 text-emerald-600'
+                          }`}
+                        >
+                          {uv.isUsed
+                            ? 'Đã sử dụng'
                             : isExpired
-                            ? "bg-orange-50 text-orange-500"
-                            : "bg-emerald-50 text-emerald-600"
-                        }`}>
-                          {uv.isUsed ? "Đã sử dụng" : isExpired ? "Đã hết hạn" : "Sẵn sàng dùng"}
+                              ? 'Đã hết hạn'
+                              : 'Sẵn sàng dùng'}
                         </span>
                       </div>
                     </div>

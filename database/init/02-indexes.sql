@@ -93,6 +93,9 @@ ON voucher_service.vouchers(is_active);
 CREATE INDEX IF NOT EXISTS idx_voucher_usage_user_id
 ON voucher_service.voucher_usages(user_id);
 
+CREATE INDEX IF NOT EXISTS idx_user_vouchers_user_id
+ON voucher_service.user_vouchers(user_id);
+
 -- Notification Service Indexes
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id
 ON notification_service.notifications(user_id);

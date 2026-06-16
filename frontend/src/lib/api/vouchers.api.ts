@@ -1,231 +1,122 @@
+import apiClient from './client';
 import {
   CreateVoucherData,
+  UserVoucher,
   Voucher,
   VoucherDiscountType,
-  UserVoucher,
 } from '@/types/voucher.types';
 
-const USE_MOCK = true;
+type VoucherApiResponse = {
+  id: string;
+  code: string;
+  name?: string;
+  description?: string;
+  discountType: VoucherDiscountType;
+  discountValue: number;
+  minOrderValue: number;
+  maxDiscount: number | null;
+  usageLimit: number | null;
+  usedCount: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+};
 
-const mockVouchers: Voucher[] = [
-  {
-    id: 'vc_001',
-    code: 'WELCOME20',
-    name: 'Chào mừng thành viên mới',
-    description: 'Giảm 20% cho đơn hàng đầu tiên',
-    discountType: VoucherDiscountType.PERCENT,
-    discountValue: 20,
-    minOrderValue: 500000,
-    maxDiscount: 200000,
-    usageLimit: 1000,
-    usedCount: 456,
-    startDate: '2024-01-01T00:00:00Z',
-    endDate: '2025-12-31T23:59:59Z',
-    isActive: true,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-03-15T10:00:00Z',
-  },
-  {
-    id: 'vc_002',
-    code: 'SUMMER50K',
-    name: 'Ưu đãi mùa hè',
-    description: 'Giảm 50.000đ cho đơn từ 300.000đ',
-    discountType: VoucherDiscountType.FIXED,
-    discountValue: 50000,
-    minOrderValue: 300000,
-    maxDiscount: null,
-    usageLimit: 500,
-    usedCount: 123,
-    startDate: '2024-05-01T00:00:00Z',
-    endDate: '2025-08-31T23:59:59Z',
-    isActive: true,
-    createdAt: '2024-04-20T00:00:00Z',
-    updatedAt: '2024-05-01T00:00:00Z',
-  },
-  {
-    id: 'vc_003',
-    code: 'VIP30',
-    name: 'Ưu đãi VIP',
-    description: 'Giảm 30% cho khách hàng thân thiết',
-    discountType: VoucherDiscountType.PERCENT,
-    discountValue: 30,
-    minOrderValue: 800000,
-    maxDiscount: 300000,
-    usageLimit: 200,
-    usedCount: 189,
-    startDate: '2024-02-01T00:00:00Z',
-    endDate: '2025-06-30T23:59:59Z',
-    isActive: true,
-    createdAt: '2024-02-01T00:00:00Z',
-    updatedAt: '2024-03-01T00:00:00Z',
-  },
-  {
-    id: 'vc_004',
-    code: 'FREESHIP',
-    name: 'Miễn phí vận chuyển',
-    description: 'Giảm 30.000đ phí ship cho mọi đơn hàng',
-    discountType: VoucherDiscountType.FIXED,
-    discountValue: 30000,
-    minOrderValue: 0,
-    maxDiscount: null,
-    usageLimit: 2000,
-    usedCount: 1876,
-    startDate: '2024-01-15T00:00:00Z',
-    endDate: '2025-12-31T23:59:59Z',
-    isActive: true,
-    createdAt: '2024-01-15T00:00:00Z',
-    updatedAt: '2024-03-20T00:00:00Z',
-  },
-  {
-    id: 'vc_005',
-    code: 'NEWYEAR100K',
-    name: 'Mừng năm mới',
-    description: 'Giảm 100.000đ cho đơn từ 1.000.000đ',
-    discountType: VoucherDiscountType.FIXED,
-    discountValue: 100000,
-    minOrderValue: 1000000,
-    maxDiscount: null,
-    usageLimit: 300,
-    usedCount: 300,
-    startDate: '2024-01-01T00:00:00Z',
-    endDate: '2024-02-28T23:59:59Z',
-    isActive: false,
-    createdAt: '2023-12-25T00:00:00Z',
-    updatedAt: '2024-02-28T23:59:59Z',
-  },
-  {
-    id: 'vc_006',
-    code: 'SILK15',
-    name: 'Bộ sưu tập Lụa',
-    description: 'Giảm 15% cho sản phẩm lụa cao cấp',
-    discountType: VoucherDiscountType.PERCENT,
-    discountValue: 15,
-    minOrderValue: 600000,
-    maxDiscount: 150000,
-    usageLimit: 800,
-    usedCount: 234,
-    startDate: '2024-03-01T00:00:00Z',
-    endDate: '2025-09-30T23:59:59Z',
-    isActive: true,
-    createdAt: '2024-03-01T00:00:00Z',
-    updatedAt: '2024-03-10T00:00:00Z',
-  },
-];
+type UserVoucherApiResponse = {
+  id: string;
+  voucher: VoucherApiResponse;
+  savedAt: string;
+  isUsed: boolean;
+  usedAt: string | null;
+};
 
-const mockUserVouchers: UserVoucher[] = [
-  {
-    id: 'uv_001',
-    voucher: mockVouchers[0],
-    savedAt: '2024-03-10T08:00:00Z',
-    isUsed: false,
-    usedAt: null,
-  },
-  {
-    id: 'uv_002',
-    voucher: mockVouchers[3],
-    savedAt: '2024-03-12T14:30:00Z',
-    isUsed: true,
-    usedAt: '2024-03-15T10:00:00Z',
-  },
-  {
-    id: 'uv_003',
-    voucher: mockVouchers[5],
-    savedAt: '2024-03-14T09:00:00Z',
-    isUsed: false,
-    usedAt: null,
-  },
-];
+function mapVoucher(input: VoucherApiResponse): Voucher {
+  return {
+    id: input.id,
+    code: input.code,
+    name: input.name?.trim() || input.code,
+    description: input.description?.trim() || '',
+    discountType: input.discountType,
+    discountValue: Number(input.discountValue ?? 0),
+    minOrderValue: Number(input.minOrderValue ?? 0),
+    maxDiscount: input.maxDiscount != null ? Number(input.maxDiscount) : null,
+    usageLimit: Number(input.usageLimit ?? 999999999),
+    usedCount: Number(input.usedCount ?? 0),
+    startDate: input.startDate,
+    endDate: input.endDate,
+    isActive: Boolean(input.isActive),
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt ?? input.createdAt,
+  };
+}
+
+function mapUserVoucher(input: UserVoucherApiResponse): UserVoucher {
+  return {
+    id: input.id,
+    voucher: mapVoucher(input.voucher),
+    savedAt: input.savedAt,
+    isUsed: Boolean(input.isUsed),
+    usedAt: input.usedAt,
+  };
+}
+
+function toVoucherPayload(data: CreateVoucherData) {
+  return {
+    code: data.code,
+    name: data.name,
+    description: data.description,
+    discountType: data.discountType,
+    discountValue: data.discountValue,
+    minOrderValue: data.minOrderValue,
+    maxDiscount: data.maxDiscount,
+    usageLimit: data.usageLimit,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    isActive: data.isActive,
+  };
+}
 
 export async function getAvailableVouchers(): Promise<Voucher[]> {
-  if (!USE_MOCK) return [];
-
-  return new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve(
-          mockVouchers.filter(
-            (voucher) =>
-              voucher.isActive &&
-              new Date(voucher.endDate) > new Date() &&
-              voucher.usedCount < voucher.usageLimit,
-          ),
-        ),
-      500,
-    ),
-  );
+  const { data } = await apiClient.get('/vouchers');
+  return (data as VoucherApiResponse[]).map(mapVoucher);
 }
 
 export async function getMyVouchers(): Promise<UserVoucher[]> {
-  if (!USE_MOCK) return [];
-  return new Promise((resolve) =>
-    setTimeout(() => resolve(mockUserVouchers), 500),
-  );
+  const { data } = await apiClient.get('/vouchers/me');
+  return (data as UserVoucherApiResponse[]).map(mapUserVoucher);
 }
 
 export async function saveVoucher(code: string): Promise<UserVoucher> {
-  if (!USE_MOCK) throw new Error('Not implemented');
-
-  const voucher = mockVouchers.find((item) => item.code === code);
-  if (!voucher) {
-    throw new Error('Voucher không tồn tại');
-  }
-
-  const userVoucher: UserVoucher = {
-    id: `uv_${Date.now()}`,
-    voucher,
-    savedAt: new Date().toISOString(),
-    isUsed: false,
-    usedAt: null,
-  };
-
-  return new Promise((resolve) => setTimeout(() => resolve(userVoucher), 500));
+  const { data } = await apiClient.post(`/vouchers/${code}/save`);
+  return mapUserVoucher(data as UserVoucherApiResponse);
 }
 
 export async function getAdminVouchers(): Promise<Voucher[]> {
-  if (!USE_MOCK) return [];
-  return new Promise((resolve) => setTimeout(() => resolve(mockVouchers), 500));
+  const { data } = await apiClient.get('/admin/vouchers');
+  return (data as VoucherApiResponse[]).map(mapVoucher);
 }
 
 export async function createVoucher(data: CreateVoucherData): Promise<Voucher> {
-  if (!USE_MOCK) throw new Error('Not implemented');
-
-  const newVoucher: Voucher = {
-    ...data,
-    id: `vc_${Date.now()}`,
-    usedCount: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  return new Promise((resolve) => setTimeout(() => resolve(newVoucher), 600));
+  const { data: response } = await apiClient.post(
+    '/admin/vouchers',
+    toVoucherPayload(data),
+  );
+  return mapVoucher(response as VoucherApiResponse);
 }
 
 export async function updateVoucher(
   id: string,
   data: Partial<CreateVoucherData>,
 ): Promise<Voucher> {
-  if (!USE_MOCK) throw new Error('Not implemented');
-
-  const voucher = mockVouchers.find((item) => item.id === id);
-  if (!voucher) {
-    throw new Error('Voucher không tồn tại');
-  }
-
-  return new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve({
-          ...voucher,
-          ...data,
-          updatedAt: new Date().toISOString(),
-        }),
-      500,
-    ),
+  const { data: response } = await apiClient.patch(
+    `/admin/vouchers/${id}`,
+    data,
   );
+  return mapVoucher(response as VoucherApiResponse);
 }
 
 export async function deleteVoucher(id: string): Promise<void> {
-  if (!USE_MOCK) return;
-  void id;
-  return new Promise((resolve) => setTimeout(resolve, 500));
+  await apiClient.delete(`/admin/vouchers/${id}`);
 }

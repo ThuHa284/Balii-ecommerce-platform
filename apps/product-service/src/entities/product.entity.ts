@@ -29,6 +29,12 @@ export class Product {
   @Column({ type: 'varchar', length: 100, nullable: true })
   material?: string;
 
+  @Column({ name: 'target_gender', type: 'varchar', length: 20, default: 'unisex' })
+  targetGender?: string;
+
+  @Column({ name: 'recommended_age_groups', type: 'text', array: true, nullable: true })
+  recommendedAgeGroups?: string[];
+
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean | undefined;
 

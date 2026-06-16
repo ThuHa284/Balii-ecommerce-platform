@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-import { IsIn, IsOptional } from 'class-validator';
+import { IsBooleanString, IsIn, IsOptional, IsString } from 'class-validator';
 
 export class CreateTryOnDto {
   @IsOptional()
@@ -13,4 +12,21 @@ export class CreateTryOnDto {
   @IsOptional()
   @IsIn(['auto', 'model', 'flat-lay'])
   garmentPhotoType?: 'auto' | 'model' | 'flat-lay';
+
+  @IsOptional()
+  @IsString()
+  productId?: string;
+
+  @IsOptional()
+  @IsIn(['male', 'female', 'unisex'])
+  targetGender?: 'male' | 'female' | 'unisex';
+
+  @IsOptional()
+  @IsString()
+  recommendedAgeGroups?: string;
+  // ví dụ: "18_25,26_35"
+
+  @IsOptional()
+  @IsBooleanString()
+  confirmWarnings?: string;
 }

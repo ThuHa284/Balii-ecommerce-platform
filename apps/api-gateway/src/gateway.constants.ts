@@ -13,6 +13,8 @@ export const ROUTE_TARGETS: RouteTarget[] = [
   { prefix: '/cart', targetEnv: 'CART_SERVICE_URL' },
   { prefix: '/orders', targetEnv: 'ORDER_SERVICE_URL' },
   { prefix: '/payments', targetEnv: 'PAYMENT_SERVICE_URL' },
+  { prefix: '/vouchers', targetEnv: 'VOUCHER_SERVICE_URL' },
+  { prefix: '/admin/vouchers', targetEnv: 'VOUCHER_SERVICE_URL' },
   { prefix: '/try-on', targetEnv: 'TRYON_SERVICE_URL' },
   { prefix: '/market-analysis', targetEnv: 'MARKET_ANALYSIS_SERVICE_URL' },
 ];

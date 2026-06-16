@@ -11,6 +11,8 @@ export interface ProductPayload {
   originalPrice?: number;
   salePrice?: number | null;
   material?: string;
+  targetGender?: 'male' | 'female' | 'unisex';
+  recommendedAgeGroups?: string[];
   isActive?: boolean;
 }
 
@@ -25,6 +27,7 @@ export interface ProductVariantPayload {
   itemType?: 'TOP' | 'BOTTOM' | 'SET';
   sizeLabel?: string;
   colorName?: string;
+  colorCode?: string;
 }
 
 export interface ProductImageRecord {
@@ -36,6 +39,26 @@ export interface ProductImageRecord {
   altText?: string | null;
   sortOrder: number;
   isPrimary: boolean;
+}
+
+export interface ProductImagePayload {
+  variantId?: string | null;
+  altText?: string;
+  sortOrder?: number;
+  isPrimary?: boolean;
+}
+
+export interface RecommendedProduct {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  basePrice: number;
+  originalPrice: number | null;
+  salePrice: number | null;
+  targetGender: string;
+  recommendedAgeGroups: string[];
+  thumbnail: string;
 }
 
 type ProductResponse = Product;
@@ -176,9 +199,25 @@ export async function getProductImages(
   return data;
 }
 
-export async function uploadProductImage(productId: string, file: File) {
+export async function uploadProductImage(
+  productId: string,
+  file: File,
+  payload?: ProductImagePayload,
+) {
   const formData = new FormData();
   formData.append('file', file);
+  if (payload?.variantId) {
+    formData.append('variantId', payload.variantId);
+  }
+  if (payload?.altText) {
+    formData.append('altText', payload.altText);
+  }
+  if (payload?.sortOrder != null) {
+    formData.append('sortOrder', String(payload.sortOrder));
+  }
+  if (payload?.isPrimary != null) {
+    formData.append('isPrimary', String(payload.isPrimary));
+  }
 
   const { data } = await apiClient.post<ProductImageRecord>(
     `/products/${productId}/images`,
@@ -190,6 +229,17 @@ export async function uploadProductImage(productId: string, file: File) {
     },
   );
 
+  return data;
+}
+
+export async function updateProductImage(
+  id: string,
+  payload: ProductImagePayload,
+): Promise<ProductImageRecord> {
+  const { data } = await apiClient.patch<ProductImageRecord>(
+    `/products/images/${id}`,
+    payload,
+  );
   return data;
 }
 
@@ -205,4 +255,21 @@ export async function getFeaturedProducts(): Promise<Product[]> {
 export async function getNewProducts(): Promise<Product[]> {
   const { products } = await getProducts({ page: 1, limit: 8 });
   return products;
+}
+
+export async function getRecommendedProducts(
+  gender: string,
+  ageGroup: string,
+): Promise<RecommendedProduct[]> {
+  const { data } = await apiClient.get<{
+    success: true;
+    data: RecommendedProduct[];
+  }>('/products/recommend', {
+    params: {
+      gender,
+      ageGroup,
+    },
+  });
+
+  return data.data ?? [];
 }

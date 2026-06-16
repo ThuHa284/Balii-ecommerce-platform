@@ -55,6 +55,15 @@
         "tsConfigPath": "apps/payment-service/tsconfig.app.json"
       }
     },
+    "voucher-service": {
+      "type": "application",
+      "root": "apps/voucher-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/voucher-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/voucher-service/tsconfig.app.json"
+      }
+    },
     "product-service": {
       "type": "application",
       "root": "apps/product-service",

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Post,
+  Headers,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -10,16 +11,9 @@ import { CreateTryOnDto } from './dto/create-tryon.dto';
 import { VirtualTryonServiceService } from './virtual-tryon-service.service';
 import { Param, Get } from '@nestjs/common';
 
-type UploadedImageFile = {
-  mimetype: string;
-  buffer: Buffer;
-  originalname?: string;
-  size?: number;
-};
-
 type TryOnUploadFiles = {
-  modelImage?: UploadedImageFile[];
-  garmentImage?: UploadedImageFile[];
+  modelImage?: Express.Multer.File[];
+  garmentImage?: Express.Multer.File[];
 };
 
 @Controller('try-on')
@@ -45,8 +39,24 @@ export class VirtualTryonServiceController {
   createTryOn(
     @UploadedFiles() files: TryOnUploadFiles,
     @Body() dto: CreateTryOnDto,
+    @Headers('x-user-id') userId?: string,
   ) {
-    return this.virtualTryonService.createTryOn(files, dto);
+    return this.virtualTryonService.createTryOn(files, dto, userId);
+  }
+
+  @Get('history')
+  getHistory(@Headers('x-user-id') userId?: string) {
+    return this.virtualTryonService.getHistory(userId);
+  }
+
+  @Get('history/:id')
+  getHistoryDetail(@Param('id') id: string) {
+    return this.virtualTryonService.getHistoryDetail(id);
+  }
+
+  @Get('stats')
+  getStats() {
+    return this.virtualTryonService.getStats();
   }
 
   @Get(':id')
@@ -71,7 +81,8 @@ export class VirtualTryonServiceController {
   createTryOnSync(
     @UploadedFiles() files: TryOnUploadFiles,
     @Body() dto: CreateTryOnDto,
+    @Headers('x-user-id') userId?: string,
   ) {
-    return this.virtualTryonService.createTryOnSync(files, dto);
+    return this.virtualTryonService.createTryOnSync(files, dto, userId);
   }
 }
