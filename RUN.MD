@@ -1,7 +1,8 @@
-uvicorn app:app --host 0.0.0.0 --port 8010 --reload
+### AI Gender + Age : Model mobilenet_v3_small
 .\.venv\Scripts\activate
->> uvicorn app:app --host 0.0.0.0 --port 8010 --reload                                                                
-                  
+uvicorn app:app --host 0.0.0.0 --port 8010 --reload
+
+                                                               
 ### Terminal 1 - API Gateway
 
 ```powershell
@@ -65,14 +66,21 @@ npm run start:tryon
 
 Port: `3010`
 
+### Voucher Service
+npm run start:voucher
+
 ## 4. Chay frontend
 
 Mo them 1 terminal rieng:
 
 ```powershell
 cd E:\HocODayNe\DoAnTotNghiep\LVTN\Balii-ecommerce-platform\frontend
+### Môi trường dev
 npm run dev
 ```
+### Chạy mượt không bị compile
+npm run build
+npm start 
 
 Frontend mac dinh: `http://localhost:3000`
 
