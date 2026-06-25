@@ -1,6 +1,7 @@
 'use client';
 
 import { Printer, X } from 'lucide-react';
+import { formatAddressLine } from '@/lib/address-utils';
 import { formatCurrency } from '@/lib/utils';
 import { Order } from '@/types/order.types';
 
@@ -18,7 +19,7 @@ export default function InvoiceModal({
   if (!isOpen || !order) return null;
 
   const shippingAddr = order.shippingAddress;
-  const addressString = `${shippingAddr.street}, ${shippingAddr.ward}, ${shippingAddr.district}, ${shippingAddr.province}`;
+  const addressString = formatAddressLine(shippingAddr);
 
   return (
     <>

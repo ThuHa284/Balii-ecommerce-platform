@@ -10,7 +10,9 @@ import {
   Sparkles,
   XCircle,
 } from 'lucide-react';
+
 import { getTryOnHistory, getTryOnStats } from '@/lib/api/tryon.api';
+import { formatAgeGroupLabel, formatGenderLabel } from '@/lib/tryon-labels';
 import { formatDateTime } from '@/lib/utils';
 import { TryOnHistoryRecord, TryOnStats } from '@/types/tryon.types';
 
@@ -29,29 +31,6 @@ const STATUS_STYLES: Record<string, string> = {
   processing: 'bg-blue-100 text-blue-700',
   pending: 'bg-slate-100 text-slate-700',
 };
-
-function formatGenderLabel(value?: string | null) {
-  if (!value) return 'Chưa có';
-
-  const normalized = value.toLowerCase();
-  if (normalized === 'female') return 'Nữ';
-  if (normalized === 'male') return 'Nam';
-  if (normalized === 'unisex') return 'Unisex';
-
-  return value;
-}
-
-function formatAgeGroupLabel(value?: string | null) {
-  if (!value) return 'Chưa có';
-
-  const normalized = value.toLowerCase();
-  if (normalized === 'under_18') return 'Dưới 18';
-  if (normalized === '18_25') return '18_25';
-  if (normalized === '26_35') return '26_35';
-  if (normalized === '36_plus') return '36_plus';
-
-  return value;
-}
 
 function StatsTile({
   title,
@@ -100,7 +79,9 @@ export default function TryOnHistoryPage() {
         setStats(statsData);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : 'Không thể tải lịch sử thử đồ.',
+          err instanceof Error
+            ? err.message
+            : 'Không thể tải lịch sử thử đồ.',
         );
       } finally {
         setLoading(false);

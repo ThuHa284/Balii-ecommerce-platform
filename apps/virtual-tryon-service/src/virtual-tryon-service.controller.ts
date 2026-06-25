@@ -50,13 +50,16 @@ export class VirtualTryonServiceController {
   }
 
   @Get('history/:id')
-  getHistoryDetail(@Param('id') id: string) {
-    return this.virtualTryonService.getHistoryDetail(id);
+  getHistoryDetail(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId?: string,
+  ) {
+    return this.virtualTryonService.getHistoryDetail(id, userId);
   }
 
   @Get('stats')
-  getStats() {
-    return this.virtualTryonService.getStats();
+  getStats(@Headers('x-user-id') userId?: string) {
+    return this.virtualTryonService.getStats(userId);
   }
 
   @Get(':id')

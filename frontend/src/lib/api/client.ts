@@ -17,6 +17,11 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
 
+      const userId = window.__BALII_USER_ID__;
+      if (userId) {
+        config.headers['x-user-id'] = userId;
+      }
+
       const sessionId = window.localStorage.getItem('balii-session-id');
       if (sessionId) {
         config.headers['x-session-id'] = sessionId;

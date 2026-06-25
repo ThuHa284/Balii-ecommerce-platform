@@ -58,7 +58,7 @@ export default function ComparePage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8 min-h-[80vh]">
+    <div className="max-w-6xl mx-auto px-4 pt-28 pb-8 space-y-8 min-h-[80vh]">
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/20 pb-4">
         <div>

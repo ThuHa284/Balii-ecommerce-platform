@@ -1,23 +1,39 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { Search, Eye, Ban } from "lucide-react";
-import { toast } from "sonner";
+import { useEffect, useMemo, useState } from 'react';
+import { Ban, Eye, Search } from 'lucide-react';
+import { toast } from 'sonner';
+
+import {
+  getAdminUsers,
+  type AdminUser,
+  updateAdminUserRole,
+} from '@/lib/api/admin.api';
 import {
   canDeleteAdminResource,
   getAdminRoleLabel,
-} from "@/lib/api/admin.utils";
-import { getAdminUsers, type AdminUser } from "@/lib/api/admin.api";
-import { getUserErrorMessage } from "@/lib/error-utils";
-import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth.store";
+  isSuperAdmin,
+} from '@/lib/api/admin.utils';
+import { getUserErrorMessage } from '@/lib/error-utils';
+import { formatCurrency, formatDate, getInitials } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth.store';
+import { UserRole } from '@/types/user.types';
+
+const ROLE_OPTIONS = [
+  { value: UserRole.CUSTOMER, label: 'Khách hàng' },
+  { value: UserRole.ADMIN, label: 'Quản trị viên' },
+  { value: UserRole.SUPER_ADMIN, label: 'Superadmin' },
+];
 
 export default function AdminUsersPage() {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const userRole = useAuthStore((state) => state.user?.role);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const currentUser = useAuthStore((state) => state.user);
+  const userRole = currentUser?.role;
   const canModerate = canDeleteAdminResource(userRole);
+  const canAssignRoles = isSuperAdmin(userRole);
   const roleLabel = getAdminRoleLabel(userRole);
 
   useEffect(() => {
@@ -28,7 +44,7 @@ export default function AdminUsersPage() {
         setUsers(data);
       } catch (error) {
         toast.error(
-          getUserErrorMessage(error, "Không tải được danh sách khách hàng."),
+          getUserErrorMessage(error, 'Không tải được danh sách khách hàng.'),
         );
       } finally {
         setIsLoading(false);
@@ -48,6 +64,29 @@ export default function AdminUsersPage() {
     [search, users],
   );
 
+  async function handleRoleChange(userId: string, role: UserRole) {
+    if (!canAssignRoles) {
+      toast.error('Chỉ superadmin mới có quyền phân quyền tài khoản.');
+      return;
+    }
+
+    setUpdatingUserId(userId);
+
+    try {
+      const updatedUser = await updateAdminUserRole(userId, role);
+      setUsers((prev) =>
+        prev.map((item) => (item.id === updatedUser.id ? updatedUser : item)),
+      );
+      toast.success('Đã cập nhật quyền tài khoản.');
+    } catch (error) {
+      toast.error(
+        getUserErrorMessage(error, 'Không thể cập nhật quyền tài khoản.'),
+      );
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }
+
   return (
     <div>
       <h1 className="mb-2 font-heading text-3xl font-bold text-foreground">
@@ -57,10 +96,12 @@ export default function AdminUsersPage() {
         {roleLabel}
       </span>
       <p className="mb-8 text-muted-foreground">{users.length} khách hàng</p>
+
       {!canModerate ? (
         <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
           Quản trị viên có thể xem danh sách khách hàng. Các thao tác can thiệp
-          tài khoản như khóa người dùng được dành riêng cho quản trị hệ thống.
+          tài khoản như khóa người dùng và phân quyền được dành riêng cho
+          superadmin.
         </div>
       ) : null}
 
@@ -96,6 +137,9 @@ export default function AdminUsersPage() {
               <th className="px-6 py-4 text-left text-sm font-medium text-muted-foreground">
                 Trạng thái
               </th>
+              <th className="px-6 py-4 text-left text-sm font-medium text-muted-foreground">
+                Vai trò
+              </th>
               <th className="px-6 py-4 text-right text-sm font-medium text-muted-foreground">
                 Thao tác
               </th>
@@ -105,7 +149,7 @@ export default function AdminUsersPage() {
             {isLoading && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-6 py-10 text-center text-sm text-muted-foreground"
                 >
                   Đang tải danh sách khách hàng...
@@ -116,7 +160,7 @@ export default function AdminUsersPage() {
             {!isLoading && filteredUsers.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-6 py-10 text-center text-sm text-muted-foreground"
                 >
                   Không tìm thấy khách hàng phù hợp.
@@ -124,73 +168,115 @@ export default function AdminUsersPage() {
               </tr>
             )}
 
-            {filteredUsers.map((user) => (
-              <tr
-                key={user.id}
-                className="border-b border-white/20 transition-colors hover:bg-white/30"
-              >
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500 text-sm font-bold text-white">
-                      {getInitials(user.fullName || user.email)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{user.fullName}</p>
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        Tham gia {formatDate(user.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm">{user.phone || "--"}</td>
-                <td className="px-6 py-4 text-sm">{user.orderCount ?? "--"}</td>
-                <td className="px-6 py-4 text-sm font-medium text-primary">
-                  {user.totalSpent != null ? formatCurrency(user.totalSpent) : "--"}
-                </td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                      user.isActive
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {user.isActive ? "Hoạt động" : "Bị khóa"}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-1">
-                    <button className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50">
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      disabled={!canModerate}
-                      onClick={() => {
-                        if (!canModerate) {
-                          toast.error(
-                            "Chỉ quản trị hệ thống mới có quyền khóa tài khoản.",
-                          );
-                          return;
-                        }
+            {filteredUsers.map((user) => {
+              const isCurrentSuperAdmin =
+                currentUser?.id === user.id &&
+                user.role === UserRole.SUPER_ADMIN;
 
-                        toast.info(
-                          "Chức năng khóa tài khoản chưa được kết nối backend.",
-                        );
-                      }}
-                      className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+              return (
+                <tr
+                  key={user.id}
+                  className="border-b border-white/20 transition-colors hover:bg-white/30"
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500 text-sm font-bold text-white">
+                        {getInitials(user.fullName || user.email)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{user.fullName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {user.email}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Tham gia {formatDate(user.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm">{user.phone || '--'}</td>
+                  <td className="px-6 py-4 text-sm">
+                    {user.orderCount ?? '--'}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-medium text-primary">
+                    {user.totalSpent != null
+                      ? formatCurrency(user.totalSpent)
+                      : '--'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                        user.isActive
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {user.isActive ? 'Hoạt động' : 'Bị khóa'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <select
+                      value={user.role}
+                      disabled={
+                        !canAssignRoles ||
+                        updatingUserId === user.id ||
+                        isCurrentSuperAdmin
+                      }
+                      onChange={(event) =>
+                        void handleRoleChange(
+                          user.id,
+                          event.target.value as UserRole,
+                        )
+                      }
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                       title={
-                        canModerate
-                          ? "Khóa tài khoản"
-                          : "Chỉ quản trị hệ thống mới được khóa tài khoản"
+                        canAssignRoles
+                          ? isCurrentSuperAdmin
+                            ? 'Không thể tự hạ quyền tài khoản superadmin'
+                            : 'Cập nhật quyền tài khoản'
+                          : 'Chỉ superadmin mới được phân quyền'
                       }
                     >
-                      <Ban className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      {ROLE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-1">
+                      <button className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50">
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        disabled={!canModerate}
+                        onClick={() => {
+                          if (!canModerate) {
+                            toast.error(
+                              'Chỉ quản trị hệ thống mới có quyền khóa tài khoản.',
+                            );
+                            return;
+                          }
+
+                          toast.info(
+                            'Chức năng khóa tài khoản chưa được kết nối backend.',
+                          );
+                        }}
+                        className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        title={
+                          canModerate
+                            ? 'Khóa tài khoản'
+                            : 'Chỉ quản trị hệ thống mới được khóa tài khoản'
+                        }
+                      >
+                        <Ban className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

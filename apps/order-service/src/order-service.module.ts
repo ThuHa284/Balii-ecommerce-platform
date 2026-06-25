@@ -7,6 +7,7 @@ import { OrderServiceService } from './order-service.service';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { CartClientService } from './clients/cart-client.service';
+import { CloudinaryService } from './cloudinary.service';
 
 @Module({
   imports: [
@@ -26,6 +27,6 @@ import { CartClientService } from './clients/cart-client.service';
     HttpModule,
   ],
   controllers: [OrderServiceController],
-  providers: [OrderServiceService, CartClientService],
+  providers: [OrderServiceService, CartClientService, CloudinaryService],
 })
 export class OrderServiceModule {}

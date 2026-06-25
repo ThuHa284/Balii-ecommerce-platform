@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -16,9 +16,16 @@ import {
   RotateCcw,
   ShieldCheck,
   Truck,
+  Upload,
   XCircle,
 } from 'lucide-react';
-import { getOrderById } from '@/lib/api/orders.api';
+import { toast } from 'sonner';
+import {
+  createOrderReturnRequest,
+  getOrderById,
+  getOrderReturnRequests,
+} from '@/lib/api/orders.api';
+import { formatAddressLine } from '@/lib/address-utils';
 import {
   ORDER_STATUS_COLORS,
   ORDER_STATUS_LABELS,
@@ -27,7 +34,7 @@ import {
   PAYMENT_STATUS_LABELS,
 } from '@/lib/constants';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
-import { Order } from '@/types/order.types';
+import { Order, ReturnRequest } from '@/types/order.types';
 
 const TIMELINE_STEPS = [
   { status: 'pending', label: 'Đặt hàng', icon: ClipboardList },
@@ -45,10 +52,52 @@ function getStepIndex(status: string) {
   return index;
 }
 
+async function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Không thể đọc ảnh minh chứng.'));
+        return;
+      }
+
+      resolve(reader.result);
+    };
+    reader.onerror = () => reject(new Error('Không thể đọc ảnh minh chứng.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function ReturnStatusBadge({ status }: { status: ReturnRequest['status'] }) {
+  const styles = {
+    pending: 'bg-amber-100 text-amber-700',
+    approved: 'bg-emerald-100 text-emerald-700',
+    rejected: 'bg-rose-100 text-rose-700',
+  } satisfies Record<ReturnRequest['status'], string>;
+
+  const labels = {
+    pending: 'Chờ duyệt',
+    approved: 'Đã duyệt',
+    rejected: 'Từ chối',
+  } satisfies Record<ReturnRequest['status'], string>;
+
+  return (
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-medium ${styles[status]}`}
+    >
+      {labels[status]}
+    </span>
+  );
+}
+
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
+  const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnImages, setReturnImages] = useState<string[]>([]);
+  const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
   useEffect(() => {
     void loadOrder();
@@ -57,12 +106,74 @@ export default function OrderDetailPage() {
   async function loadOrder() {
     setLoading(true);
     try {
-      const data = await getOrderById(params.id);
-      setOrder(data);
+      const [orderData, returnData] = await Promise.all([
+        getOrderById(params.id),
+        getOrderReturnRequests(params.id).catch(() => []),
+      ]);
+      setOrder(orderData);
+      setReturnRequests(returnData);
     } finally {
       setLoading(false);
     }
   }
+
+  async function handleReturnImageChange(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []).slice(0, 5);
+    try {
+      const dataUrls = await Promise.all(
+        files.map((file) => fileToDataUrl(file)),
+      );
+      setReturnImages(dataUrls);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Không thể tải ảnh minh chứng.',
+      );
+    }
+  }
+
+  async function handleSubmitReturnRequest() {
+    if (!order) return;
+
+    if (!returnReason.trim()) {
+      toast.error('Vui lòng nhập lý do trả hàng.');
+      return;
+    }
+
+    if (returnImages.length === 0) {
+      toast.error('Vui lòng tải lên ít nhất 1 ảnh minh chứng.');
+      return;
+    }
+
+    try {
+      setIsSubmittingReturn(true);
+      const created = await createOrderReturnRequest(order.id, {
+        reason: returnReason.trim(),
+        imageUrls: returnImages,
+      });
+      setReturnRequests((current) => [created, ...current]);
+      setReturnReason('');
+      setReturnImages([]);
+      toast.success('Đã gửi yêu cầu trả hàng để admin xác nhận.');
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Không thể gửi yêu cầu trả hàng.',
+      );
+    } finally {
+      setIsSubmittingReturn(false);
+    }
+  }
+
+  const activeReturnRequest = useMemo(
+    () =>
+      returnRequests.find((request) =>
+        ['pending', 'approved'].includes(request.status),
+      ) ?? null,
+    [returnRequests],
+  );
 
   if (loading) {
     return (
@@ -113,6 +224,7 @@ export default function OrderDetailPage() {
   const isVnpayPending =
     paymentMethod === 'vnpay' && paymentStatus === 'pending';
   const isVnpayFailed = paymentMethod === 'vnpay' && paymentStatus === 'failed';
+  const canRequestReturn = orderStatus === 'delivered' && !activeReturnRequest;
 
   return (
     <div>
@@ -152,9 +264,7 @@ export default function OrderDetailPage() {
               style={{
                 width:
                   currentStep >= 0
-                    ? `calc(${
-                        (currentStep / (TIMELINE_STEPS.length - 1)) * 100
-                      }% - 40px)`
+                    ? `calc(${(currentStep / (TIMELINE_STEPS.length - 1)) * 100}% - 40px)`
                     : '0%',
               }}
             />
@@ -240,7 +350,7 @@ export default function OrderDetailPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {isVnpayFailed
                   ? 'Đơn hàng vẫn được giữ trong hệ thống. Bạn có thể thanh toán lại hoặc liên hệ hỗ trợ.'
-                  : 'Nếu bạn đã thanh toán trên VNPay nhưng đơn hàng chưa cập nhật, vui lòng chờ một chút và tải lại trang.'}
+                  : 'Nếu bạn đã thanh toán trên VNPay nhưng đơn hàng chưa cập nhật, vui lòng chờ thêm một chút và tải lại trang.'}
               </p>
             </div>
           </div>
@@ -298,24 +408,129 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          {orderStatus === 'pending' || orderStatus === 'shipping' ? (
+          {(orderStatus === 'delivered' || returnRequests.length > 0) && (
             <div className="glass-card p-6">
-              <div className="flex gap-3">
-                {orderStatus === 'pending' ? (
-                  <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 text-sm font-medium text-white transition-all hover:bg-red-600">
-                    <XCircle className="h-4 w-4" />
-                    Hủy đơn hàng
-                  </button>
-                ) : null}
-                {orderStatus === 'shipping' ? (
-                  <button className="btn-primary flex flex-1 items-center justify-center gap-2 py-3 text-sm">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Đã nhận hàng
-                  </button>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-heading text-sm font-semibold text-foreground">
+                    Yêu cầu trả hàng
+                  </h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Người dùng cần nêu lý do và gửi ảnh minh chứng để admin xác
+                    nhận.
+                  </p>
+                </div>
+                {activeReturnRequest ? (
+                  <ReturnStatusBadge status={activeReturnRequest.status} />
                 ) : null}
               </div>
+
+              {returnRequests.length > 0 && (
+                <div className="mb-6 space-y-4">
+                  {returnRequests.map((request) => (
+                    <div
+                      key={request.id}
+                      className="rounded-2xl border border-white/50 bg-white/50 p-4"
+                    >
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            Gửi lúc {formatDateTime(request.createdAt)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {request.reason}
+                          </p>
+                        </div>
+                        <ReturnStatusBadge status={request.status} />
+                      </div>
+
+                      {request.imageUrls.length > 0 && (
+                        <div className="grid grid-cols-3 gap-3">
+                          {request.imageUrls.map((imageUrl, index) => (
+                            <div
+                              key={`${request.id}-${index}`}
+                              className="relative aspect-square overflow-hidden rounded-xl bg-slate-100"
+                            >
+                              <Image
+                                src={imageUrl}
+                                alt={`Ảnh minh chứng ${index + 1}`}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {request.adminNote ? (
+                        <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs text-muted-foreground">
+                          Phản hồi admin: {request.adminNote}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {canRequestReturn ? (
+                <div className="space-y-4">
+                  <textarea
+                    value={returnReason}
+                    onChange={(e) => setReturnReason(e.target.value)}
+                    rows={4}
+                    placeholder="Mô tả rõ lý do trả hàng và vấn đề gặp phải..."
+                    className="w-full rounded-2xl border border-white/50 bg-white/60 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                  />
+
+                  <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-violet-300 bg-violet-50/50 px-4 py-4 text-sm text-violet-700">
+                    <Upload className="h-4 w-4" />
+                    <span>
+                      Tải ảnh minh chứng
+                      {returnImages.length > 0
+                        ? ` (${returnImages.length} ảnh đã chọn)`
+                        : ' (tối đa 5 ảnh)'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => void handleReturnImageChange(e)}
+                    />
+                  </label>
+
+                  {returnImages.length > 0 && (
+                    <div className="grid grid-cols-3 gap-3">
+                      {returnImages.map((imageUrl, index) => (
+                        <div
+                          key={index}
+                          className="relative aspect-square overflow-hidden rounded-xl bg-slate-100"
+                        >
+                          <Image
+                            src={imageUrl}
+                            alt={`Ảnh minh chứng ${index + 1}`}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmitReturnRequest()}
+                    disabled={isSubmittingReturn}
+                    className="btn-primary w-full py-3 text-sm disabled:opacity-60"
+                  >
+                    {isSubmittingReturn
+                      ? 'Đang gửi yêu cầu...'
+                      : 'Gửi yêu cầu trả hàng'}
+                  </button>
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          )}
         </div>
 
         <div className="space-y-6">
@@ -332,9 +547,7 @@ export default function OrderDetailPage() {
                 {order.shippingAddress.phone}
               </p>
               <p className="text-muted-foreground">
-                {order.shippingAddress.street}, {order.shippingAddress.ward},{' '}
-                {order.shippingAddress.district},{' '}
-                {order.shippingAddress.province}
+                {formatAddressLine(order.shippingAddress)}
               </p>
             </div>
           </div>
@@ -393,11 +606,9 @@ export default function OrderDetailPage() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Phí vận chuyển</span>
                 <span className="text-foreground">
-                  {order.shippingFee === 0 ? (
-                    <span className="text-emerald-600">Miễn phí</span>
-                  ) : (
-                    formatCurrency(order.shippingFee)
-                  )}
+                  {order.shippingFee === 0
+                    ? 'Miễn phí'
+                    : formatCurrency(order.shippingFee)}
                 </span>
               </div>
               <div className="flex justify-between border-t border-white/30 pt-3">

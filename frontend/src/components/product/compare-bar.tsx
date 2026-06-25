@@ -1,15 +1,38 @@
 "use client";
 
 import { useCompareStore } from "@/store/compare.store";
-import { X, ArrowRightLeft, Trash2 } from "lucide-react";
+import { X, ArrowRightLeft, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
+import { useState } from "react";
 
 export default function FloatingCompareBar() {
   const { compareItems, removeItem, clearCompare } = useCompareStore();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   if (compareItems.length === 0) return null;
+
+  // Collapsed state — show a small floating pill
+  if (isCollapsed) {
+    return (
+      <button
+        onClick={() => setIsCollapsed(false)}
+        className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2.5 bg-white/80 backdrop-blur-xl border border-violet-200/60 shadow-2xl rounded-full px-5 py-3 animate-slide-up hover:shadow-violet-300/30 transition-all hover:scale-[1.02] active:scale-95"
+      >
+        <div className="p-1.5 rounded-lg bg-violet-100 text-violet-600">
+          <ArrowRightLeft className="w-4 h-4" />
+        </div>
+        <span className="text-sm font-bold text-slate-800">
+          So sánh
+        </span>
+        <span className="flex items-center justify-center h-5 w-5 rounded-full bg-violet-500 text-[10px] font-bold text-white">
+          {compareItems.length}
+        </span>
+        <ChevronUp className="w-4 h-4 text-slate-400" />
+      </button>
+    );
+  }
 
   return (
     <div className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-2xl bg-white/80 backdrop-blur-xl border border-violet-200/60 shadow-2xl rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4 animate-slide-up">
@@ -24,12 +47,22 @@ export default function FloatingCompareBar() {
             <p className="text-[10px] text-muted-foreground">Tối đa 3 sản phẩm ({compareItems.length}/3)</p>
           </div>
         </div>
-        <button
-          onClick={clearCompare}
-          className="sm:hidden text-xs text-red-500 font-bold flex items-center gap-1 hover:underline"
-        >
-          <Trash2 className="w-3.5 h-3.5" /> Xoá hết
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={clearCompare}
+            className="sm:hidden text-xs text-red-500 font-bold flex items-center gap-1 hover:underline"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Xoá hết
+          </button>
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            aria-label="Thu gọn thanh so sánh"
+            title="Thu gọn"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Product Thumbnails List */}

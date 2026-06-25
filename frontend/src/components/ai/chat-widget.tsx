@@ -19,7 +19,7 @@ const MARKETPLACE_LINKS = [
     ),
   },
   {
-    href: 'https://tiktok.com',
+    href: 'https://vt.tiktok.com/ZS96rgAn3T2Wn-lIlcD/',
     label: 'TikTok Shop',
     bgClass: 'bg-slate-900 hover:bg-black shadow-slate-400/20',
     logo: (

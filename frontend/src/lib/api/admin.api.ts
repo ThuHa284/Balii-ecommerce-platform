@@ -1,7 +1,7 @@
 import apiClient from './client';
 import { mapOrder } from './adapters';
-import { Order } from '@/types/order.types';
-import { User } from '@/types/user.types';
+import { Order, ReturnRequest } from '@/types/order.types';
+import { User, UserRole } from '@/types/user.types';
 import { mapUser } from './adapters';
 
 export interface AdminRevenuePoint {
@@ -115,6 +115,52 @@ export async function getAdminOrders(): Promise<AdminOrder[]> {
   }));
 }
 
+export async function updateAdminOrderStatus(
+  orderId: string,
+  status:
+    | 'pending'
+    | 'confirmed'
+    | 'processing'
+    | 'shipping'
+    | 'delivered'
+    | 'cancelled',
+  note?: string,
+): Promise<AdminOrder> {
+  const { data } = await apiClient.patch<BackendAdminOrder>(
+    `/orders/admin/orders/${orderId}/status`,
+    { status, note },
+  );
+
+  return {
+    ...mapOrder(data),
+    customerName: data.customerName,
+    customerEmail: data.customerEmail ?? null,
+  };
+}
+
+export async function getAdminOrderReturnRequests(
+  orderId: string,
+): Promise<ReturnRequest[]> {
+  const { data } = await apiClient.get<ReturnRequest[]>(
+    `/orders/admin/orders/${orderId}/return-requests`,
+  );
+  return data;
+}
+
+export async function reviewAdminReturnRequest(
+  returnRequestId: string,
+  payload: {
+    status: 'approved' | 'rejected';
+    adminNote?: string;
+  },
+): Promise<ReturnRequest> {
+  const { data } = await apiClient.patch<ReturnRequest>(
+    `/orders/admin/return-requests/${returnRequestId}`,
+    payload,
+  );
+  return data;
+}
+
 type BackendAdminUser = Parameters<typeof mapUser>[0];
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
@@ -124,6 +170,22 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
     orderCount: null,
     totalSpent: null,
   }));
+}
+
+export async function updateAdminUserRole(
+  userId: string,
+  role: UserRole,
+): Promise<AdminUser> {
+  const { data } = await apiClient.patch<BackendAdminUser>(
+    `/users/${userId}/role`,
+    { role },
+  );
+
+  return {
+    ...mapUser(data, []),
+    orderCount: null,
+    totalSpent: null,
+  };
 }
 
 export async function getAdminRefunds(): Promise<AdminRefund[]> {

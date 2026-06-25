@@ -6,6 +6,7 @@ export type RouteTarget = {
 export const ROUTE_TARGETS: RouteTarget[] = [
   { prefix: '/auth', targetEnv: 'USER_SERVICE_URL' },
   { prefix: '/users', targetEnv: 'USER_SERVICE_URL' },
+  { prefix: '/locations', targetEnv: 'USER_SERVICE_URL' },
   { prefix: '/products', targetEnv: 'PRODUCT_SERVICE_URL' },
   { prefix: '/variants', targetEnv: 'PRODUCT_SERVICE_URL' },
   { prefix: '/categories', targetEnv: 'PRODUCT_SERVICE_URL' },

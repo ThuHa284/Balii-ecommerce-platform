@@ -192,6 +192,8 @@ export async function getTryOnHistory(): Promise<TryOnHistoryRecord[]> {
 }
 
 export async function getTryOnStats(): Promise<TryOnStats> {
-  const { data } = await apiClient.get<TryOnStats>('/try-on/stats');
+  const { data } = await apiClient.get<TryOnStats>('/try-on/stats', {
+    headers: getCurrentUserHeaders(),
+  });
   return data;
 }

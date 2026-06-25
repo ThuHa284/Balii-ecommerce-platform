@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X, User, Phone, MapPin, Loader2 } from 'lucide-react';
-import { useAuthStore } from '@/store/auth.store';
+import { Loader2, MapPin, Phone, User, X } from 'lucide-react';
 import { toast } from 'sonner';
+
+import { getProvinces } from '@/lib/api/locations.api';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth.store';
+import { LocationOption } from '@/types/location.types';
 
 const addressSchema = z.object({
   fullName: z.string().min(2, 'Vui lòng nhập họ và tên (tối thiểu 2 ký tự)'),
@@ -15,12 +18,11 @@ const addressSchema = z.object({
     .string()
     .regex(
       /^(0|\+84)[0-9]{9}$/,
-      'Vui lòng nhập số điện thoại hợp lệ (VD: 0901234567)',
+      'Vui lòng nhập số điện thoại hợp lệ (ví dụ: 0901234567)',
     ),
-  province: z.string().min(1, 'Vui lòng chọn tỉnh/thành phố'),
-  district: z.string().min(1, 'Vui lòng chọn quận/huyện'),
-  ward: z.string().min(1, 'Vui lòng chọn phường/xã'),
-  street: z.string().min(5, 'Vui lòng nhập địa chỉ cụ thể (tối thiểu 5 ký tự)'),
+  provinceId: z.string().min(1, 'Vui lòng chọn tỉnh/thành phố'),
+  ward: z.string().min(2, 'Vui lòng nhập phường/xã'),
+  street: z.string().min(5, 'Vui lòng nhập địa chỉ cụ thể'),
   isDefault: z.boolean().optional(),
 });
 
@@ -37,21 +39,17 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-foreground mb-1.5">
+      <label className="mb-1.5 block text-sm font-medium text-foreground">
         {label} <span className="text-rose-400">*</span>
       </label>
       {children}
-      {error ? (
-        <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
-          <span>Cảnh báo</span> {error}
-        </p>
-      ) : null}
+      {error ? <p className="mt-1 text-sm text-red-500">{error}</p> : null}
     </div>
   );
 }
 
 const inputCls =
-  'w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm placeholder:text-muted-foreground/60 transition-all';
+  'w-full rounded-xl border border-white/50 bg-white/60 px-4 py-3 text-sm transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-violet-300';
 const inputErrorCls = 'border-red-300 focus:ring-red-200';
 
 interface AddressFormModalProps {
@@ -67,44 +65,106 @@ export default function AddressFormModal({
 }: AddressFormModalProps) {
   const { addAddress, addresses } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [provinces, setProvinces] = useState<LocationOption[]>([]);
 
   const {
     register,
+    watch,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
-    defaultValues: { isDefault: addresses.length === 0 },
+    defaultValues: {
+      provinceId: '',
+      ward: '',
+      street: '',
+      isDefault: addresses.length === 0,
+    },
   });
 
+  const provinceId = watch('provinceId');
+
+  const selectedProvince = useMemo(
+    () => provinces.find((item) => String(item.id) === provinceId) ?? null,
+    [provinceId, provinces],
+  );
+
   const handleClose = useCallback(() => {
-    reset();
+    reset({
+      fullName: '',
+      phone: '',
+      provinceId: '',
+      ward: '',
+      street: '',
+      isDefault: addresses.length === 0,
+    });
     onClose();
-  }, [onClose, reset]);
+  }, [addresses.length, onClose, reset]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadProvinces() {
+      try {
+        setIsLoadingLocations(true);
+        const provinceList = await getProvinces();
+        if (isMounted) {
+          setProvinces(provinceList);
+        }
+      } catch {
+        toast.error('Không thể tải danh sách tỉnh/thành phố.');
+      } finally {
+        if (isMounted) {
+          setIsLoadingLocations(false);
+        }
+      }
+    }
+
+    void loadProvinces();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open]);
 
   const onSubmit = async (data: AddressFormData) => {
+    if (!selectedProvince) {
+      toast.error('Vui lòng chọn tỉnh/thành phố hợp lệ.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
       await addAddress({
         fullName: data.fullName,
         phone: data.phone,
-        province: data.province,
-        district: data.district,
-        ward: data.ward,
-        street: data.street,
+        provinceId: selectedProvince.id,
+        districtId: 0,
+        wardId: 0,
+        province: selectedProvince.name,
+        district: '',
+        ward: data.ward.trim(),
+        street: data.street.trim(),
         isDefault: data.isDefault ?? false,
       });
-      toast.success('Thêm địa chỉ thành công!', {
-        description: `${data.street}, ${data.ward}, ${data.district}`,
+
+      toast.success('Thêm địa chỉ thành công.', {
+        description: `${data.street.trim()}, ${data.ward.trim()}, ${selectedProvince.name}`,
       });
-      reset();
+
+      handleClose();
       onSuccess?.();
-      onClose();
     } catch (err) {
       toast.error(
-        (err as Error).message ?? 'Không thể thêm địa chỉ. Vui lòng thử lại.',
+        err instanceof Error
+          ? err.message
+          : 'Không thể thêm địa chỉ. Vui lòng thử lại.',
       );
     } finally {
       setIsSubmitting(false);
@@ -115,22 +175,22 @@ export default function AddressFormModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm"
       onClick={handleClose}
     >
       <div
-        className="glass-card w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        className="glass-card max-h-[90vh] w-full max-w-lg overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-white/30">
+        <div className="flex items-center justify-between border-b border-white/30 p-6">
           <h2 className="font-heading text-xl font-semibold text-foreground">
             Thêm địa chỉ mới
           </h2>
           <button
             onClick={handleClose}
-            className="p-2 rounded-xl hover:bg-white/40 transition-colors text-muted-foreground hover:text-foreground"
+            className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-white/40 hover:text-foreground"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -138,12 +198,12 @@ export default function AddressFormModal({
           onSubmit={(e) => {
             void handleSubmit(onSubmit)(e);
           }}
-          className="p-6 space-y-4"
+          className="space-y-4 p-6"
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Họ và tên" error={errors.fullName?.message}>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   {...register('fullName')}
                   type="text"
@@ -156,9 +216,10 @@ export default function AddressFormModal({
                 />
               </div>
             </Field>
+
             <Field label="Số điện thoại" error={errors.phone?.message}>
               <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   {...register('phone')}
                   type="tel"
@@ -173,57 +234,58 @@ export default function AddressFormModal({
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Tỉnh/Thành phố" error={errors.province?.message}>
-              <input
-                {...register('province')}
-                type="text"
-                placeholder="TP. Hồ Chí Minh"
-                className={cn(inputCls, errors.province && inputErrorCls)}
-              />
-            </Field>
-            <Field label="Quận/Huyện" error={errors.district?.message}>
-              <input
-                {...register('district')}
-                type="text"
-                placeholder="Quận 1"
-                className={cn(inputCls, errors.district && inputErrorCls)}
-              />
-            </Field>
-          </div>
+          <Field label="Tỉnh/Thành phố" error={errors.provinceId?.message}>
+            <select
+              {...register('provinceId')}
+              className={cn(inputCls, errors.provinceId && inputErrorCls)}
+              disabled={isLoadingLocations}
+            >
+              <option value="">
+                {isLoadingLocations
+                  ? 'Đang tải tỉnh/thành phố...'
+                  : 'Chọn tỉnh/thành phố'}
+              </option>
+              {provinces.map((province) => (
+                <option key={province.id} value={province.id}>
+                  {province.name}
+                </option>
+              ))}
+            </select>
+          </Field>
 
           <Field label="Phường/Xã" error={errors.ward?.message}>
             <input
               {...register('ward')}
               type="text"
-              placeholder="Phường Bến Nghé"
+              placeholder="Ví dụ: Phường Tân Định"
               className={cn(inputCls, errors.ward && inputErrorCls)}
             />
           </Field>
+
           <Field label="Địa chỉ cụ thể" error={errors.street?.message}>
             <div className="relative">
-              <MapPin className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+              <MapPin className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
               <textarea
                 {...register('street')}
                 rows={2}
                 placeholder="Số nhà, tên đường..."
                 className={cn(
                   inputCls,
-                  'pl-10 resize-none',
+                  'resize-none pl-10',
                   errors.street && inputErrorCls,
                 )}
               />
             </div>
           </Field>
 
-          <label className="flex items-center gap-3 cursor-pointer group">
+          <label className="group flex cursor-pointer items-center gap-3">
             <input
               {...register('isDefault')}
               type="checkbox"
               disabled={addresses.length === 0}
-              className="w-4 h-4 rounded text-primary focus:ring-violet-300"
+              className="h-4 w-4 rounded text-primary focus:ring-violet-300"
             />
-            <span className="text-sm text-foreground/70 group-hover:text-foreground transition-colors">
+            <span className="text-sm text-foreground/70 transition-colors group-hover:text-foreground">
               Đặt làm địa chỉ mặc định
             </span>
           </label>
@@ -232,18 +294,18 @@ export default function AddressFormModal({
             <button
               type="button"
               onClick={handleClose}
-              className="flex-1 px-4 py-3 rounded-xl border-2 border-white/50 text-foreground font-medium hover:bg-white/40 transition-all text-sm"
+              className="flex-1 rounded-xl border-2 border-white/50 px-4 py-3 text-sm font-medium text-foreground transition-all hover:bg-white/40"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 btn-primary flex items-center justify-center gap-2 text-sm"
+              className="btn-primary flex flex-1 items-center justify-center gap-2 text-sm"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Đang lưu...
                 </>
               ) : (

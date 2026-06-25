@@ -44,7 +44,7 @@ export default function VnpayCheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId') ?? '';
-  const orderCode = searchParams.get('orderCode') ?? 'Khong xac dinh';
+  const orderCode = searchParams.get('orderCode') ?? 'Không xác định';
   const paymentId = searchParams.get('paymentId') ?? '';
   const transactionId = searchParams.get('transactionId') ?? '';
 
@@ -55,7 +55,7 @@ export default function VnpayCheckoutPage() {
 
   useEffect(() => {
     if (!orderId || !paymentId) {
-      setError('Thieu thong tin giao dich VNPay.');
+      setError('Thiếu thông tin giao dịch VNPay.');
       setIsLoading(false);
       return;
     }
@@ -77,7 +77,7 @@ export default function VnpayCheckoutPage() {
         }
 
         if (!orderData) {
-          throw new Error('Khong tim thay don hang.');
+          throw new Error('Không tìm thấy đơn hàng.');
         }
 
         setPayment(paymentData);
@@ -87,7 +87,7 @@ export default function VnpayCheckoutPage() {
           setError(
             loadError instanceof Error
               ? loadError.message
-              : 'Khong the tai thong tin thanh toan.',
+              : 'Không thể tải thông tin thanh toán.',
           );
         }
       } finally {
@@ -172,10 +172,10 @@ export default function VnpayCheckoutPage() {
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
             <div>
               <p className="font-heading text-2xl font-bold text-foreground">
-                Dang tao ma QR VNPay
+                Đang tạo mã QR VNPay
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                He thong dang tai thong tin giao dich cho don hang {orderCode}.
+                Hệ thống đang tải thông tin giao dịch cho đơn hàng {orderCode}.
               </p>
             </div>
           </div>
@@ -191,17 +191,17 @@ export default function VnpayCheckoutPage() {
           <div className="glass-card p-10 text-center">
             <AlertCircle className="mx-auto mb-4 h-12 w-12 text-rose-500" />
             <h1 className="font-heading text-2xl font-bold text-foreground">
-              Khong the hien thi ma QR
+              Không thể hiển thị mã QR
             </h1>
             <p className="mt-3 text-sm text-muted-foreground">
-              {error ?? 'Giao dich VNPay khong co du lieu thanh toan hop le.'}
+              {error ?? 'Giao dịch VNPay không có dữ liệu thanh toán hợp lệ.'}
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <Link href="/account/orders" className="btn-outline">
-                Xem don hang
+                Xem đơn hàng
               </Link>
               <Link href="/checkout" className="btn-primary">
-                Quay lai thanh toan
+                Quay lại thanh toán
               </Link>
             </div>
           </div>
@@ -215,14 +215,14 @@ export default function VnpayCheckoutPage() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 text-center">
           <p className="text-sm font-medium uppercase tracking-[0.28em] text-primary/70">
-            VNPay QR Checkout
+            Thanh toán QR VNPay
           </p>
           <h1 className="mt-3 font-heading text-3xl font-bold text-foreground">
-            Quet ma QR de thanh toan
+            Quét mã QR để thanh toán
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
-            Ban van dang o giao dien cua Balii. Sau khi VNPay xac nhan, trang se
-            tu dong cap nhat ket qua thanh toan.
+            Bạn vẫn đang ở giao diện của Balii. Sau khi VNPay xác nhận, trang sẽ
+            tự động cập nhật kết quả thanh toán.
           </p>
         </div>
 
@@ -234,10 +234,10 @@ export default function VnpayCheckoutPage() {
               </div>
               <div>
                 <p className="font-heading text-xl font-semibold text-foreground">
-                  Ma QR thanh toan VNPay
+                  Mã QR thanh toán VNPay
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Su dung ung dung ngan hang hoac vi ho tro quet QR.
+                  Sử dụng ứng dụng ngân hàng hoặc ví hỗ trợ quét QR.
                 </p>
               </div>
             </div>
@@ -268,13 +268,13 @@ export default function VnpayCheckoutPage() {
                   className="btn-primary inline-flex items-center justify-center gap-2"
                 >
                   <ExternalLink className="h-4 w-4" />
-                  Mo VNPay
+                  Mở VNPay
                 </a>
                 <Link
                   href={`/account/orders/${order.id}`}
                   className="btn-outline"
                 >
-                  Xem don hang
+                  Xem đơn hàng
                 </Link>
               </div>
             </div>
@@ -284,7 +284,7 @@ export default function VnpayCheckoutPage() {
             <div className="glass-card p-6">
               <h2 className="mb-4 flex items-center gap-2 font-heading text-sm font-semibold text-foreground">
                 <CreditCard className="h-4 w-4 text-primary" />
-                Trang thai thanh toan
+                Trạng thái thanh toán
               </h2>
               <span
                 className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${paymentStatusClass}`}
@@ -292,30 +292,30 @@ export default function VnpayCheckoutPage() {
                 {paymentStatusLabel}
               </span>
               <p className="mt-3 text-sm text-muted-foreground">
-                Trang nay tu dong kiem tra ket qua moi sau moi{' '}
+                Trang này tự động kiểm tra kết quả mỗi{' '}
                 {POLL_INTERVAL_MS / 1000} giay.
               </p>
             </div>
 
             <div className="glass-card p-6">
               <h2 className="mb-4 font-heading text-sm font-semibold text-foreground">
-                Thong tin don hang
+                Thông tin đơn hàng
               </h2>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Ma don hang</span>
+                  <span className="text-muted-foreground">Mã đơn hàng</span>
                   <span className="font-medium text-foreground">
                     {order.orderCode}
                   </span>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Tong thanh toan</span>
+                  <span className="text-muted-foreground">Tổng thanh toán</span>
                   <span className="font-semibold text-primary">
                     {formatCurrency(order.total)}
                   </span>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Phuong thuc</span>
+                  <span className="text-muted-foreground">Phương thức</span>
                   <span className="font-medium text-foreground">VNPay</span>
                 </div>
               </div>
@@ -323,13 +323,13 @@ export default function VnpayCheckoutPage() {
 
             <div className="glass-card p-6">
               <h2 className="mb-4 font-heading text-sm font-semibold text-foreground">
-                Cach thanh toan
+                Cách thanh toán
               </h2>
               <ol className="space-y-3 text-sm text-muted-foreground">
-                <li>1. Mo app ngan hang hoac vi co ho tro quet QR.</li>
-                <li>2. Quet ma QR tren man hinh nay hoac bam Mo VNPay.</li>
-                <li>3. Xac nhan giao dich trong ung dung cua ban.</li>
-                <li>4. Quay lai trang nay neu can; he thong se tu cap nhat.</li>
+                <li>1. Mở app ngân hàng hoặc ví có hỗ trợ quét QR.</li>
+                <li>2. Quét mã QR trên màn hình này hoặc bấm Mở VNPay.</li>
+                <li>3. Xác nhận giao dịch trong ứng dụng của bạn.</li>
+                <li>4. Quay lại trang này nếu cần; hệ thống sẽ tự cập nhật.</li>
               </ol>
             </div>
           </div>

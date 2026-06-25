@@ -1,6 +1,6 @@
 import { mapOrder } from './adapters';
 import apiClient from './client';
-import { Order } from '@/types/order.types';
+import { Order, ReturnRequest } from '@/types/order.types';
 import { Address } from '@/types/user.types';
 
 type BackendOrder = Parameters<typeof mapOrder>[0];
@@ -57,9 +57,12 @@ export async function createOrder(orderData: {
     shippingAddress: {
       recipientName: orderData.address.fullName,
       phone: orderData.address.phone,
-      provinceId: extractNumericId(orderData.address.province),
-      districtId: extractNumericId(orderData.address.district),
-      wardId: extractNumericId(orderData.address.ward),
+      provinceId: orderData.address.provinceId,
+      districtId: orderData.address.districtId,
+      wardId: orderData.address.wardId,
+      province: orderData.address.province,
+      district: orderData.address.district,
+      ward: orderData.address.ward,
       streetAddress: orderData.address.street,
     },
   });
@@ -67,7 +70,25 @@ export async function createOrder(orderData: {
   return mapOrder(data);
 }
 
-function extractNumericId(label: string) {
-  const matched = label.match(/(\d+)/);
-  return matched ? Number(matched[1]) : 0;
+export async function getOrderReturnRequests(
+  orderId: string,
+): Promise<ReturnRequest[]> {
+  const { data } = await apiClient.get<ReturnRequest[]>(
+    `/orders/${orderId}/return-requests`,
+  );
+  return data;
+}
+
+export async function createOrderReturnRequest(
+  orderId: string,
+  payload: {
+    reason: string;
+    imageUrls: string[];
+  },
+): Promise<ReturnRequest> {
+  const { data } = await apiClient.post<ReturnRequest>(
+    `/orders/${orderId}/return-requests`,
+    payload,
+  );
+  return data;
 }

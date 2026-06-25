@@ -88,7 +88,7 @@ export class ProductsService {
       pv.sku AS "sku",
       COALESCE(pv.size_label, '') AS "variantSize",
       COALESCE(pv.color_name, '') AS "variantColor",
-      COALESCE(pv.price, p.base_price) AS "unitPrice",
+      COALESCE(p.sale_price, pv.price, p.base_price) AS "unitPrice",
       pv.stock_quantity AS "stockQuantity",
       pv.reserved_quantity AS "reservedQuantity",
       pv.is_active AS "variantActive",
@@ -130,7 +130,7 @@ export class ProductsService {
     LEFT JOIN product_service.attributes a
       ON a.id = av.attribute_id
     WHERE pv.id = $1
-    GROUP BY pv.id, p.id, p.name, pv.sku, pv.price, p.base_price,
+    GROUP BY pv.id, p.id, p.name, pv.sku, pv.price, p.sale_price, p.base_price,
              pv.stock_quantity, pv.reserved_quantity,
              pv.is_active, p.is_active
     `,

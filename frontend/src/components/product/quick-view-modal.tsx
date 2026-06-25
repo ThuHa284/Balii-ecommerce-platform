@@ -3,26 +3,13 @@
 import { useQuickViewStore } from '@/store/quickview.store';
 import { useCartStore } from '@/store/cart.store';
 import { useWishlistStore } from '@/store/wishlist.store';
-import { X, ShoppingBag, Heart, Check, HelpCircle } from 'lucide-react';
+import { X, ShoppingBag, Heart, Check } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 
-function parseSizeRange(sizeLabel: string) {
-  const matched = sizeLabel.match(
-    /(\d+(?:[.,]\d+)?)\s*(?:kg)?\s*[-–]\s*(\d+(?:[.,]\d+)?)\s*(?:kg)?/i,
-  );
 
-  if (!matched) {
-    return null;
-  }
-
-  return {
-    min: Number(matched[1].replace(',', '.')),
-    max: Number(matched[2].replace(',', '.')),
-  };
-}
 
 export default function QuickViewModal() {
   const { isOpen, selectedProduct, closeQuickView } = useQuickViewStore();
@@ -32,8 +19,7 @@ export default function QuickViewModal() {
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [weightInput, setWeightInput] = useState('');
-  const [suggestedSize, setSuggestedSize] = useState('');
+
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
@@ -49,8 +35,7 @@ export default function QuickViewModal() {
       }
 
       setQuantity(1);
-      setWeightInput('');
-      setSuggestedSize('');
+
       setActiveImageIndex(0);
     }, 0);
 
@@ -76,26 +61,7 @@ export default function QuickViewModal() {
     ).entries(),
   );
 
-  const handleWeightChange = (value: string) => {
-    setWeightInput(value);
-    const weight = parseFloat(value);
 
-    if (Number.isNaN(weight) || weight <= 0) {
-      setSuggestedSize('');
-      return;
-    }
-
-    const recommendedSize =
-      sizes.find((sizeLabel) => {
-        const range = parseSizeRange(sizeLabel);
-        return range ? weight >= range.min && weight <= range.max : false;
-      }) ?? '';
-
-    setSuggestedSize(recommendedSize);
-    if (recommendedSize) {
-      setSelectedSize(recommendedSize);
-    }
-  };
 
   const currentVariant =
     selectedProduct.variants.find(
@@ -247,32 +213,6 @@ export default function QuickViewModal() {
             )}
           </div>
 
-          <div className="space-y-3 rounded-xl border border-violet-200/50 bg-gradient-to-r from-violet-500/5 to-purple-500/5 p-4">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                <HelpCircle className="h-4 w-4 text-violet-500" />
-                Gợi ý chọn size theo cân nặng
-              </label>
-              {suggestedSize && (
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-600">
-                  Gợi ý: {suggestedSize}
-                </span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={weightInput}
-                onChange={(event) => handleWeightChange(event.target.value)}
-                placeholder="Nhập cân nặng của bạn (kg), ví dụ 52"
-                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
-              />
-            </div>
-            <p className="text-[10px] leading-relaxed text-muted-foreground">
-              Hệ thống sẽ đối chiếu cân nặng với khoảng kg có sẵn trong từng
-              size của sản phẩm.
-            </p>
-          </div>
 
           <div className="space-y-2">
             <span className="text-xs font-bold text-slate-800">
@@ -282,24 +222,19 @@ export default function QuickViewModal() {
               </span>
             </span>
             <div className="flex flex-wrap gap-2">
-              {sizes.map((sizeLabel) => {
-                const isSuggested = sizeLabel === suggestedSize;
-                return (
+              {sizes.map((sizeLabel) => (
                   <button
                     key={sizeLabel}
                     onClick={() => setSelectedSize(sizeLabel)}
                     className={`rounded-lg border px-4 py-2 text-xs font-bold transition-all ${
                       selectedSize === sizeLabel
                         ? 'scale-105 border-violet-600 bg-violet-600 text-white shadow-md'
-                        : isSuggested
-                          ? 'border-emerald-300 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-200'
-                          : 'border-slate-200 bg-white/60 text-slate-700 hover:bg-white'
+                        : 'border-slate-200 bg-white/60 text-slate-700 hover:bg-white'
                     }`}
                   >
-                    {sizeLabel} {isSuggested && '✨'}
+                    {sizeLabel}
                   </button>
-                );
-              })}
+              ))}
             </div>
           </div>
 

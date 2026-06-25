@@ -1,4 +1,4 @@
-import { Address } from "./user.types";
+import { Address } from './user.types';
 
 export interface Order {
   id: string;
@@ -18,6 +18,20 @@ export interface Order {
   updatedAt: string;
 }
 
+export interface ReturnRequest {
+  id: string;
+  orderId: string;
+  userId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reason: string;
+  imageUrls: string[];
+  adminNote: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface OrderItem {
   id: string;
   productId: string;
@@ -33,18 +47,18 @@ export interface OrderItem {
 }
 
 export enum OrderStatus {
-  PENDING = "pending",
-  CONFIRMED = "confirmed",
-  PROCESSING = "processing",
-  SHIPPING = "shipping",
-  DELIVERED = "delivered",
-  CANCELLED = "cancelled",
-  REFUNDED = "refunded",
+  PENDING = 'pending',
+  CONFIRMED = 'confirmed',
+  PROCESSING = 'processing',
+  SHIPPING = 'shipping',
+  DELIVERED = 'delivered',
+  CANCELLED = 'cancelled',
+  REFUNDED = 'refunded',
 }
 
 export enum PaymentStatus {
-  PENDING = "pending",
-  PAID = "paid",
-  FAILED = "failed",
-  REFUNDED = "refunded",
+  PENDING = 'pending',
+  PAID = 'paid',
+  FAILED = 'failed',
+  REFUNDED = 'refunded',
 }

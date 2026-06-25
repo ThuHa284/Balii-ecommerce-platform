@@ -7,17 +7,31 @@ import {
 } from '@/types/user.types';
 import { mapUser } from './adapters';
 import { getMyAddresses } from './addresses.api';
+import { mergeGuestCartApi } from './cart.api';
+
+type BackendAuthUser = Parameters<typeof mapUser>[0];
+
+type BackendAuthResponse = {
+  accessToken: string;
+  refreshToken?: string;
+  user: BackendAuthUser;
+};
 
 export async function loginApi(
   credentials: LoginCredentials,
 ): Promise<AuthResponse> {
-  const { data } = await apiClient.post('/auth/login', credentials);
+  const { data } = await apiClient.post<BackendAuthResponse>(
+    '/auth/login',
+    credentials,
+  );
 
   if (typeof window !== 'undefined') {
     window.__BALII_ACCESS_TOKEN__ = data.accessToken;
     window.__BALII_REFRESH_TOKEN__ = data.refreshToken;
     window.__BALII_USER_ID__ = data.user?.id;
   }
+
+  await mergeGuestCartApi().catch(() => null);
 
   const addresses = await getMyAddresses().catch(() => []);
 
@@ -56,7 +70,7 @@ export async function refreshTokenApi(): Promise<AuthResponse> {
     throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
   }
 
-  const { data } = await apiClient.post('/auth/refresh', {
+  const { data } = await apiClient.post<BackendAuthResponse>('/auth/refresh', {
     userId,
     refreshToken,
   });
@@ -74,22 +88,20 @@ export async function refreshTokenApi(): Promise<AuthResponse> {
   };
 }
 
-export async function forgotPasswordApi(
-  email: string,
-): Promise<{ message: string }> {
-  return {
+export function forgotPasswordApi(email: string): Promise<{ message: string }> {
+  return Promise.resolve({
     message: `Tính năng quên mật khẩu chưa được hỗ trợ. Vui lòng liên hệ hỗ trợ cho ${email}.`,
-  };
+  });
 }
 
-export async function resetPasswordApi(): Promise<{ message: string }> {
-  return {
+export function resetPasswordApi(): Promise<{ message: string }> {
+  return Promise.resolve({
     message: 'Tính năng đặt lại mật khẩu chưa được hỗ trợ trên hệ thống này.',
-  };
+  });
 }
 
 export async function getProfileApi(): Promise<User> {
-  const { data } = await apiClient.get('/users/me');
+  const { data } = await apiClient.get<BackendAuthUser>('/users/me');
   const addresses = await getMyAddresses().catch(() => []);
   return mapUser(data, addresses);
 }
@@ -99,7 +111,7 @@ export async function updateProfileApi(payload: {
   phone: string;
   avatarUrl?: string;
 }): Promise<User> {
-  const { data } = await apiClient.patch('/users/me', payload);
+  const { data } = await apiClient.patch<BackendAuthUser>('/users/me', payload);
   const addresses = await getMyAddresses().catch(() => []);
   return mapUser(data, addresses);
 }

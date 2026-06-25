@@ -12,27 +12,36 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+
+import AddressSelectorModal from '@/components/checkout/address-selector-modal';
+import { formatAddressLine } from '@/lib/address-utils';
 import { createOrder } from '@/lib/api/orders.api';
 import { createPayment } from '@/lib/api/payment.api';
 import { getComboTier, isEligibleForFreeShipping } from '@/lib/combo-utils';
 import { PAYMENT_METHOD_LABELS } from '@/lib/constants';
 import { getUserErrorMessage } from '@/lib/error-utils';
 import { formatCurrency } from '@/lib/utils';
-import { useCartStore } from '@/store/cart.store';
 import { useAuthStore, useSelectedAddress } from '@/store/auth.store';
+import { useCartStore } from '@/store/cart.store';
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, clearCart } = useCartStore();
-  const { hydrateAddresses } = useAuthStore();
+  const { hydrateAddresses, isAuthenticated } = useAuthStore();
   const selectedAddress = useSelectedAddress();
   const [isLoading, setIsLoading] = useState(false);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [note, setNote] = useState('');
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/login?redirect=/checkout');
+      return;
+    }
+
     void hydrateAddresses();
-  }, [hydrateAddresses]);
+  }, [hydrateAddresses, isAuthenticated, router]);
 
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -46,6 +55,11 @@ export default function CheckoutPage() {
 
     if (items.length === 0) {
       toast.error('Giỏ hàng đang trống.');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      router.push('/login?redirect=/checkout');
       return;
     }
 
@@ -73,7 +87,7 @@ export default function CheckoutPage() {
         );
 
         if (!payment.paymentUrl) {
-          throw new Error('Khong nhan duoc duong dan thanh toan VNPay.');
+          throw new Error('Không nhận được đường dẫn thanh toán VNPay.');
         }
 
         await clearCart();
@@ -105,7 +119,7 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="pt-28 pb-16">
+    <div className="pb-16 pt-28">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <h1 className="mb-8 font-heading text-3xl font-bold text-foreground">
           Thanh toán <span className="text-gradient">đơn hàng</span>
@@ -115,12 +129,22 @@ export default function CheckoutPage() {
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
               <div className="glass-card p-6">
-                <div className="mb-5 flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  <h2 className="font-heading text-lg font-semibold">
-                    Địa chỉ giao hàng
-                  </h2>
+                <div className="mb-5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    <h2 className="font-heading text-lg font-semibold">
+                      Địa chỉ giao hàng
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddressModalOpen(true)}
+                    className="rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-violet-100/70"
+                  >
+                    Thêm địa chỉ khác
+                  </button>
                 </div>
+
                 {selectedAddress ? (
                   <div className="rounded-xl border border-white/40 bg-white/40 p-4 text-sm">
                     <p className="font-semibold">{selectedAddress.fullName}</p>
@@ -128,14 +152,13 @@ export default function CheckoutPage() {
                       {selectedAddress.phone}
                     </p>
                     <p className="text-muted-foreground">
-                      {selectedAddress.street}, {selectedAddress.ward},{' '}
-                      {selectedAddress.district}, {selectedAddress.province}
+                      {formatAddressLine(selectedAddress)}
                     </p>
                   </div>
                 ) : (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-                    Chưa có địa chỉ. Vui lòng thêm địa chỉ trong tài khoản trước
-                    khi thanh toán.
+                    Chưa có địa chỉ. Nhấn <strong>Thêm địa chỉ khác</strong> để
+                    thêm và chọn địa chỉ giao hàng ngay tại đây.
                   </div>
                 )}
               </div>
@@ -266,6 +289,11 @@ export default function CheckoutPage() {
           </div>
         </form>
       </div>
+
+      <AddressSelectorModal
+        open={isAddressModalOpen}
+        onClose={() => setIsAddressModalOpen(false)}
+      />
     </div>
   );
 }

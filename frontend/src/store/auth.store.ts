@@ -7,8 +7,10 @@ import {
   createAddress,
   deleteAddress,
   getMyAddresses,
+  setDefaultAddress as setDefaultAddressApi,
   updateAddress as updateAddressApi,
 } from '@/lib/api/addresses.api';
+import { encodeStoredAddress, resolveFallbackLocationIds } from '@/lib/address-utils';
 
 interface AuthState {
   user: User | null;
@@ -30,7 +32,7 @@ interface AuthState {
   ) => Promise<void>;
   removeAddress: (id: string) => Promise<void>;
   setSelectedAddress: (id: string) => void;
-  setDefaultAddress: (id: string) => void;
+  setDefaultAddress: (id: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -123,48 +125,66 @@ export const useAuthStore = create<AuthState>()(
         if (!user) {
           throw new Error('Bạn cần đăng nhập để thêm địa chỉ.');
         }
+        const fallbackIds = await resolveFallbackLocationIds(
+          addressData.provinceId,
+        );
         const newAddress = await createAddress({
           recipientName: addressData.fullName,
           phone: addressData.phone,
-          provinceId: extractNumericId(addressData.province),
-          districtId: extractNumericId(addressData.district),
-          wardId: extractNumericId(addressData.ward),
-          streetAddress: addressData.street,
-          isDefault: addressData.isDefault ?? addresses.length === 0,
+          provinceId: addressData.provinceId,
+          districtId: addressData.districtId || fallbackIds.districtId,
+          wardId: addressData.wardId || fallbackIds.wardId,
+          streetAddress: encodeStoredAddress(addressData.street, addressData.ward),
+          isDefault: addressData.isDefault ?? false,
         });
+        const shouldSetDefault =
+          addressData.isDefault === true && addresses.length > 0;
+        const savedAddress = shouldSetDefault
+          ? await setDefaultAddressApi(newAddress.id)
+          : newAddress;
         const updatedAddresses =
-          (addressData.isDefault ?? false)
+          shouldSetDefault || addresses.length === 0
             ? [
                 ...addresses.map((a) => ({ ...a, isDefault: false })),
-                newAddress,
+                savedAddress,
               ]
-            : [...addresses, newAddress];
+            : [...addresses, savedAddress];
 
         set({
           addresses: updatedAddresses,
-          selectedAddressId: newAddress.id,
+          selectedAddressId: savedAddress.id,
         });
-        return newAddress;
+        return savedAddress;
       },
 
       updateAddress: async (id, data) => {
+        const fallbackIds =
+          data.provinceId != null
+            ? await resolveFallbackLocationIds(data.provinceId)
+            : null;
         await updateAddressApi(id, {
           recipientName: data.fullName,
           phone: data.phone,
-          provinceId: data.province
-            ? extractNumericId(data.province)
-            : undefined,
-          districtId: data.district
-            ? extractNumericId(data.district)
-            : undefined,
-          wardId: data.ward ? extractNumericId(data.ward) : undefined,
-          streetAddress: data.street,
+          provinceId: data.provinceId,
+          districtId: data.districtId ?? fallbackIds?.districtId,
+          wardId: data.wardId ?? fallbackIds?.wardId,
+          streetAddress:
+            data.street && data.ward
+              ? encodeStoredAddress(data.street, data.ward)
+              : data.street,
           isDefault: data.isDefault,
         });
+        if (data.isDefault) {
+          await setDefaultAddressApi(id);
+        }
         set({
-          addresses: get().addresses.map((a) =>
-            a.id === id ? { ...a, ...data } : a,
-          ),
+          addresses: get().addresses.map((a) => {
+            if (data.isDefault) {
+              return { ...a, isDefault: a.id === id, ...(a.id === id ? data : {}) };
+            }
+
+            return a.id === id ? { ...a, ...data } : a;
+          }),
         });
       },
 
@@ -181,12 +201,14 @@ export const useAuthStore = create<AuthState>()(
 
       setSelectedAddress: (id) => set({ selectedAddressId: id }),
 
-      setDefaultAddress: (id) => {
+      setDefaultAddress: async (id) => {
+        await setDefaultAddressApi(id);
         set({
           addresses: get().addresses.map((a) => ({
             ...a,
             isDefault: a.id === id,
           })),
+          selectedAddressId: id,
         });
       },
     }),
@@ -218,8 +240,3 @@ export const useSelectedAddress = () =>
   useAuthStore(
     (s) => s.addresses.find((a) => a.id === s.selectedAddressId) ?? null,
   );
-
-function extractNumericId(label: string) {
-  const matched = label.match(/(\d+)/);
-  return matched ? Number(matched[1]) : 0;
-}

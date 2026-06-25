@@ -1,11 +1,13 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { X, MapPin, Plus, Check, AlertCircle } from "lucide-react";
-import { useAuthStore } from "@/store/auth.store";
-import { cn } from "@/lib/utils";
-import { Address } from "@/types/user.types";
-import AddressFormModal from "./address-form-modal";
+import { useEffect, useState } from 'react';
+import { AlertCircle, Check, MapPin, Plus, X } from 'lucide-react';
+
+import { formatAddressLine } from '@/lib/address-utils';
+import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth.store';
+import { Address } from '@/types/user.types';
+import AddressFormModal from './address-form-modal';
 
 const MAX_ADDRESSES = 5;
 
@@ -27,36 +29,39 @@ function AddressCard({
     <button
       onClick={onSelect}
       className={cn(
-        "w-full text-left p-4 rounded-xl border-2 transition-all duration-200 group",
+        'group w-full rounded-xl border-2 p-4 text-left transition-all duration-200',
         selected
-          ? "border-primary bg-violet-50/60 shadow-md shadow-violet-200/30"
-          : "border-white/50 bg-white/40 hover:border-violet-200 hover:bg-white/60"
+          ? 'border-primary bg-violet-50/60 shadow-md shadow-violet-200/30'
+          : 'border-white/50 bg-white/40 hover:border-violet-200 hover:bg-white/60',
       )}
     >
       <div className="flex items-start gap-3">
-        {/* Radio indicator */}
         <div
           className={cn(
-            "mt-0.5 w-4.5 h-4.5 rounded-full border-2 shrink-0 flex items-center justify-center transition-all",
-            selected ? "border-primary bg-primary" : "border-muted-foreground/40"
+            'mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border-2 transition-all',
+            selected
+              ? 'border-primary bg-primary'
+              : 'border-muted-foreground/40',
           )}
         >
-          {selected && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+          {selected && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />}
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm text-foreground">{address.fullName}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-foreground">
+              {address.fullName}
+            </span>
             <span className="text-sm text-muted-foreground">·</span>
             <span className="text-sm text-muted-foreground">{address.phone}</span>
             {address.isDefault && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                 Mặc định
               </span>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-            {address.street}, {address.ward}, {address.district}, {address.province}
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            {formatAddressLine(address)}
           </p>
         </div>
       </div>
@@ -68,46 +73,53 @@ export default function AddressSelectorModal({
   open,
   onClose,
 }: AddressSelectorModalProps) {
-  const { addresses, selectedAddressId, setSelectedAddress } = useAuthStore();
+  const { addresses, selectedAddressId, setSelectedAddress, hydrateAddresses } =
+    useAuthStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [localSelected, setLocalSelected] = useState(selectedAddressId);
   const atLimit = addresses.length >= MAX_ADDRESSES;
 
-  if (!open) return null;
+  useEffect(() => {
+    if (open) {
+      setLocalSelected(selectedAddressId);
+    }
+  }, [open, selectedAddressId]);
 
   const handleConfirm = () => {
-    if (localSelected) setSelectedAddress(localSelected);
+    if (localSelected) {
+      setSelectedAddress(localSelected);
+    }
     onClose();
   };
+
+  if (!open) return null;
 
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm"
         onClick={onClose}
       >
         <div
-          className="glass-card w-full max-w-lg max-h-[80vh] flex flex-col"
+          className="glass-card flex max-h-[80vh] w-full max-w-lg flex-col"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/30 shrink-0">
+          <div className="flex shrink-0 items-center justify-between border-b border-white/30 p-6">
             <div className="flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-primary" />
+              <MapPin className="h-5 w-5 text-primary" />
               <h2 className="font-heading text-xl font-semibold text-foreground">
                 Chọn địa chỉ giao hàng
               </h2>
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl hover:bg-white/40 transition-colors text-muted-foreground hover:text-foreground"
+              className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-white/40 hover:text-foreground"
             >
-              <X className="w-5 h-5" />
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Address list */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-3">
+          <div className="flex-1 space-y-3 overflow-y-auto p-6">
             {addresses.map((addr) => (
               <AddressCard
                 key={addr.id}
@@ -117,26 +129,26 @@ export default function AddressSelectorModal({
               />
             ))}
 
-            {/* Add new address button */}
             <div>
               <button
                 onClick={() => !atLimit && setShowAddForm(true)}
                 disabled={atLimit}
                 className={cn(
-                  "w-full flex items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed text-sm font-medium transition-all",
+                  'w-full rounded-xl border-2 border-dashed p-4 text-sm font-medium transition-all',
+                  'flex items-center justify-center gap-2',
                   atLimit
-                    ? "border-muted/30 text-muted-foreground/50 cursor-not-allowed"
-                    : "border-violet-200 text-primary hover:border-primary hover:bg-violet-50/30"
+                    ? 'cursor-not-allowed border-muted/30 text-muted-foreground/50'
+                    : 'border-violet-200 text-primary hover:border-primary hover:bg-violet-50/30',
                 )}
               >
-                <Plus className="w-4 h-4" />
-                Thêm địa chỉ mới
+                <Plus className="h-4 w-4" />
+                Thêm địa chỉ khác
               </button>
               {atLimit && (
-                <div className="flex items-start gap-2 mt-2 p-3 rounded-xl bg-amber-50/60 border border-amber-100">
-                  <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                <div className="mt-2 flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50/60 p-3">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                   <p className="text-xs text-amber-700">
-                    Bạn đã đạt giới hạn 5 địa chỉ. Vui lòng xóa bớt trong trang{" "}
+                    Bạn đã đạt giới hạn 5 địa chỉ. Vui lòng xóa bớt trong trang{' '}
                     <strong>Hồ sơ cá nhân</strong> để thêm mới.
                   </p>
                 </div>
@@ -144,18 +156,17 @@ export default function AddressSelectorModal({
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="p-6 border-t border-white/30 shrink-0 flex gap-3">
+          <div className="flex shrink-0 gap-3 border-t border-white/30 p-6">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-3 rounded-xl border-2 border-white/50 text-foreground font-medium hover:bg-white/40 transition-all text-sm"
+              className="flex-1 rounded-xl border-2 border-white/50 px-4 py-3 text-sm font-medium text-foreground transition-all hover:bg-white/40"
             >
               Hủy
             </button>
             <button
               onClick={handleConfirm}
               disabled={!localSelected}
-              className="flex-1 btn-primary text-sm"
+              className="btn-primary flex-1 text-sm"
             >
               Xác nhận
             </button>
@@ -163,11 +174,23 @@ export default function AddressSelectorModal({
         </div>
       </div>
 
-      {/* Nested add-address form */}
       <AddressFormModal
         open={showAddForm}
         onClose={() => setShowAddForm(false)}
-        onSuccess={() => setShowAddForm(false)}
+        onSuccess={() => {
+          setShowAddForm(false);
+          void (async () => {
+            await hydrateAddresses();
+            const latestAddress =
+              useAuthStore
+                .getState()
+                .addresses.find((item) => item.isDefault) ??
+              useAuthStore.getState().addresses.at(-1);
+            if (latestAddress) {
+              setLocalSelected(latestAddress.id);
+            }
+          })();
+        }}
       />
     </>
   );

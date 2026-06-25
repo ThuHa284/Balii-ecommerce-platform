@@ -1,5 +1,9 @@
 import apiClient from "./client";
 import { mapAddress } from "./adapters";
+import {
+  enrichAddressWithLocationNames,
+  enrichAddressesWithLocationNames,
+} from "@/lib/address-utils";
 import { Address } from "@/types/user.types";
 
 type AddressPayload = {
@@ -14,12 +18,12 @@ type AddressPayload = {
 
 export async function getMyAddresses(): Promise<Address[]> {
   const { data } = await apiClient.get("/users/me/addresses");
-  return (data as any[]).map(mapAddress);
+  return enrichAddressesWithLocationNames((data as any[]).map(mapAddress));
 }
 
 export async function createAddress(payload: AddressPayload): Promise<Address> {
   const { data } = await apiClient.post("/users/me/addresses", payload);
-  return mapAddress(data);
+  return enrichAddressWithLocationNames(mapAddress(data));
 }
 
 export async function updateAddress(
@@ -27,9 +31,14 @@ export async function updateAddress(
   payload: Partial<AddressPayload>,
 ): Promise<Address> {
   const { data } = await apiClient.patch(`/users/me/addresses/${id}`, payload);
-  return mapAddress(data);
+  return enrichAddressWithLocationNames(mapAddress(data));
 }
 
 export async function deleteAddress(id: string): Promise<void> {
   await apiClient.delete(`/users/me/addresses/${id}`);
+}
+
+export async function setDefaultAddress(id: string): Promise<Address> {
+  const { data } = await apiClient.patch(`/users/me/addresses/${id}/default`);
+  return enrichAddressWithLocationNames(mapAddress(data));
 }

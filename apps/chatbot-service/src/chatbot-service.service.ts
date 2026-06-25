@@ -28,12 +28,16 @@ export class ChatbotServiceService {
       context,
     });
 
+    const assistantContent = this.finalizeAnswer(
+      generatedAnswer ||
+        this.buildFallbackAnswer(message, context, retrieval.suggestedProducts),
+      retrieval.suggestedProducts,
+    );
+
     const assistantMessage = {
       id: `assistant_${Date.now()}`,
       role: 'assistant' as const,
-      content:
-        generatedAnswer ||
-        this.buildFallbackAnswer(message, context, retrieval.suggestedProducts),
+      content: assistantContent,
       timestamp: new Date().toISOString(),
       productSuggestions: retrieval.suggestedProducts.map((product) => ({
         productId: product.id,
@@ -95,30 +99,52 @@ export class ChatbotServiceService {
     suggestedProducts: ProductContext[],
   ) {
     if (!context.length && !suggestedProducts.length) {
-      return `Mình đã nhận câu hỏi "${message}". Hiện tại mình chưa thấy sản phẩm thật sự khớp trong dữ liệu, nhưng bạn có thể cho mình biết thêm về chất liệu, mức giá hoặc người mặc để mình gợi ý dịu và sát nhu cầu hơn nhé.`;
+      return `Mình chưa thấy mẫu thật sự khớp với "${message}". Bạn muốn ưu tiên chất liệu hay tầm giá nào nhé?`;
     }
 
     const productHint = suggestedProducts.length
-      ? `Mình đang thấy ${suggestedProducts.length} lựa chọn khá phù hợp trong catalog của Balii.`
+      ? `Mình thấy ${suggestedProducts.length} mẫu khá phù hợp với nhu cầu của bạn.`
       : '';
-    const contextHint = context[0]
-      ? `Thông tin gần nhất mình tìm được là: ${context[0]}`
-      : '';
+    const contextHint = context[0] ? `Bạn có thể tham khảo: ${context[0]}` : '';
 
-    return [
-      productHint,
-      contextHint,
-      'Nếu bạn muốn, mình có thể lọc tiếp theo chất liệu, tầm giá hoặc nhu cầu mặc mùa hè hay mùa đông để gợi ý sát hơn cho bạn.',
-    ]
-      .filter(Boolean)
-      .join(' ');
+    return [productHint, contextHint].filter(Boolean).join(' ');
+  }
+
+  private finalizeAnswer(
+    rawAnswer: string,
+    suggestedProducts: ProductContext[],
+  ) {
+    const sanitized = rawAnswer
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/\b(CONTEXT|HISTORY|CUSTOMER|SYSTEM|PROMPT)\s*:/gi, ' ')
+      .replace(/\b(user|assistant)\s*:/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const answer =
+      sanitized ||
+      'Mình đang lọc lại gợi ý phù hợp hơn cho bạn. Bạn thích kiểu dáng rộng rãi hay ôm gọn hơn?';
+
+    if (!suggestedProducts.length) {
+      return answer;
+    }
+
+    const mentionedProduct = suggestedProducts.some((product) =>
+      answer.toLowerCase().includes(product.name.toLowerCase()),
+    );
+
+    if (mentionedProduct) {
+      return answer;
+    }
+
+    return `${answer} Mình có gợi ý sẵn vài mẫu bên dưới để bạn mở nhanh trang sản phẩm.`;
   }
 
   private buildSuggestionReason(product: ProductContext) {
     if (product.salePrice && product.salePrice < product.price) {
-      return 'Mức giá hiện tại đang tốt hơn giá gốc';
+      return 'Giá hiện tại tốt hơn giá gốc';
     }
 
-    return 'Khá phù hợp với nội dung bạn đang tìm';
+    return 'Khá phù hợp với nhu cầu bạn đang hỏi';
   }
 }

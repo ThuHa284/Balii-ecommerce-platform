@@ -6,6 +6,7 @@ import { Check, Search, ShoppingBag, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { getProducts } from '@/lib/api/products.api';
+import { formatAgeGroupLabel, formatGenderLabel } from '@/lib/tryon-labels';
 import { cn, formatCurrency } from '@/lib/utils';
 import { useTryOnStore } from '@/store/tryon.store';
 import { Product } from '@/types/product.types';
@@ -14,28 +15,10 @@ interface TryOnGarmentPickerProps {
   className?: string;
 }
 
-const AGE_OPTIONS = [
-  { value: 'under_18', label: 'Dưới 18' },
-  { value: '18_25', label: '18_25' },
-  { value: '26_35', label: '26_35' },
-  { value: '36_plus', label: '36_plus' },
-] as const;
-
 function getProductImageOptions(product: Product) {
   return Array.from(
     new Set([product.thumbnail, ...(product.images ?? [])].filter(Boolean)),
   );
-}
-
-function renderGenderLabel(value?: string | null) {
-  if (value === 'male') return 'Nam';
-  if (value === 'female') return 'Nữ';
-  if (value === 'unisex') return 'Unisex';
-  return 'Chưa chọn';
-}
-
-function renderAgeLabel(value: string) {
-  return AGE_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }
 
 export default function TryOnGarmentPicker({
@@ -57,7 +40,9 @@ export default function TryOnGarmentPicker({
         const response = await getProducts({ limit: 100 });
         setProducts(response.products);
       } catch {
-        toast.error('Không tải được danh sách sản phẩm. Vui lòng thử lại.');
+        toast.error(
+          'Không tải được danh sách sản phẩm. Vui lòng thử lại.',
+        );
       }
     }
 
@@ -152,14 +137,16 @@ export default function TryOnGarmentPicker({
             <p>
               Giới tính phù hợp:{' '}
               <span className="font-medium text-foreground">
-                {renderGenderLabel(garmentTargetGender)}
+                {formatGenderLabel(garmentTargetGender)}
               </span>
             </p>
             <p>
               Độ tuổi phù hợp:{' '}
               <span className="font-medium text-foreground">
                 {garmentRecommendedAgeGroups.length
-                  ? garmentRecommendedAgeGroups.map(renderAgeLabel).join(', ')
+                  ? garmentRecommendedAgeGroups
+                      .map(formatAgeGroupLabel)
+                      .join(', ')
                   : 'Chưa chọn'}
               </span>
             </p>
@@ -259,9 +246,9 @@ export default function TryOnGarmentPicker({
                 {formatCurrency(product.salePrice || product.basePrice)}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {renderGenderLabel(product.targetGender)} •{' '}
+                {formatGenderLabel(product.targetGender)} •{' '}
                 {(product.recommendedAgeGroups ?? [])
-                  .map(renderAgeLabel)
+                  .map(formatAgeGroupLabel)
                   .join(', ')}
               </p>
             </div>

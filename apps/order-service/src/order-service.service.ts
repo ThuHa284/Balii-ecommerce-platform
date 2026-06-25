@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
@@ -18,6 +17,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { CartClientService } from './clients/cart-client.service';
+import { CloudinaryService } from './cloudinary.service';
 import { OrderSummary } from './order-service.types';
 
 type OrderItemRow = {
@@ -92,6 +92,20 @@ type OrderStatusPoint = {
   count: number;
 };
 
+type ReturnRequestRow = {
+  id: string;
+  orderId: string;
+  userId: string;
+  status: string;
+  reason: string;
+  imageUrls: unknown;
+  adminNote?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: Date | string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+};
+
 type AdminDashboardStats = {
   totalRevenue: number;
   totalOrders: number;
@@ -116,6 +130,20 @@ type AdminAnalyticsStats = {
   orderStatusBreakdown: OrderStatusPoint[];
 };
 
+type ReturnRequestSummary = {
+  id: string;
+  orderId: string;
+  userId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reason: string;
+  imageUrls: string[];
+  adminNote: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 @Injectable()
 export class OrderServiceService {
   private readonly logger = new Logger(OrderServiceService.name);
@@ -128,6 +156,7 @@ export class OrderServiceService {
     private readonly cartClientService: CartClientService,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   async createOrder(userId: string | undefined, dto: CreateOrderDto) {
@@ -170,6 +199,14 @@ export class OrderServiceService {
     await this.cartClientService.clearCart(userId, dto.sessionId);
 
     const response = await this.findMyOrderById(userId, savedOrder.id);
+    void this.sendOrderCreatedNotifications(response).catch((error) => {
+      const message =
+        error instanceof Error ? error.message : 'Unknown email error';
+      this.logger.warn(
+        `Unable to send order created emails for order ${savedOrder.id}: ${message}`,
+      );
+    });
+
     return {
       ...response,
       paymentMethod: dto.paymentMethod,
@@ -337,6 +374,247 @@ export class OrderServiceService {
     return response;
   }
 
+  async updateOrderStatus(
+    orderId: string,
+    status:
+      | 'pending'
+      | 'confirmed'
+      | 'processing'
+      | 'shipping'
+      | 'delivered'
+      | 'cancelled',
+    note?: string,
+  ) {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const nextStatusId = await this.getOrderStatusId(status);
+    if (order.statusId === nextStatusId) {
+      return this.findMyOrderById(order.userId, order.id);
+    }
+
+    const previousStatusId = order.statusId;
+    order.statusId = nextStatusId;
+    await this.orderRepository.save(order);
+    await this.dataSource.query(
+      `
+      INSERT INTO order_service.order_status_logs (
+        order_id,
+        from_status_id,
+        to_status_id,
+        note
+      )
+      VALUES ($1, $2, $3, $4)
+      `,
+      [
+        order.id,
+        previousStatusId,
+        nextStatusId,
+        note ?? `Status updated to ${status}`,
+      ],
+    );
+
+    return this.findMyOrderById(order.userId, order.id);
+  }
+
+  async createReturnRequest(
+    userId: string | undefined,
+    orderId: string,
+    input: {
+      reason: string;
+      imageUrls?: string[];
+    },
+  ): Promise<ReturnRequestSummary> {
+    if (!userId) {
+      throw new BadRequestException('Missing x-user-id');
+    }
+
+    const orderRows = await this.dataSource.query(
+      `
+      SELECT o.id
+      FROM order_service.orders o
+      JOIN order_service.order_statuses os ON os.id = o.status_id
+      WHERE o.id = $1
+        AND o.user_id = $2
+        AND os.code = 'delivered'
+      LIMIT 1
+      `,
+      [orderId, userId],
+    );
+
+    if (!orderRows.length) {
+      throw new BadRequestException(
+        'Chỉ có thể yêu cầu trả hàng sau khi đơn đã giao thành công.',
+      );
+    }
+
+    const existingRows = await this.dataSource.query(
+      `
+      SELECT id
+      FROM order_service.return_requests
+      WHERE order_id = $1
+        AND user_id = $2
+        AND status IN ('pending', 'approved')
+      LIMIT 1
+      `,
+      [orderId, userId],
+    );
+
+    if (existingRows.length) {
+      throw new BadRequestException(
+        'Đơn hàng này đang có yêu cầu trả hàng đang xử lý.',
+      );
+    }
+
+    const uploadedImageUrls = await this.uploadReturnRequestImages(
+      orderId,
+      userId,
+      input.imageUrls ?? [],
+    );
+
+    const rows = await this.dataSource.query(
+      `
+      INSERT INTO order_service.return_requests (
+        order_id,
+        user_id,
+        reason,
+        image_urls,
+        created_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4::jsonb, NOW(), NOW())
+      RETURNING
+        id,
+        order_id AS "orderId",
+        user_id AS "userId",
+        status,
+        reason,
+        image_urls AS "imageUrls",
+        admin_note AS "adminNote",
+        reviewed_by AS "reviewedBy",
+        reviewed_at AS "reviewedAt",
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+      `,
+      [orderId, userId, input.reason.trim(), JSON.stringify(uploadedImageUrls)],
+    );
+
+    return this.mapReturnRequest(rows[0] as ReturnRequestRow);
+  }
+
+  async findMyReturnRequests(
+    userId: string | undefined,
+    orderId: string,
+  ): Promise<ReturnRequestSummary[]> {
+    if (!userId) {
+      throw new BadRequestException('Missing x-user-id');
+    }
+
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        id,
+        order_id AS "orderId",
+        user_id AS "userId",
+        status,
+        reason,
+        image_urls AS "imageUrls",
+        admin_note AS "adminNote",
+        reviewed_by AS "reviewedBy",
+        reviewed_at AS "reviewedAt",
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+      FROM order_service.return_requests
+      WHERE order_id = $1 AND user_id = $2
+      ORDER BY created_at DESC
+      `,
+      [orderId, userId],
+    );
+
+    return rows.map((row: ReturnRequestRow) => this.mapReturnRequest(row));
+  }
+
+  async findAdminReturnRequests(
+    orderId: string,
+  ): Promise<ReturnRequestSummary[]> {
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        id,
+        order_id AS "orderId",
+        user_id AS "userId",
+        status,
+        reason,
+        image_urls AS "imageUrls",
+        admin_note AS "adminNote",
+        reviewed_by AS "reviewedBy",
+        reviewed_at AS "reviewedAt",
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+      FROM order_service.return_requests
+      WHERE order_id = $1
+      ORDER BY created_at DESC
+      `,
+      [orderId],
+    );
+
+    return rows.map((row: ReturnRequestRow) => this.mapReturnRequest(row));
+  }
+
+  async reviewReturnRequest(
+    returnRequestId: string,
+    reviewedBy: string | undefined,
+    input: {
+      status: 'approved' | 'rejected';
+      adminNote?: string;
+    },
+  ): Promise<ReturnRequestSummary> {
+    if (!reviewedBy) {
+      throw new BadRequestException('Missing x-user-id');
+    }
+
+    const rows = await this.dataSource.query(
+      `
+      UPDATE order_service.return_requests
+      SET status = $1,
+          admin_note = $2,
+          reviewed_by = $3,
+          reviewed_at = NOW(),
+          updated_at = NOW()
+      WHERE id = $4
+      RETURNING
+        id,
+        order_id AS "orderId",
+        user_id AS "userId",
+        status,
+        reason,
+        image_urls AS "imageUrls",
+        admin_note AS "adminNote",
+        reviewed_by AS "reviewedBy",
+        reviewed_at AS "reviewedAt",
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+      `,
+      [
+        input.status,
+        input.adminNote?.trim() ?? null,
+        reviewedBy,
+        returnRequestId,
+      ],
+    );
+
+    if (!rows.length) {
+      throw new NotFoundException('Return request not found');
+    }
+
+    return this.mapReturnRequest(rows[0] as ReturnRequestRow);
+  }
+
   async getAdminDashboardStats(): Promise<AdminDashboardStats> {
     const [summary, monthlyRevenue, recentOrders] = await Promise.all([
       this.getAdminSummary(),
@@ -481,6 +759,90 @@ export class OrderServiceService {
         lineTotal: Number(item.subtotal),
       })),
     };
+  }
+
+  private mapReturnRequest(row: ReturnRequestRow): ReturnRequestSummary {
+    const imageUrls = Array.isArray(row.imageUrls)
+      ? row.imageUrls.map((item) => String(item))
+      : typeof row.imageUrls === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(row.imageUrls) as unknown[];
+              return Array.isArray(parsed)
+                ? parsed.map((item) => String(item))
+                : [];
+            } catch {
+              return [];
+            }
+          })()
+        : [];
+
+    return {
+      id: row.id,
+      orderId: row.orderId,
+      userId: row.userId,
+      status: row.status as ReturnRequestSummary['status'],
+      reason: row.reason,
+      imageUrls,
+      adminNote: row.adminNote ?? null,
+      reviewedBy: row.reviewedBy ?? null,
+      reviewedAt: row.reviewedAt
+        ? new Date(row.reviewedAt).toISOString()
+        : null,
+      createdAt: new Date(row.createdAt).toISOString(),
+      updatedAt: new Date(row.updatedAt).toISOString(),
+    };
+  }
+
+  private parseDataUrlImage(dataUrl: string): {
+    buffer: Buffer;
+    extension: string;
+  } {
+    const matches = dataUrl.match(
+      /^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/,
+    );
+
+    if (!matches) {
+      throw new BadRequestException('Ảnh minh chứng không hợp lệ.');
+    }
+
+    return {
+      extension: matches[1].replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg',
+      buffer: Buffer.from(matches[2], 'base64'),
+    };
+  }
+
+  private async uploadReturnRequestImages(
+    orderId: string,
+    userId: string,
+    imageUrls: string[],
+  ): Promise<string[]> {
+    if (!imageUrls.length) {
+      return [];
+    }
+
+    const folder =
+      this.configService.get<string>('CLOUDINARY_RETURN_FOLDER') ||
+      'balii/returns';
+
+    const uploadedUrls = await Promise.all(
+      imageUrls.map(async (imageUrl, index) => {
+        if (!imageUrl.startsWith('data:image/')) {
+          return imageUrl;
+        }
+
+        const parsed = this.parseDataUrlImage(imageUrl);
+        const publicId = `${userId}_${orderId}_${Date.now()}_${index + 1}.${parsed.extension}`;
+        const uploaded = await this.cloudinaryService.uploadBuffer(
+          parsed.buffer,
+          folder,
+          publicId,
+        );
+        return uploaded.url;
+      }),
+    );
+
+    return uploadedUrls;
   }
 
   private generateOrderCode(): string {
@@ -681,6 +1043,7 @@ export class OrderServiceService {
     order: ReturnType<OrderServiceService['mapOrder']>,
     customerName: string,
     customerEmail: string | null,
+    headline = 'Đơn hàng mới cần xử lý',
   ) {
     const shippingAddress = this.buildShippingAddressText(
       order.shippingAddress,
@@ -694,7 +1057,7 @@ export class OrderServiceService {
 
     return `
       <div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;color:#0f172a;">
-        <h2>Đơn hàng mới đã thanh toán - cần đóng gói</h2>
+        <h2>${headline}</h2>
         <p><strong>Mã đơn:</strong> #${order.orderNumber}</p>
         <p><strong>Khách hàng:</strong> ${customerName}</p>
         <p><strong>Email:</strong> ${customerEmail ?? 'Không có'}</p>
@@ -711,6 +1074,84 @@ export class OrderServiceService {
         }
       </div>
     `;
+  }
+
+  private buildOrderCreatedHtml(
+    order: ReturnType<OrderServiceService['mapOrder']>,
+    customerName: string,
+  ) {
+    const shippingAddress = this.buildShippingAddressText(
+      order.shippingAddress,
+    );
+
+    return `
+      <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;color:#0f172a;">
+        <h2 style="margin-bottom:8px;">Balii Sleepwear - Đặt hàng thành công</h2>
+        <p>Xin chào ${customerName}, Balii đã ghi nhận đơn hàng <strong>#${order.orderNumber}</strong> của bạn.</p>
+        <p>Trạng thái hiện tại: <strong>${order.status}</strong>. Hệ thống sẽ tiếp tục cập nhật khi đơn được xác nhận và giao hàng.</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;">
+          <p style="margin:0 0 6px;"><strong>Người nhận:</strong> ${safeString(order.shippingAddress.recipientName) || customerName}</p>
+          <p style="margin:0 0 6px;"><strong>Số điện thoại:</strong> ${safeString(order.shippingAddress.phone)}</p>
+          <p style="margin:0;"><strong>Địa chỉ:</strong> ${shippingAddress}</p>
+        </div>
+        <p><strong>Tổng thanh toán:</strong> ${this.formatCurrency(order.totalAmount)}</p>
+        <p><strong>Phương thức thanh toán:</strong> ${order.paymentMethod}</p>
+      </div>
+    `;
+  }
+
+  private async sendOrderCreatedNotifications(
+    order: ReturnType<OrderServiceService['mapOrder']>,
+  ) {
+    if (!this.isMailEnabled()) {
+      this.logger.warn(
+        `MAIL_HOST/MAIL_PORT/MAIL_USER/MAIL_PASS chưa cấu hình. Bỏ qua gửi mail cho đơn ${order.id}.`,
+      );
+      return;
+    }
+
+    const transporter = this.createMailerTransport();
+    const customer = await this.loadCustomerContact(order.userId);
+    const from =
+      this.configService.get<string>('MAIL_FROM') || 'no-reply@balii.com';
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const customerHtml = this.buildOrderCreatedHtml(order, customer.fullName);
+    const adminRecipients = (
+      this.configService.get<string>('ADMIN_ORDER_EMAILS') || ''
+    )
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (customer.email) {
+      await transporter.sendMail({
+        from,
+        to: customer.email,
+        subject: `Đặt hàng thành công #${order.orderNumber}`,
+        html: `
+          ${customerHtml}
+          <p style="font-family:Arial,sans-serif;color:#475569;margin-top:24px;">
+            Bạn có thể theo dõi đơn hàng tại:
+            <a href="${frontendUrl}/account/orders/${order.id}">${frontendUrl}/account/orders/${order.id}</a>
+          </p>
+        `,
+      });
+    }
+
+    if (adminRecipients.length > 0) {
+      await transporter.sendMail({
+        from,
+        to: adminRecipients.join(', '),
+        subject: `Đơn hàng mới #${order.orderNumber}`,
+        html: this.buildAdminOrderHtml(
+          order,
+          customer.fullName,
+          customer.email,
+          'Đơn hàng mới cần xác nhận',
+        ),
+      });
+    }
   }
 
   private async sendPaymentSuccessNotifications(

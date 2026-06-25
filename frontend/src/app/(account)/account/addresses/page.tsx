@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, MapPin, Pencil, Trash2 } from "lucide-react";
+import { formatAddressLine } from "@/lib/address-utils";
 import { useAuthStore } from "@/store/auth.store";
 import AddressFormModal from "@/components/checkout/address-form-modal";
 
@@ -33,7 +34,7 @@ export default function AddressesPage() {
                     {addr.isDefault && <span className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium">Mặc định</span>}
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">{addr.phone}</p>
-                  <p className="text-sm text-muted-foreground">{addr.street}, {addr.ward}, {addr.district}, {addr.province}</p>
+                  <p className="text-sm text-muted-foreground">{formatAddressLine(addr)}</p>
                 </div>
               </div>
               <div className="flex gap-1">

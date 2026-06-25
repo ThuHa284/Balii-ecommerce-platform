@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Mail, Lock, User, Phone, Loader2 } from 'lucide-react';
 import { registerApi } from '@/lib/api/auth.api';
-import { useAuthStore } from '@/store/auth.store';
+import { useCartStore } from '@/store/cart.store';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { login } = useAuthStore();
+  const searchParams = useSearchParams();
+  const hydrateCart = useCartStore((state) => state.hydrateCart);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -37,8 +38,8 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await registerApi(formData);
-      await login({ email: formData.email, password: formData.password });
-      router.push('/');
+      await hydrateCart().catch(() => undefined);
+      router.push(searchParams.get('redirect') || '/');
     } catch (err: unknown) {
       setError(
         err instanceof Error && err.message

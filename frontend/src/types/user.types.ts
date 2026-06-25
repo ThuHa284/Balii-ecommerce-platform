@@ -20,6 +20,9 @@ export enum UserRole {
 export interface Address {
   id: string;
   userId: string;
+  provinceId: number;
+  districtId: number;
+  wardId: number;
   fullName: string;
   phone: string;
   province: string;

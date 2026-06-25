@@ -43,6 +43,14 @@ export class VirtualTryonServiceService {
     private readonly tryonHistoryRepository: Repository<TryonHistory>,
   ) {}
 
+  private requireUserId(userId?: string): string {
+    if (!userId) {
+      throw new BadRequestException('Missing x-user-id');
+    }
+
+    return userId;
+  }
+
   private fileToBase64(
     file: UploadedImageFile | undefined,
     fieldName: string,
@@ -197,6 +205,7 @@ export class VirtualTryonServiceService {
     dto: CreateTryOnDto,
     userId?: string,
   ) {
+    const resolvedUserId = this.requireUserId(userId);
     const apiKey = this.configService.get<string>('FASHN_API_KEY');
     const apiUrl =
       this.configService.get<string>('FASHN_API_URL') ||
@@ -220,7 +229,12 @@ export class VirtualTryonServiceService {
       await this.tryonHistoryRepository.save({
         status: 'need_confirmation',
         needConfirmation: true,
-        ...this.buildHistoryPayload(dto, userId, analysis, warningResult),
+        ...this.buildHistoryPayload(
+          dto,
+          resolvedUserId,
+          analysis,
+          warningResult,
+        ),
         userConfirmed: false,
       });
 
@@ -344,6 +358,7 @@ export class VirtualTryonServiceService {
     dto: CreateTryOnDto,
     userId?: string,
   ) {
+    const resolvedUserId = this.requireUserId(userId);
     const created = await this.createTryOn(files, dto, userId);
 
     if (!created.success && created.needConfirmation) {
@@ -377,7 +392,7 @@ export class VirtualTryonServiceService {
           completedAt: new Date(),
           ...this.buildHistoryPayload(
             dto,
-            userId,
+            resolvedUserId,
             personAnalysis,
             warningResult,
           ),
@@ -404,7 +419,7 @@ export class VirtualTryonServiceService {
             rawProviderResponse: result.data,
             ...this.buildHistoryPayload(
               dto,
-              userId,
+              resolvedUserId,
               personAnalysis,
               warningResult,
             ),
@@ -420,7 +435,7 @@ export class VirtualTryonServiceService {
           errorMessage: result.data.error || 'FASHN try-on failed',
           ...this.buildHistoryPayload(
             dto,
-            userId,
+            resolvedUserId,
             personAnalysis,
             warningResult,
           ),
@@ -445,8 +460,9 @@ export class VirtualTryonServiceService {
   }
 
   async getHistory(userId?: string) {
+    const resolvedUserId = this.requireUserId(userId);
     return this.tryonHistoryRepository.find({
-      where: userId ? { userId } : {},
+      where: { userId: resolvedUserId },
       order: {
         createdAt: 'DESC',
       },
@@ -454,9 +470,10 @@ export class VirtualTryonServiceService {
     });
   }
 
-  async getHistoryDetail(id: string) {
+  async getHistoryDetail(id: string, userId?: string) {
+    const resolvedUserId = this.requireUserId(userId);
     const history = await this.tryonHistoryRepository.findOne({
-      where: { id },
+      where: { id, userId: resolvedUserId },
     });
 
     if (!history) {
@@ -466,16 +483,18 @@ export class VirtualTryonServiceService {
     return history;
   }
 
-  async getStats() {
-    const total = await this.tryonHistoryRepository.count();
+  async getStats(userId?: string) {
+    const resolvedUserId = this.requireUserId(userId);
+    const where = { userId: resolvedUserId };
+    const total = await this.tryonHistoryRepository.count({ where });
     const completed = await this.tryonHistoryRepository.count({
-      where: { status: 'completed' },
+      where: { ...where, status: 'completed' },
     });
     const failed = await this.tryonHistoryRepository.count({
-      where: { status: 'failed' },
+      where: { ...where, status: 'failed' },
     });
     const needConfirmation = await this.tryonHistoryRepository.count({
-      where: { status: 'need_confirmation' },
+      where: { ...where, status: 'need_confirmation' },
     });
 
     return {

@@ -18,6 +18,7 @@ import TryOnGuidePopup from '@/components/ai/try-on-guide-popup';
 import TryOnResult from '@/components/ai/try-on-result';
 import TryOnUpload from '@/components/ai/try-on-upload';
 import TryOnWarningModal from '@/components/ai/try-on-warning-modal';
+import AuthGuard from '@/components/auth/auth-guard';
 import {
   getProductBySlug,
   getRecommendedProducts,
@@ -511,17 +512,19 @@ function TryOnContent() {
 
 export default function TryOnPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center pb-16 pt-28">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-violet-300 border-t-violet-500" />
-            <p className="text-sm text-muted-foreground">Đang tải...</p>
+    <AuthGuard redirectTo="/login?redirect=/try-on">
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center pb-16 pt-28">
+            <div className="text-center">
+              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-violet-300 border-t-violet-500" />
+              <p className="text-sm text-muted-foreground">Đang tải...</p>
+            </div>
           </div>
-        </div>
-      }
-    >
-      <TryOnContent />
-    </Suspense>
+        }
+      >
+        <TryOnContent />
+      </Suspense>
+    </AuthGuard>
   );
 }

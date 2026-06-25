@@ -2,14 +2,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
+import { useCartStore } from '@/store/cart.store';
 import { UserRole } from '@/types/user.types';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, isLoading } = useAuthStore();
+  const hydrateCart = useCartStore((state) => state.hydrateCart);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,6 +24,7 @@ export default function LoginPage() {
 
     try {
       await login({ email, password });
+      await hydrateCart().catch(() => undefined);
       const user = useAuthStore.getState().user;
 
       if (
@@ -29,7 +33,8 @@ export default function LoginPage() {
       ) {
         router.push('/admin/dashboard');
       } else {
-        router.push('/');
+        const redirectTo = searchParams.get('redirect') || '/';
+        router.push(redirectTo);
       }
     } catch (err: unknown) {
       setError(
@@ -185,7 +190,6 @@ export default function LoginPage() {
           Đăng ký ngay
         </Link>
       </p>
-
     </div>
   );
 }

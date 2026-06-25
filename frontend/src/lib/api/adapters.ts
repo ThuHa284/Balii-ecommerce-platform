@@ -1,4 +1,5 @@
 import { Cart, CartItem } from '@/types/cart.types';
+import { parseStoredAddress } from '@/lib/address-utils';
 import { Order } from '@/types/order.types';
 import {
   Category,
@@ -150,10 +151,13 @@ type BackendAddress = {
   wardId: number;
   streetAddress: string;
   isDefault: boolean;
+  provinceName?: string;
+  districtName?: string;
+  wardName?: string;
 };
 
 function humanizeLocation(label: string, id: number) {
-  return `${label} ${id}`;
+  return id > 0 ? `${label} ${id}` : label;
 }
 
 function safeString(value: unknown) {
@@ -321,15 +325,25 @@ export function mapCart(input: BackendCart): Cart {
 }
 
 export function mapAddress(input: BackendAddress): Address {
+  const parsedStreet = parseStoredAddress(input.streetAddress);
+
   return {
     id: input.id,
     userId: input.userId,
+    provinceId: Number(input.provinceId ?? 0),
+    districtId: Number(input.districtId ?? 0),
+    wardId: Number(input.wardId ?? 0),
     fullName: input.recipientName,
     phone: input.phone,
-    province: humanizeLocation('Tỉnh/TP', input.provinceId),
-    district: humanizeLocation('Quận/Huyện', input.districtId),
-    ward: humanizeLocation('Phường/Xã', input.wardId),
-    street: input.streetAddress,
+    province:
+      input.provinceName ?? humanizeLocation('Tỉnh/Thành phố', input.provinceId),
+    district:
+      input.districtName ?? humanizeLocation('Quận/Huyện', input.districtId),
+    ward:
+      parsedStreet.ward ||
+      input.wardName ||
+      humanizeLocation('Phường/Xã', input.wardId),
+    street: parsedStreet.street || input.streetAddress,
     isDefault: input.isDefault,
   };
 }
@@ -383,20 +397,26 @@ export function mapOrder(input: BackendOrder): Order {
     shippingAddress: {
       id: '',
       userId: input.userId ?? '',
+      provinceId: Number(input.shippingAddress.provinceId ?? 0),
+      districtId: Number(input.shippingAddress.districtId ?? 0),
+      wardId: Number(input.shippingAddress.wardId ?? 0),
       fullName: safeString(input.shippingAddress.recipientName),
       phone: safeString(input.shippingAddress.phone),
-      province: humanizeLocation(
-        'Tỉnh/TP',
-        Number(input.shippingAddress.provinceId ?? 0),
-      ),
-      district: humanizeLocation(
-        'Quận/Huyện',
-        Number(input.shippingAddress.districtId ?? 0),
-      ),
-      ward: humanizeLocation(
-        'Phường/Xã',
-        Number(input.shippingAddress.wardId ?? 0),
-      ),
+      province:
+        safeString(input.shippingAddress.province) ||
+        humanizeLocation(
+          'Tỉnh/Thành phố',
+          Number(input.shippingAddress.provinceId ?? 0),
+        ),
+      district:
+        safeString(input.shippingAddress.district) ||
+        humanizeLocation(
+          'Quận/Huyện',
+          Number(input.shippingAddress.districtId ?? 0),
+        ),
+      ward:
+        safeString(input.shippingAddress.ward) ||
+        humanizeLocation('Phường/Xã', Number(input.shippingAddress.wardId ?? 0)),
       street: safeString(input.shippingAddress.streetAddress),
       isDefault: false,
     },
