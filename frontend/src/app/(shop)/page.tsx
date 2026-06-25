@@ -190,7 +190,7 @@ export default function HomePage() {
           </div>
           <Link
             href="/products"
-            className="clickable hidden items-center gap-1 text-sm font-medium text-primary hover:underline sm:inline-flex"
+            className="clickable inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
           >
             Xem tất cả <ArrowRight className="h-4 w-4" />
           </Link>
@@ -335,13 +335,21 @@ export default function HomePage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
-        <div className="mb-10 text-center">
-          <h2 className="mb-2 font-heading text-3xl font-bold text-foreground md:text-4xl">
-            Hàng <span className="text-gradient">Mới Về</span>
-          </h2>
-          <p className="text-muted-foreground">
-            Cập nhật xu hướng thời trang đồ ngủ mới nhất
-          </p>
+        <div className="mb-10 flex items-end justify-between">
+          <div>
+            <h2 className="mb-2 font-heading text-3xl font-bold text-foreground md:text-4xl">
+              Hàng <span className="text-gradient">Mới Về</span>
+            </h2>
+            <p className="text-muted-foreground">
+              Cập nhật xu hướng thời trang đồ ngủ mới nhất
+            </p>
+          </div>
+          <Link
+            href="/products"
+            className="clickable inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            Xem tất cả <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
         <ProductGrid products={newProducts} columns={3} />
       </section>

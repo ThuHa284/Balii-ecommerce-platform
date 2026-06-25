@@ -256,6 +256,48 @@ export class PaymentServiceService {
     return this.getPaymentDetail(savedPayment.id);
   }
 
+  async simulatePaymentSuccess(userId: string | undefined, paymentId: string) {
+    if (process.env.PAYMENT_SIMULATION_ENABLED !== 'true') {
+      throw new BadRequestException(
+        'Tính năng giả lập thanh toán chưa được bật.',
+      );
+    }
+
+    if (!userId) {
+      throw new BadRequestException('Missing x-user-id');
+    }
+
+    const payment = await this.paymentRepository.findOne({
+      where: { id: paymentId },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.userId !== userId) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    const providerCode = await this.getProviderCode(payment.providerId);
+
+    if (providerCode !== 'vnpay') {
+      throw new BadRequestException(
+        'Chỉ hỗ trợ giả lập thành công cho thanh toán VNPay.',
+      );
+    }
+
+    const currentStatus = await this.getPaymentStatusCode(payment.statusId);
+
+    if (currentStatus !== 'pending') {
+      throw new BadRequestException(
+        'Chỉ có thể giả lập với giao dịch đang chờ thanh toán.',
+      );
+    }
+
+    return this.completePayment(paymentId, `sandbox_vnpay_${Date.now()}`);
+  }
+
   async handleVnpayReturn(query: VnpayCallbackPayload) {
     try {
       const handled = await this.processVnpayCallback(query);
@@ -332,6 +374,34 @@ export class PaymentServiceService {
       transactionId:
         payment.providerTransactionId ?? payment.providerRef ?? payment.id,
     };
+  }
+
+  private async getProviderCode(providerId: number) {
+    const provider = await this.dataSource.query(
+      `
+      SELECT code
+      FROM payment_service.payment_providers
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [providerId],
+    );
+
+    return String(provider[0]?.code ?? '');
+  }
+
+  private async getPaymentStatusCode(statusId: number) {
+    const status = await this.dataSource.query(
+      `
+      SELECT code
+      FROM payment_service.payment_statuses
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [statusId],
+    );
+
+    return String(status[0]?.code ?? '');
   }
 
   private async getPaymentDetail(paymentId: string) {

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Brain,
+  Grid2x2,
   LayoutDashboard,
   Library,
   LogOut,
@@ -13,6 +14,7 @@ import {
   Ticket,
   Users,
 } from 'lucide-react';
+
 import { hasRoleAccess } from '@/lib/api/admin.utils';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
@@ -28,6 +30,7 @@ type AdminLink = {
 const adminLinks: AdminLink[] = [
   { href: '/admin/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Sản phẩm', icon: Package },
+  { href: '/admin/categories', label: 'Danh mục', icon: Grid2x2 },
   { href: '/admin/collections', label: 'Bộ sưu tập', icon: Library },
   { href: '/admin/orders', label: 'Đơn hàng', icon: ShoppingCart },
   { href: '/admin/vouchers', label: 'Voucher', icon: Ticket },

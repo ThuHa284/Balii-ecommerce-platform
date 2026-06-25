@@ -14,14 +14,15 @@ export class CollectionsService {
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
-  create(dto: CreateCollectionDto) {
+  async create(dto: CreateCollectionDto) {
     const collection = this.collectionRepo.create({
       ...dto,
       productIds: dto.productIds ?? [],
       isActive: dto.isActive ?? true,
     });
 
-    return this.collectionRepo.save(collection);
+    const saved = await this.collectionRepo.save(collection);
+    return this.toFrontendCollection(saved);
   }
 
   async findAll() {

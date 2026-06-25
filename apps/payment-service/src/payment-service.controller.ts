@@ -75,6 +75,14 @@ export class PaymentServiceController {
     return this.paymentServiceService.failPayment(paymentId);
   }
 
+  @Post(':id/simulate-success')
+  simulatePaymentSuccess(
+    @Headers('x-user-id') userId: string | undefined,
+    @Param('id') paymentId: string,
+  ) {
+    return this.paymentServiceService.simulatePaymentSuccess(userId, paymentId);
+  }
+
   @Post('workflow/start')
   async startPaymentWorkflow(
     @Body()

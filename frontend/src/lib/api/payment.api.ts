@@ -63,6 +63,16 @@ export async function completePayment(
   return data;
 }
 
+export async function simulateVnpaySuccess(
+  paymentId: string,
+): Promise<PaymentApiResponse> {
+  const { data } = await apiClient.post<PaymentApiResponse>(
+    `/payments/${paymentId}/simulate-success`,
+    {},
+  );
+  return data;
+}
+
 export async function getPaymentById(
   paymentId: string,
 ): Promise<PaymentDetailResponse> {

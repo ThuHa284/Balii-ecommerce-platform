@@ -1,9 +1,11 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
+import { toast } from 'sonner';
 import {
   AlertCircle,
   CreditCard,
@@ -11,17 +13,22 @@ import {
   Loader2,
   QrCode,
 } from 'lucide-react';
+
 import { getOrderById } from '@/lib/api/orders.api';
 import {
   getPaymentById,
+  simulateVnpaySuccess,
   type PaymentDetailResponse,
 } from '@/lib/api/payment.api';
 import { PAYMENT_STATUS_COLORS, PAYMENT_STATUS_LABELS } from '@/lib/constants';
+import { getUserErrorMessage } from '@/lib/error-utils';
 import { formatCurrency } from '@/lib/utils';
 import { PaymentStatus, type Order } from '@/types/order.types';
 
 const POLL_INTERVAL_MS = 5000;
 const QR_IMAGE_SIZE = 280;
+const ENABLE_VNPAY_SIMULATION =
+  process.env.NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION === 'true';
 
 function buildCheckoutResultUrl(input: {
   orderId: string;
@@ -51,6 +58,7 @@ export default function VnpayCheckoutPage() {
   const [payment, setPayment] = useState<PaymentDetailResponse | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -164,9 +172,39 @@ export default function VnpayCheckoutPage() {
   const paymentStatusLabel =
     PAYMENT_STATUS_LABELS[paymentStatus] || PAYMENT_STATUS_LABELS.pending;
 
+  const handleSimulateSuccess = async () => {
+    if (!payment || isSimulatingPayment) {
+      return;
+    }
+
+    try {
+      setIsSimulatingPayment(true);
+      const updatedPayment = await simulateVnpaySuccess(payment.id);
+      setPayment((current) =>
+        current
+          ? {
+              ...current,
+              status: updatedPayment.status ?? 'paid',
+              paidAt: updatedPayment.paidAt ?? current.paidAt,
+            }
+          : current,
+      );
+      toast.success('Đã giả lập thanh toán VNPay thành công.');
+    } catch (simulateError) {
+      toast.error(
+        getUserErrorMessage(
+          simulateError,
+          'Không thể giả lập thanh toán VNPay thành công.',
+        ),
+      );
+    } finally {
+      setIsSimulatingPayment(false);
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="pt-28 pb-16">
+      <div className="pb-16 pt-28">
         <div className="mx-auto max-w-xl px-4">
           <div className="glass-card flex min-h-[420px] flex-col items-center justify-center gap-4 p-10 text-center">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -186,7 +224,7 @@ export default function VnpayCheckoutPage() {
 
   if (error || !payment || !order || !paymentUrl) {
     return (
-      <div className="pt-28 pb-16">
+      <div className="pb-16 pt-28">
         <div className="mx-auto max-w-xl px-4">
           <div className="glass-card p-10 text-center">
             <AlertCircle className="mx-auto mb-4 h-12 w-12 text-rose-500" />
@@ -211,7 +249,7 @@ export default function VnpayCheckoutPage() {
   }
 
   return (
-    <div className="pt-28 pb-16">
+    <div className="pb-16 pt-28">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 text-center">
           <p className="text-sm font-medium uppercase tracking-[0.28em] text-primary/70">
@@ -255,7 +293,7 @@ export default function VnpayCheckoutPage() {
                 />
               </div>
               <p className="mt-4 text-sm text-muted-foreground">
-                Ma giao dich:{' '}
+                Mã giao dịch:{' '}
                 <span className="font-semibold text-foreground">
                   {transactionId}
                 </span>
@@ -276,7 +314,27 @@ export default function VnpayCheckoutPage() {
                 >
                   Xem đơn hàng
                 </Link>
+                {ENABLE_VNPAY_SIMULATION &&
+                payment.method === 'vnpay' &&
+                paymentStatus === 'pending' ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleSimulateSuccess()}
+                    disabled={isSimulatingPayment}
+                    className="btn-outline disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSimulatingPayment
+                      ? 'Đang giả lập thanh toán...'
+                      : 'Giả lập thanh toán thành công'}
+                  </button>
+                ) : null}
               </div>
+              {ENABLE_VNPAY_SIMULATION ? (
+                <p className="mt-4 text-xs text-amber-700">
+                  Chế độ test đang bật. Nút giả lập chỉ dùng cho môi trường dev
+                  hoặc sandbox.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -292,8 +350,8 @@ export default function VnpayCheckoutPage() {
                 {paymentStatusLabel}
               </span>
               <p className="mt-3 text-sm text-muted-foreground">
-                Trang này tự động kiểm tra kết quả mỗi{' '}
-                {POLL_INTERVAL_MS / 1000} giay.
+                Trang này tự động kiểm tra kết quả mỗi {POLL_INTERVAL_MS / 1000}{' '}
+                giây.
               </p>
             </div>
 
@@ -329,7 +387,10 @@ export default function VnpayCheckoutPage() {
                 <li>1. Mở app ngân hàng hoặc ví có hỗ trợ quét QR.</li>
                 <li>2. Quét mã QR trên màn hình này hoặc bấm Mở VNPay.</li>
                 <li>3. Xác nhận giao dịch trong ứng dụng của bạn.</li>
-                <li>4. Quay lại trang này nếu cần; hệ thống sẽ tự cập nhật.</li>
+                <li>
+                  4. Quay lại trang này nếu cần; hệ thống sẽ tự cập nhật kết
+                  quả.
+                </li>
               </ol>
             </div>
           </div>
