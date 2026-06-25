@@ -26,6 +26,17 @@ export default function TryOnWarningModal({
 }: TryOnWarningModalProps) {
   if (!open || !warning) return null;
 
+  const translateTryOnText = (value: string) =>
+    value
+      .replace(/\bmale\b/gi, 'nam')
+      .replace(/\bfemale\b/gi, 'n\u1eef')
+      .replace(/\bunisex\b/gi, 'unisex')
+      .replace(/\badult\b/gi, 'ng\u01b0\u1eddi l\u1edbn')
+      .replace(/\bteen\b/gi, 'thi\u1ebfu ni\u00ean')
+      .replace(/\bmiddle_age\b/gi, 'trung ni\u00ean')
+      .replace(/\bsenior\b/gi, 'l\u1edbn tu\u1ed5i')
+      .replace(/\bchild\b/gi, 'tr\u1ebb em');
+
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
@@ -75,7 +86,7 @@ export default function TryOnWarningModal({
                     key={item}
                     className="rounded-xl border border-amber-200 bg-white/70 px-4 py-3 text-sm text-amber-900"
                   >
-                    {item}
+                    {translateTryOnText(item)}
                   </div>
                 ))}
               </div>
@@ -91,7 +102,7 @@ export default function TryOnWarningModal({
                     key={item}
                     className="rounded-xl border border-violet-200 bg-white/70 px-4 py-3 text-sm text-violet-900"
                   >
-                    {item}
+                    {translateTryOnText(item)}
                   </div>
                 ))}
                 {(!warning.suggestions || warning.suggestions.length === 0) && (

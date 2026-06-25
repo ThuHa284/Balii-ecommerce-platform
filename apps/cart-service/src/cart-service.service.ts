@@ -54,7 +54,11 @@ export class CartService {
     }));
 
     cart.subtotal = cart.items.reduce((sum, item) => sum + item.subtotal, 0);
-    cart.shippingFee = cart.subtotal > 0 ? 30000 : 0;
+    const totalQuantity = cart.items.reduce(
+      (sum, item) => sum + item.quantity,
+      0,
+    );
+    cart.shippingFee = totalQuantity === 0 ? 0 : totalQuantity >= 2 ? 0 : 30000;
     cart.totalAmount = cart.subtotal - cart.discountAmount + cart.shippingFee;
     cart.updatedAt = new Date().toISOString();
 
@@ -101,12 +105,14 @@ export class CartService {
 
     if (existedItem) {
       existedItem.quantity = newQuantity;
-        existedItem.unitPrice = variant.unitPrice;
-        existedItem.productName = variant.productName;
-        existedItem.productSlug = variant.productSlug;
-        existedItem.sku = variant.sku;
+      existedItem.unitPrice = variant.unitPrice;
+      existedItem.productName = variant.productName;
+      existedItem.productSlug = variant.productSlug;
+      existedItem.sku = variant.sku;
       existedItem.thumbnailUrl = variant.thumbnailUrl;
       existedItem.variantLabel = variant.variantLabel;
+      existedItem.variantSize = variant.variantSize;
+      existedItem.variantColor = variant.variantColor;
     } else {
       cart.items.push({
         variantId: variant.variantId,
@@ -116,6 +122,8 @@ export class CartService {
         sku: variant.sku,
         thumbnailUrl: variant.thumbnailUrl,
         variantLabel: variant.variantLabel,
+        variantSize: variant.variantSize,
+        variantColor: variant.variantColor,
         unitPrice: variant.unitPrice,
         quantity: dto.quantity,
         subtotal: variant.unitPrice * dto.quantity,
@@ -152,6 +160,8 @@ export class CartService {
     item.sku = variant.sku;
     item.thumbnailUrl = variant.thumbnailUrl;
     item.variantLabel = variant.variantLabel;
+    item.variantSize = variant.variantSize;
+    item.variantColor = variant.variantColor;
 
     return this.saveCart(key, cart);
   }
@@ -241,6 +251,8 @@ export class CartService {
       item.sku = variant.sku;
       item.thumbnailUrl = variant.thumbnailUrl;
       item.variantLabel = variant.variantLabel;
+      item.variantSize = variant.variantSize;
+      item.variantColor = variant.variantColor;
     }
 
     return this.saveCart(key, cart);

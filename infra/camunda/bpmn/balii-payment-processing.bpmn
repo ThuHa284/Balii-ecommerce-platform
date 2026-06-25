@@ -1,0 +1,445 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:modeler="http://camunda.org/schema/modeler/1.0"
+                  id="Definitions_Balii_Payment_Processing"
+                  targetNamespace="http://balii-sleepwear/payment"
+                  exporter="Camunda Modeler"
+                  exporterVersion="5.45.0"
+                  modeler:executionPlatform="Camunda Platform"
+                  modeler:executionPlatformVersion="7.24.0">
+
+  <bpmn:message id="Message_PaymentCallbackReceived" name="payment.callback.received" camunda:historyTimeToLive="180"/>
+
+  <bpmn:process id="Process_Payment_Processing" name="Balii Payment Processing Workflow" isExecutable="true" camunda:historyTimeToLive="180">
+    <bpmn:startEvent id="StartEvent_PaymentRequested" name="Payment Requested">
+      <bpmn:outgoing>Flow_Start_Validate</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_ValidatePaymentRequest" name="Validate Payment Request" camunda:type="external" camunda:topic="payment.validate-request">
+      <bpmn:incoming>Flow_Start_Validate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Validate_CheckIdempotency</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CheckPaymentIdempotency" name="Check Payment Idempotency" camunda:type="external" camunda:topic="payment.check-idempotency">
+      <bpmn:incoming>Flow_Validate_CheckIdempotency</bpmn:incoming>
+      <bpmn:outgoing>Flow_CheckIdempotency_CreateOrReuse</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CreateOrReusePayment" name="Create or Reuse Payment" camunda:type="external" camunda:topic="payment.create-or-reuse">
+      <bpmn:incoming>Flow_CheckIdempotency_CreateOrReuse</bpmn:incoming>
+      <bpmn:outgoing>Flow_CreateOrReuse_GenerateUrl</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_GenerateProviderPaymentUrl" name="Generate Provider Payment URL" camunda:type="external" camunda:topic="payment.generate-provider-url">
+      <bpmn:incoming>Flow_CreateOrReuse_GenerateUrl</bpmn:incoming>
+      <bpmn:outgoing>Flow_GenerateUrl_WaitCallback</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:intermediateCatchEvent id="Event_WaitGatewayCallback" name="Wait Gateway Callback">
+      <bpmn:incoming>Flow_GenerateUrl_WaitCallback</bpmn:incoming>
+      <bpmn:outgoing>Flow_Callback_VerifySignature</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_Callback" messageRef="Message_PaymentCallbackReceived" />
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:boundaryEvent id="BoundaryEvent_PaymentTimeout" name="Payment Timeout 15 Minutes" attachedToRef="Event_WaitGatewayCallback" cancelActivity="true">
+      <bpmn:outgoing>Flow_Timeout_ExpireTransaction</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_PaymentTimeout">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT15M</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="Task_VerifyHmacSignature" name="Verify HMAC Signature" camunda:type="external" camunda:topic="payment.verify-signature">
+      <bpmn:incoming>Flow_Callback_VerifySignature</bpmn:incoming>
+      <bpmn:outgoing>Flow_VerifySignature_IsValid</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_IsSignatureValid" name="Is Signature Valid?">
+      <bpmn:incoming>Flow_VerifySignature_IsValid</bpmn:incoming>
+      <bpmn:outgoing>Flow_SignatureValid_CheckDuplicate</bpmn:outgoing>
+      <bpmn:outgoing>Flow_SignatureInvalid_SaveInvalidWebhook</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_SaveInvalidWebhook" name="Save Invalid Webhook Audit" camunda:type="external" camunda:topic="payment.save-invalid-webhook">
+      <bpmn:incoming>Flow_SignatureInvalid_SaveInvalidWebhook</bpmn:incoming>
+      <bpmn:outgoing>Flow_SaveInvalidWebhook_MarkReview</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_MarkReviewRequired_Invalid" name="Mark Review Required" camunda:type="external" camunda:topic="payment.mark-review-required">
+      <bpmn:incoming>Flow_SaveInvalidWebhook_MarkReview</bpmn:incoming>
+      <bpmn:outgoing>Flow_MarkReview_EndInvalid</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_InvalidCallback" name="Invalid Callback - Review Required">
+      <bpmn:incoming>Flow_MarkReview_EndInvalid</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:serviceTask id="Task_CheckDuplicateCallback" name="Check Duplicate Callback" camunda:type="external" camunda:topic="payment.check-duplicate-callback">
+      <bpmn:incoming>Flow_SignatureValid_CheckDuplicate</bpmn:incoming>
+      <bpmn:outgoing>Flow_CheckDuplicate_PersistResult</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_PersistPaymentResultTransaction" name="Persist Payment Result Transaction" camunda:type="external" camunda:topic="payment.persist-result-transaction">
+      <bpmn:incoming>Flow_CheckDuplicate_PersistResult</bpmn:incoming>
+      <bpmn:outgoing>Flow_PersistResult_StatusGateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_PaymentResult" name="Payment Result?">
+      <bpmn:incoming>Flow_PersistResult_StatusGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_ResultSuccess_SignalOutbox</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ResultFailed_CancelOrder</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ResultReview_ManualReview</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_SignalOutboxPublisherSuccess" name="Signal Outbox Publisher" camunda:type="external" camunda:topic="outbox.signal-publisher">
+      <bpmn:incoming>Flow_ResultSuccess_SignalOutbox</bpmn:incoming>
+      <bpmn:outgoing>Flow_SignalOutbox_CorrelateOrder</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CorrelateOrderWorkflowSuccess" name="Correlate Order Workflow: payment.success" camunda:type="external" camunda:topic="workflow.correlate-payment-success">
+      <bpmn:incoming>Flow_SignalOutbox_CorrelateOrder</bpmn:incoming>
+      <bpmn:outgoing>Flow_CorrelateOrder_EndCompleted</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_PaymentCompleted" name="Payment Completed">
+      <bpmn:incoming>Flow_CorrelateOrder_EndCompleted</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:serviceTask id="Task_CancelReleaseOrderFailed" name="Cancel / Release Order" camunda:type="external" camunda:topic="order.cancel-release">
+      <bpmn:incoming>Flow_ResultFailed_CancelOrder</bpmn:incoming>
+      <bpmn:outgoing>Flow_CancelFailed_SignalOutbox</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_SignalOutboxPublisherFailed" name="Signal Outbox Publisher" camunda:type="external" camunda:topic="outbox.signal-publisher">
+      <bpmn:incoming>Flow_CancelFailed_SignalOutbox</bpmn:incoming>
+      <bpmn:outgoing>Flow_SignalOutboxFailed_EndFailed</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_PaymentFailed" name="Payment Failed / Cancelled">
+      <bpmn:incoming>Flow_SignalOutboxFailed_EndFailed</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:userTask id="UserTask_ManualPaymentReview" name="Manual Payment Review" camunda:assignee="payment-admin">
+      <bpmn:incoming>Flow_ResultReview_ManualReview</bpmn:incoming>
+      <bpmn:outgoing>Flow_ManualReview_Decision</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_ManualReviewDecision" name="Review Decision?">
+      <bpmn:incoming>Flow_ManualReview_Decision</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReviewApprove_CorrelateSuccess</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ReviewReject_CancelOrder</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ReviewRefund_EndRefundRequired</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_CorrelateOrderWorkflowReviewSuccess" name="Correlate Order Workflow: approved" camunda:type="external" camunda:topic="workflow.correlate-payment-success">
+      <bpmn:incoming>Flow_ReviewApprove_CorrelateSuccess</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReviewSuccess_EndCompleted</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CancelReleaseOrderReviewReject" name="Cancel / Release Order" camunda:type="external" camunda:topic="order.cancel-release">
+      <bpmn:incoming>Flow_ReviewReject_CancelOrder</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReviewReject_EndFailed</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_RefundRequired" name="Refund Required">
+      <bpmn:incoming>Flow_ReviewRefund_EndRefundRequired</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:serviceTask id="Task_MarkPaymentExpiredTransaction" name="Mark Payment EXPIRED Transaction" camunda:type="external" camunda:topic="payment.mark-expired-transaction">
+      <bpmn:incoming>Flow_Timeout_ExpireTransaction</bpmn:incoming>
+      <bpmn:outgoing>Flow_Expired_CancelOrder</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CancelReleaseOrderExpired" name="Cancel / Release Order" camunda:type="external" camunda:topic="order.cancel-release">
+      <bpmn:incoming>Flow_Expired_CancelOrder</bpmn:incoming>
+      <bpmn:outgoing>Flow_CancelExpired_SignalOutbox</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_SignalOutboxPublisherExpired" name="Signal Outbox Publisher" camunda:type="external" camunda:topic="outbox.signal-publisher">
+      <bpmn:incoming>Flow_CancelExpired_SignalOutbox</bpmn:incoming>
+      <bpmn:outgoing>Flow_SignalExpired_EndTimeout</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_PaymentTimeout" name="Payment Timeout">
+      <bpmn:incoming>Flow_SignalExpired_EndTimeout</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Start_Validate" sourceRef="StartEvent_PaymentRequested" targetRef="Task_ValidatePaymentRequest" />
+    <bpmn:sequenceFlow id="Flow_Validate_CheckIdempotency" sourceRef="Task_ValidatePaymentRequest" targetRef="Task_CheckPaymentIdempotency" />
+    <bpmn:sequenceFlow id="Flow_CheckIdempotency_CreateOrReuse" sourceRef="Task_CheckPaymentIdempotency" targetRef="Task_CreateOrReusePayment" />
+    <bpmn:sequenceFlow id="Flow_CreateOrReuse_GenerateUrl" sourceRef="Task_CreateOrReusePayment" targetRef="Task_GenerateProviderPaymentUrl" />
+    <bpmn:sequenceFlow id="Flow_GenerateUrl_WaitCallback" sourceRef="Task_GenerateProviderPaymentUrl" targetRef="Event_WaitGatewayCallback" />
+    <bpmn:sequenceFlow id="Flow_Callback_VerifySignature" sourceRef="Event_WaitGatewayCallback" targetRef="Task_VerifyHmacSignature" />
+    <bpmn:sequenceFlow id="Flow_VerifySignature_IsValid" sourceRef="Task_VerifyHmacSignature" targetRef="Gateway_IsSignatureValid" />
+    <bpmn:sequenceFlow id="Flow_SignatureValid_CheckDuplicate" name="Yes" sourceRef="Gateway_IsSignatureValid" targetRef="Task_CheckDuplicateCallback">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${signatureValid == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_SignatureInvalid_SaveInvalidWebhook" name="No" sourceRef="Gateway_IsSignatureValid" targetRef="Task_SaveInvalidWebhook">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${signatureValid == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_SaveInvalidWebhook_MarkReview" sourceRef="Task_SaveInvalidWebhook" targetRef="Task_MarkReviewRequired_Invalid" />
+    <bpmn:sequenceFlow id="Flow_MarkReview_EndInvalid" sourceRef="Task_MarkReviewRequired_Invalid" targetRef="EndEvent_InvalidCallback" />
+    <bpmn:sequenceFlow id="Flow_CheckDuplicate_PersistResult" sourceRef="Task_CheckDuplicateCallback" targetRef="Task_PersistPaymentResultTransaction" />
+    <bpmn:sequenceFlow id="Flow_PersistResult_StatusGateway" sourceRef="Task_PersistPaymentResultTransaction" targetRef="Gateway_PaymentResult" />
+    <bpmn:sequenceFlow id="Flow_ResultSuccess_SignalOutbox" name="SUCCESS" sourceRef="Gateway_PaymentResult" targetRef="Task_SignalOutboxPublisherSuccess">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${paymentResult == "SUCCESS"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ResultFailed_CancelOrder" name="FAILED / CANCELLED" sourceRef="Gateway_PaymentResult" targetRef="Task_CancelReleaseOrderFailed">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${paymentResult == "FAILED" || paymentResult == "CANCELLED"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ResultReview_ManualReview" name="UNKNOWN / MISMATCH" sourceRef="Gateway_PaymentResult" targetRef="UserTask_ManualPaymentReview">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${paymentResult == "UNKNOWN" || paymentResult == "AMOUNT_MISMATCH" || paymentResult == "REVIEW_REQUIRED"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_SignalOutbox_CorrelateOrder" sourceRef="Task_SignalOutboxPublisherSuccess" targetRef="Task_CorrelateOrderWorkflowSuccess" />
+    <bpmn:sequenceFlow id="Flow_CorrelateOrder_EndCompleted" sourceRef="Task_CorrelateOrderWorkflowSuccess" targetRef="EndEvent_PaymentCompleted" />
+    <bpmn:sequenceFlow id="Flow_CancelFailed_SignalOutbox" sourceRef="Task_CancelReleaseOrderFailed" targetRef="Task_SignalOutboxPublisherFailed" />
+    <bpmn:sequenceFlow id="Flow_SignalOutboxFailed_EndFailed" sourceRef="Task_SignalOutboxPublisherFailed" targetRef="EndEvent_PaymentFailed" />
+    <bpmn:sequenceFlow id="Flow_ManualReview_Decision" sourceRef="UserTask_ManualPaymentReview" targetRef="Gateway_ManualReviewDecision" />
+    <bpmn:sequenceFlow id="Flow_ReviewApprove_CorrelateSuccess" name="Approve" sourceRef="Gateway_ManualReviewDecision" targetRef="Task_CorrelateOrderWorkflowReviewSuccess">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${reviewDecision == "APPROVE"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ReviewReject_CancelOrder" name="Reject" sourceRef="Gateway_ManualReviewDecision" targetRef="Task_CancelReleaseOrderReviewReject">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${reviewDecision == "REJECT"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ReviewRefund_EndRefundRequired" name="Refund" sourceRef="Gateway_ManualReviewDecision" targetRef="EndEvent_RefundRequired">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${reviewDecision == "REFUND"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ReviewSuccess_EndCompleted" sourceRef="Task_CorrelateOrderWorkflowReviewSuccess" targetRef="EndEvent_PaymentCompleted" />
+    <bpmn:sequenceFlow id="Flow_ReviewReject_EndFailed" sourceRef="Task_CancelReleaseOrderReviewReject" targetRef="EndEvent_PaymentFailed" />
+    <bpmn:sequenceFlow id="Flow_Timeout_ExpireTransaction" sourceRef="BoundaryEvent_PaymentTimeout" targetRef="Task_MarkPaymentExpiredTransaction" />
+    <bpmn:sequenceFlow id="Flow_Expired_CancelOrder" sourceRef="Task_MarkPaymentExpiredTransaction" targetRef="Task_CancelReleaseOrderExpired" />
+    <bpmn:sequenceFlow id="Flow_CancelExpired_SignalOutbox" sourceRef="Task_CancelReleaseOrderExpired" targetRef="Task_SignalOutboxPublisherExpired" />
+    <bpmn:sequenceFlow id="Flow_SignalExpired_EndTimeout" sourceRef="Task_SignalOutboxPublisherExpired" targetRef="EndEvent_PaymentTimeout" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Payment_Processing">
+    <bpmndi:BPMNPlane id="BPMNPlane_Payment_Processing" bpmnElement="Process_Payment_Processing">
+      <bpmndi:BPMNShape id="StartEvent_PaymentRequested_di" bpmnElement="StartEvent_PaymentRequested">
+        <dc:Bounds x="160" y="230" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ValidatePaymentRequest_di" bpmnElement="Task_ValidatePaymentRequest">
+        <dc:Bounds x="240" y="208" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckPaymentIdempotency_di" bpmnElement="Task_CheckPaymentIdempotency">
+        <dc:Bounds x="440" y="208" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CreateOrReusePayment_di" bpmnElement="Task_CreateOrReusePayment">
+        <dc:Bounds x="650" y="208" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_GenerateProviderPaymentUrl_di" bpmnElement="Task_GenerateProviderPaymentUrl">
+        <dc:Bounds x="860" y="208" width="180" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_WaitGatewayCallback_di" bpmnElement="Event_WaitGatewayCallback">
+        <dc:Bounds x="1110" y="230" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BoundaryEvent_PaymentTimeout_di" bpmnElement="BoundaryEvent_PaymentTimeout">
+        <dc:Bounds x="1110" y="272" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_VerifyHmacSignature_di" bpmnElement="Task_VerifyHmacSignature">
+        <dc:Bounds x="1220" y="208" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_IsSignatureValid_di" bpmnElement="Gateway_IsSignatureValid" isMarkerVisible="true">
+        <dc:Bounds x="1430" y="223" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SaveInvalidWebhook_di" bpmnElement="Task_SaveInvalidWebhook">
+        <dc:Bounds x="1530" y="80" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_MarkReviewRequired_Invalid_di" bpmnElement="Task_MarkReviewRequired_Invalid">
+        <dc:Bounds x="1740" y="80" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_InvalidCallback_di" bpmnElement="EndEvent_InvalidCallback">
+        <dc:Bounds x="1940" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckDuplicateCallback_di" bpmnElement="Task_CheckDuplicateCallback">
+        <dc:Bounds x="1530" y="208" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PersistPaymentResultTransaction_di" bpmnElement="Task_PersistPaymentResultTransaction">
+        <dc:Bounds x="1740" y="208" width="190" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_PaymentResult_di" bpmnElement="Gateway_PaymentResult" isMarkerVisible="true">
+        <dc:Bounds x="1980" y="223" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SignalOutboxPublisherSuccess_di" bpmnElement="Task_SignalOutboxPublisherSuccess">
+        <dc:Bounds x="2090" y="208" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CorrelateOrderWorkflowSuccess_di" bpmnElement="Task_CorrelateOrderWorkflowSuccess">
+        <dc:Bounds x="2310" y="208" width="200" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_PaymentCompleted_di" bpmnElement="EndEvent_PaymentCompleted">
+        <dc:Bounds x="2560" y="230" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CancelReleaseOrderFailed_di" bpmnElement="Task_CancelReleaseOrderFailed">
+        <dc:Bounds x="2090" y="370" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SignalOutboxPublisherFailed_di" bpmnElement="Task_SignalOutboxPublisherFailed">
+        <dc:Bounds x="2310" y="370" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_PaymentFailed_di" bpmnElement="EndEvent_PaymentFailed">
+        <dc:Bounds x="2560" y="392" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ManualPaymentReview_di" bpmnElement="UserTask_ManualPaymentReview">
+        <dc:Bounds x="2090" y="540" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ManualReviewDecision_di" bpmnElement="Gateway_ManualReviewDecision" isMarkerVisible="true">
+        <dc:Bounds x="2310" y="555" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CorrelateOrderWorkflowReviewSuccess_di" bpmnElement="Task_CorrelateOrderWorkflowReviewSuccess">
+        <dc:Bounds x="2440" y="505" width="210" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CancelReleaseOrderReviewReject_di" bpmnElement="Task_CancelReleaseOrderReviewReject">
+        <dc:Bounds x="2440" y="625" width="180" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_RefundRequired_di" bpmnElement="EndEvent_RefundRequired">
+        <dc:Bounds x="2440" y="760" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_MarkPaymentExpiredTransaction_di" bpmnElement="Task_MarkPaymentExpiredTransaction">
+        <dc:Bounds x="1220" y="690" width="190" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CancelReleaseOrderExpired_di" bpmnElement="Task_CancelReleaseOrderExpired">
+        <dc:Bounds x="1460" y="690" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SignalOutboxPublisherExpired_di" bpmnElement="Task_SignalOutboxPublisherExpired">
+        <dc:Bounds x="1680" y="690" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_PaymentTimeout_di" bpmnElement="EndEvent_PaymentTimeout">
+        <dc:Bounds x="1900" y="712" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_Validate_di" bpmnElement="Flow_Start_Validate">
+        <di:waypoint x="196" y="248" />
+        <di:waypoint x="240" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Validate_CheckIdempotency_di" bpmnElement="Flow_Validate_CheckIdempotency">
+        <di:waypoint x="390" y="248" />
+        <di:waypoint x="440" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CheckIdempotency_CreateOrReuse_di" bpmnElement="Flow_CheckIdempotency_CreateOrReuse">
+        <di:waypoint x="600" y="248" />
+        <di:waypoint x="650" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CreateOrReuse_GenerateUrl_di" bpmnElement="Flow_CreateOrReuse_GenerateUrl">
+        <di:waypoint x="810" y="248" />
+        <di:waypoint x="860" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GenerateUrl_WaitCallback_di" bpmnElement="Flow_GenerateUrl_WaitCallback">
+        <di:waypoint x="1040" y="248" />
+        <di:waypoint x="1110" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Callback_VerifySignature_di" bpmnElement="Flow_Callback_VerifySignature">
+        <di:waypoint x="1146" y="248" />
+        <di:waypoint x="1220" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_VerifySignature_IsValid_di" bpmnElement="Flow_VerifySignature_IsValid">
+        <di:waypoint x="1380" y="248" />
+        <di:waypoint x="1430" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignatureValid_CheckDuplicate_di" bpmnElement="Flow_SignatureValid_CheckDuplicate">
+        <di:waypoint x="1480" y="248" />
+        <di:waypoint x="1530" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignatureInvalid_SaveInvalidWebhook_di" bpmnElement="Flow_SignatureInvalid_SaveInvalidWebhook">
+        <di:waypoint x="1455" y="223" />
+        <di:waypoint x="1455" y="120" />
+        <di:waypoint x="1530" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SaveInvalidWebhook_MarkReview_di" bpmnElement="Flow_SaveInvalidWebhook_MarkReview">
+        <di:waypoint x="1700" y="120" />
+        <di:waypoint x="1740" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_MarkReview_EndInvalid_di" bpmnElement="Flow_MarkReview_EndInvalid">
+        <di:waypoint x="1900" y="120" />
+        <di:waypoint x="1940" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CheckDuplicate_PersistResult_di" bpmnElement="Flow_CheckDuplicate_PersistResult">
+        <di:waypoint x="1700" y="248" />
+        <di:waypoint x="1740" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PersistResult_StatusGateway_di" bpmnElement="Flow_PersistResult_StatusGateway">
+        <di:waypoint x="1930" y="248" />
+        <di:waypoint x="1980" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ResultSuccess_SignalOutbox_di" bpmnElement="Flow_ResultSuccess_SignalOutbox">
+        <di:waypoint x="2030" y="248" />
+        <di:waypoint x="2090" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignalOutbox_CorrelateOrder_di" bpmnElement="Flow_SignalOutbox_CorrelateOrder">
+        <di:waypoint x="2260" y="248" />
+        <di:waypoint x="2310" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CorrelateOrder_EndCompleted_di" bpmnElement="Flow_CorrelateOrder_EndCompleted">
+        <di:waypoint x="2510" y="248" />
+        <di:waypoint x="2560" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ResultFailed_CancelOrder_di" bpmnElement="Flow_ResultFailed_CancelOrder">
+        <di:waypoint x="2005" y="273" />
+        <di:waypoint x="2005" y="410" />
+        <di:waypoint x="2090" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CancelFailed_SignalOutbox_di" bpmnElement="Flow_CancelFailed_SignalOutbox">
+        <di:waypoint x="2260" y="410" />
+        <di:waypoint x="2310" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignalOutboxFailed_EndFailed_di" bpmnElement="Flow_SignalOutboxFailed_EndFailed">
+        <di:waypoint x="2480" y="410" />
+        <di:waypoint x="2560" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ResultReview_ManualReview_di" bpmnElement="Flow_ResultReview_ManualReview">
+        <di:waypoint x="2005" y="273" />
+        <di:waypoint x="2005" y="580" />
+        <di:waypoint x="2090" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ManualReview_Decision_di" bpmnElement="Flow_ManualReview_Decision">
+        <di:waypoint x="2260" y="580" />
+        <di:waypoint x="2310" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReviewApprove_CorrelateSuccess_di" bpmnElement="Flow_ReviewApprove_CorrelateSuccess">
+        <di:waypoint x="2360" y="580" />
+        <di:waypoint x="2400" y="580" />
+        <di:waypoint x="2400" y="545" />
+        <di:waypoint x="2440" y="545" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReviewReject_CancelOrder_di" bpmnElement="Flow_ReviewReject_CancelOrder">
+        <di:waypoint x="2335" y="605" />
+        <di:waypoint x="2335" y="665" />
+        <di:waypoint x="2440" y="665" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReviewRefund_EndRefundRequired_di" bpmnElement="Flow_ReviewRefund_EndRefundRequired">
+        <di:waypoint x="2335" y="605" />
+        <di:waypoint x="2335" y="778" />
+        <di:waypoint x="2440" y="778" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReviewSuccess_EndCompleted_di" bpmnElement="Flow_ReviewSuccess_EndCompleted">
+        <di:waypoint x="2650" y="545" />
+        <di:waypoint x="2680" y="545" />
+        <di:waypoint x="2680" y="248" />
+        <di:waypoint x="2596" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReviewReject_EndFailed_di" bpmnElement="Flow_ReviewReject_EndFailed">
+        <di:waypoint x="2620" y="665" />
+        <di:waypoint x="2680" y="665" />
+        <di:waypoint x="2680" y="410" />
+        <di:waypoint x="2596" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Timeout_ExpireTransaction_di" bpmnElement="Flow_Timeout_ExpireTransaction">
+        <di:waypoint x="1128" y="308" />
+        <di:waypoint x="1128" y="730" />
+        <di:waypoint x="1220" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Expired_CancelOrder_di" bpmnElement="Flow_Expired_CancelOrder">
+        <di:waypoint x="1410" y="730" />
+        <di:waypoint x="1460" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CancelExpired_SignalOutbox_di" bpmnElement="Flow_CancelExpired_SignalOutbox">
+        <di:waypoint x="1630" y="730" />
+        <di:waypoint x="1680" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignalExpired_EndTimeout_di" bpmnElement="Flow_SignalExpired_EndTimeout">
+        <di:waypoint x="1850" y="730" />
+        <di:waypoint x="1900" y="730" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

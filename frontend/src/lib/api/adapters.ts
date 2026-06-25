@@ -69,6 +69,8 @@ type BackendCart = {
     sku: string;
     thumbnailUrl?: string;
     variantLabel?: string;
+    variantSize?: string;
+    variantColor?: string;
     unitPrice: number;
     quantity: number;
     subtotal: number;
@@ -281,6 +283,8 @@ function parseVariantLabel(label?: string) {
 export function mapCart(input: BackendCart): Cart {
   const items: CartItem[] = input.items.map((item) => {
     const parsed = parseVariantLabel(item.variantLabel);
+    const variantSize = item.variantSize ?? parsed.size;
+    const variantColor = item.variantColor ?? parsed.color;
     return {
       id: item.variantId,
       productId: item.productId,
@@ -290,8 +294,8 @@ export function mapCart(input: BackendCart): Cart {
       variant: {
         id: item.variantId,
         productId: item.productId,
-        size: parsed.size,
-        color: parsed.color,
+        size: variantSize,
+        color: variantColor,
         colorCode: '#E5E7EB',
         sku: item.sku,
         price: Number(item.unitPrice),

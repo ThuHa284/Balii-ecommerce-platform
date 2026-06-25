@@ -69,6 +69,9 @@ Port: `3010`
 ### Voucher Service
 npm run start:voucher
 
+### Chatbot Service
+npm run start:chatbot
+
 ## 4. Chay frontend
 
 Mo them 1 terminal rieng:

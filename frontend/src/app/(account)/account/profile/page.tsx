@@ -27,7 +27,7 @@ export default function ProfilePage() {
         setPhone(profile.phone ?? "");
         setCreatedAt(profile.createdAt ?? "");
       } catch {
-        toast.error("Khong tai duoc thong tin tai khoan.");
+        toast.error("Không tải được thông tin tài khoản.");
       } finally {
         setIsLoading(false);
       }
@@ -62,9 +62,9 @@ export default function ProfilePage() {
       setEmail(updatedUser.email ?? "");
       setPhone(updatedUser.phone ?? "");
       setCreatedAt(updatedUser.createdAt ?? "");
-      toast.success("Da cap nhat thong tin tai khoan.");
+      toast.success("Đã cập nhật thông tin tài khoản.");
     } catch {
-      toast.error("Cap nhat thong tin that bai.");
+      toast.error("Cập nhật thông tin thất bại.");
     } finally {
       setIsSaving(false);
     }
@@ -73,7 +73,7 @@ export default function ProfilePage() {
   return (
     <div className="glass-card p-8">
       <h1 className="mb-6 font-heading text-2xl font-bold text-foreground">
-        Thong tin ca nhan
+        Thông tin cá nhân
       </h1>
 
       <div className="mb-8 flex items-center gap-6 border-b border-white/30 pb-8">
@@ -90,10 +90,10 @@ export default function ProfilePage() {
         </div>
         <div>
           <h2 className="text-lg font-medium text-foreground">
-            {fullName || "Tai khoan"}
+            {fullName || "Tài khoản"}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Thanh vien tu {memberSince}
+            Thành viên từ {memberSince}
           </p>
         </div>
       </div>
@@ -101,7 +101,7 @@ export default function ProfilePage() {
       <form className="space-y-5" onSubmit={handleSubmit}>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-foreground">
-            Ho va ten
+            Họ và tên
           </label>
           <div className="relative">
             <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -132,7 +132,7 @@ export default function ProfilePage() {
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-foreground">
-            So dien thoai
+            Số điện thoại
           </label>
           <div className="relative">
             <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -151,7 +151,7 @@ export default function ProfilePage() {
           className="btn-primary"
           disabled={isLoading || isSaving}
         >
-          {isSaving ? "Dang cap nhat..." : "Cap nhat thong tin"}
+          {isSaving ? "Đang cập nhật..." : "Cập nhật thông tin"}
         </button>
       </form>
     </div>

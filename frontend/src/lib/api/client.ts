@@ -50,9 +50,7 @@ apiClient.interceptors.response.use(
         const userId = window.__BALII_USER_ID__;
 
         if (!refreshToken || !userId) {
-          throw new Error(
-            'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
-          );
+          throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
         }
 
         const { data } = await axios.post(
@@ -114,7 +112,6 @@ function normalizeApiErrorMessage(
 ): string {
   const apiError = error as {
     code?: string;
-    message?: string;
     response?: {
       status?: number;
     };

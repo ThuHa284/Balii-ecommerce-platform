@@ -20,6 +20,7 @@ $services = @(
     @{ Name = 'order-service'; Workdir = $root; FilePath = 'npm.cmd'; Args = @('run', 'start:order') },
     @{ Name = 'payment-service'; Workdir = $root; FilePath = 'npm.cmd'; Args = @('run', 'start:payment') },
     @{ Name = 'voucher-service'; Workdir = $root; FilePath = 'npm.cmd'; Args = @('run', 'start:voucher') },
+    @{ Name = 'chatbot-service'; Workdir = $root; FilePath = 'npm.cmd'; Args = @('run', 'start:chatbot') },
     @{ Name = 'api-gateway'; Workdir = $root; FilePath = 'npm.cmd'; Args = @('run', 'start:gateway') },
     @{ Name = 'virtual-tryon-service'; Workdir = $root; FilePath = 'npm.cmd'; Args = @('run', 'start:tryon') },
     @{ Name = 'frontend'; Workdir = (Join-Path $root 'frontend'); FilePath = 'npm.cmd'; Args = @('run', 'dev', '--', '--port', '3000') }

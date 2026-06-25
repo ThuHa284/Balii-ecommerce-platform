@@ -41,7 +41,7 @@ export default async function CheckoutSuccessPage({
           <p className="mb-8 text-xs text-muted-foreground">
             Hình thức:{' '}
             {checkoutMode === 'online'
-              ? 'Thanh toán online (mock đồng bộ)'
+              ? 'Thanh toán online VNPay'
               : 'Thanh toán khi nhận hàng'}
           </p>
 

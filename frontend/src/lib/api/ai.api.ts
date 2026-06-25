@@ -3,7 +3,7 @@ import { ApiResponse } from "@/types/api.types";
 import apiClient from "./client";
 import { MOCK_PRODUCTS } from "./mock-data";
 
-const USE_MOCK = true;
+const USE_MOCK = false;
 
 export async function sendChatMessage(message: string, history: ChatMessage[]): Promise<ChatMessage> {
   if (USE_MOCK) {
@@ -14,7 +14,7 @@ export async function sendChatMessage(message: string, history: ChatMessage[]): 
       }), 1200)
     );
   }
-  const { data } = await apiClient.post<ApiResponse<ChatMessage>>("/ai/chat", { message, history });
+  const { data } = await apiClient.post<ApiResponse<ChatMessage>>("/chatbot/chat", { message, history });
   return data.data;
 }
 
@@ -27,6 +27,17 @@ export async function getRecommendations(userId?: string): Promise<RecommendedPr
       }))), 600)
     );
   }
-  const { data } = await apiClient.get<ApiResponse<RecommendedProduct[]>>(`/ai/recommend${userId ? `/${userId}` : ""}`);
+  const { data } = await apiClient.post<ApiResponse<RecommendedProduct[]>>("/chatbot/recommendations", {
+    history: userId
+      ? [
+          {
+            id: "user_context",
+            role: "user",
+            content: userId,
+            timestamp: new Date().toISOString(),
+          },
+        ]
+      : [],
+  });
   return data.data;
 }

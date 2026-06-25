@@ -52,10 +52,7 @@ export async function createOrder(orderData: {
   note?: string;
 }): Promise<Order> {
   const { data } = await apiClient.post<BackendOrder>('/orders', {
-    paymentMethod:
-      orderData.paymentMethod === 'vnpay' || orderData.paymentMethod === 'momo'
-        ? 'mock_online'
-        : orderData.paymentMethod,
+    paymentMethod: orderData.paymentMethod,
     customerNote: orderData.note,
     shippingAddress: {
       recipientName: orderData.address.fullName,

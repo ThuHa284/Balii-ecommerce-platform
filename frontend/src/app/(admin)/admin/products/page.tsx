@@ -6,9 +6,13 @@ import Link from 'next/link';
 import { FileSpreadsheet, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ExcelImportModal from '@/components/admin/excel-import-modal';
-import { canDeleteAdminResource } from '@/lib/api/admin.utils';
+import {
+  canDeleteAdminResource,
+  getAdminRoleLabel,
+} from '@/lib/api/admin.utils';
 import { getCategories } from '@/lib/api/categories.api';
 import { deleteProduct, getAdminProducts } from '@/lib/api/products.api';
+import { getUserErrorMessage } from '@/lib/error-utils';
 import { formatCurrency } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { Category, Product } from '@/types/product.types';
@@ -30,6 +34,7 @@ export default function AdminProductsPage() {
   const [deleting, setDeleting] = useState(false);
   const userRole = useAuthStore((state) => state.user?.role);
   const canDelete = canDeleteAdminResource(userRole);
+  const roleLabel = getAdminRoleLabel(userRole);
 
   useEffect(() => {
     async function loadData() {
@@ -43,9 +48,7 @@ export default function AdminProductsPage() {
         setCategories(categoryData);
       } catch (error) {
         toast.error(
-          error instanceof Error
-            ? error.message
-            : 'Không tải được danh sách sản phẩm.',
+          getUserErrorMessage(error, 'Không tải được danh sách sản phẩm.'),
         );
       } finally {
         setLoading(false);
@@ -118,9 +121,7 @@ export default function AdminProductsPage() {
       setDeleteId(null);
       toast.success('Đã xóa sản phẩm.');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Xóa sản phẩm thất bại.',
-      );
+      toast.error(getUserErrorMessage(error, 'Xóa sản phẩm thất bại.'));
     } finally {
       setDeleting(false);
     }
@@ -134,6 +135,9 @@ export default function AdminProductsPage() {
             <p className="mb-2 text-xs uppercase tracking-[0.24em] text-white/60">
               Quản trị danh mục bán hàng
             </p>
+            <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
+              {roleLabel}
+            </span>
             <h1 className="font-heading text-3xl font-bold">
               Sản phẩm và tồn kho
             </h1>
@@ -141,6 +145,12 @@ export default function AdminProductsPage() {
               Theo dõi nhanh số lượng sản phẩm, hàng nổi bật và trạng thái tồn
               kho để xử lý vận hành hằng ngày.
             </p>
+            {!canDelete ? (
+              <p className="mt-3 max-w-2xl rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+                Bạn đang ở quyền admin. Tạo và cập nhật sản phẩm vẫn khả dụng,
+                nhưng xóa sản phẩm là thao tác dành riêng cho super admin.
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <button

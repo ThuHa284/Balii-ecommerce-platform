@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useQuickViewStore } from "@/store/quickview.store";
-import { useCartStore } from "@/store/cart.store";
-import { useWishlistStore } from "@/store/wishlist.store";
-import { X, ShoppingBag, Heart, Star, Check, HelpCircle } from "lucide-react";
-import Image from "next/image";
-import { useEffect, useState } from "react";
-import { formatCurrency } from "@/lib/utils";
-import { toast } from "sonner";
+import { useQuickViewStore } from '@/store/quickview.store';
+import { useCartStore } from '@/store/cart.store';
+import { useWishlistStore } from '@/store/wishlist.store';
+import { X, ShoppingBag, Heart, Check, HelpCircle } from 'lucide-react';
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import { formatCurrency } from '@/lib/utils';
+import { toast } from 'sonner';
 
 function parseSizeRange(sizeLabel: string) {
   const matched = sizeLabel.match(
@@ -19,8 +19,8 @@ function parseSizeRange(sizeLabel: string) {
   }
 
   return {
-    min: Number(matched[1].replace(",", ".")),
-    max: Number(matched[2].replace(",", ".")),
+    min: Number(matched[1].replace(',', '.')),
+    max: Number(matched[2].replace(',', '.')),
   };
 }
 
@@ -29,11 +29,11 @@ export default function QuickViewModal() {
   const { addItem, setCartDrawerOpen } = useCartStore();
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
-  const [selectedSize, setSelectedSize] = useState("");
-  const [selectedColor, setSelectedColor] = useState("");
+  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [weightInput, setWeightInput] = useState("");
-  const [suggestedSize, setSuggestedSize] = useState("");
+  const [weightInput, setWeightInput] = useState('');
+  const [suggestedSize, setSuggestedSize] = useState('');
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
@@ -49,8 +49,8 @@ export default function QuickViewModal() {
       }
 
       setQuantity(1);
-      setWeightInput("");
-      setSuggestedSize("");
+      setWeightInput('');
+      setSuggestedSize('');
       setActiveImageIndex(0);
     }, 0);
 
@@ -63,11 +63,16 @@ export default function QuickViewModal() {
 
   const isFavorite = isInWishlist(selectedProduct.id);
   const sizes = Array.from(
-    new Set(selectedProduct.variants.map((variant) => variant.size).filter(Boolean)),
+    new Set(
+      selectedProduct.variants.map((variant) => variant.size).filter(Boolean),
+    ),
   );
   const colors = Array.from(
     new Map(
-      selectedProduct.variants.map((variant) => [variant.color, variant.colorCode]),
+      selectedProduct.variants.map((variant) => [
+        variant.color,
+        variant.colorCode,
+      ]),
     ).entries(),
   );
 
@@ -76,7 +81,7 @@ export default function QuickViewModal() {
     const weight = parseFloat(value);
 
     if (Number.isNaN(weight) || weight <= 0) {
-      setSuggestedSize("");
+      setSuggestedSize('');
       return;
     }
 
@@ -84,7 +89,7 @@ export default function QuickViewModal() {
       sizes.find((sizeLabel) => {
         const range = parseSizeRange(sizeLabel);
         return range ? weight >= range.min && weight <= range.max : false;
-      }) ?? "";
+      }) ?? '';
 
     setSuggestedSize(recommendedSize);
     if (recommendedSize) {
@@ -122,12 +127,12 @@ export default function QuickViewModal() {
 
   const handleAddToCart = async () => {
     if (!currentVariant) {
-      toast.error("Vui long chon kich co va mau sac hop le.");
+      toast.error('Vui lòng chọn kích cỡ và màu sắc hợp lệ.');
       return;
     }
 
     if (currentVariant.stock <= 0) {
-      toast.error("Phien ban nay da het hang.");
+      toast.error('Phiên bản này đã hết hàng.');
       return;
     }
 
@@ -144,7 +149,7 @@ export default function QuickViewModal() {
     });
 
     toast.success(
-      `Da them ${quantity} x "${selectedProduct.name}" (${currentVariant.size}) vao gio hang!`,
+      `Đã thêm ${quantity} x "${selectedProduct.name}" (${currentVariant.size}) vào giỏ hàng!`,
     );
     closeQuickView();
     setCartDrawerOpen(true);
@@ -153,13 +158,16 @@ export default function QuickViewModal() {
   const handleToggleWishlist = () => {
     toggleWishlist(selectedProduct.id);
     if (!isFavorite) {
-      toast.success(`Da them "${selectedProduct.name}" vao danh sach yeu thich!`, {
-        icon: "♥",
-      });
+      toast.success(
+        `Đã thêm "${selectedProduct.name}" vào danh sách yêu thích!`,
+        {
+          icon: '♥',
+        },
+      );
       return;
     }
 
-    toast.info(`Da xoa "${selectedProduct.name}" khoi danh sach yeu thich.`);
+    toast.info(`Đã xóa "${selectedProduct.name}" khỏi danh sách yêu thích.`);
   };
 
   return (
@@ -180,14 +188,16 @@ export default function QuickViewModal() {
         <div className="flex w-full flex-col justify-between border-b border-white/20 bg-slate-50/20 p-4 md:w-1/2 md:border-b-0 md:border-r sm:p-6">
           <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 via-white to-rose-50 shadow-inner">
             <Image
-              src={imagesToDisplay[activeImageIndex] || selectedProduct.thumbnail}
+              src={
+                imagesToDisplay[activeImageIndex] || selectedProduct.thumbnail
+              }
               alt={selectedProduct.name}
               fill
               className="object-contain p-4 transition-all duration-300"
             />
             {hasDiscount && (
               <span className="absolute left-3 top-3 rounded-full bg-red-500 px-2.5 py-1 text-xs font-bold text-white shadow">
-                GIAM GIA
+                GIẢM GIÁ
               </span>
             )}
           </div>
@@ -200,11 +210,16 @@ export default function QuickViewModal() {
                   onClick={() => setActiveImageIndex(index)}
                   className={`relative h-16 w-14 shrink-0 overflow-hidden rounded-lg border-2 bg-white transition-all ${
                     index === activeImageIndex
-                      ? "scale-105 border-violet-500"
-                      : "border-transparent opacity-70 hover:opacity-100"
+                      ? 'scale-105 border-violet-500'
+                      : 'border-transparent opacity-70 hover:opacity-100'
                   }`}
                 >
-                  <Image src={image} alt="" fill className="object-contain p-1" />
+                  <Image
+                    src={image}
+                    alt=""
+                    fill
+                    className="object-contain p-1"
+                  />
                 </button>
               ))}
             </div>
@@ -214,22 +229,11 @@ export default function QuickViewModal() {
         <div className="flex max-h-[50vh] w-full flex-col space-y-5 overflow-y-auto p-6 md:max-h-[90vh] md:w-1/2">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-violet-600">
-              {selectedProduct.category?.name || "Do ngu thiet ke"}
+              {selectedProduct.category?.name || 'Đồ ngủ thiết kế'}
             </span>
             <h2 className="mt-1 font-heading text-xl font-extrabold text-slate-900 md:text-2xl">
               {selectedProduct.name}
             </h2>
-            <div className="mt-2 flex items-center gap-2">
-              <div className="flex items-center gap-0.5">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span className="text-sm font-semibold text-slate-800">
-                  {selectedProduct.averageRating}
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                ({selectedProduct.totalReviews} danh gia)
-              </span>
-            </div>
           </div>
 
           <div className="flex items-baseline gap-3 rounded-xl border border-violet-100/50 bg-violet-500/5 p-3">
@@ -247,11 +251,11 @@ export default function QuickViewModal() {
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                 <HelpCircle className="h-4 w-4 text-violet-500" />
-                Goi y chon size theo can nang
+                Gợi ý chọn size theo cân nặng
               </label>
               {suggestedSize && (
                 <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-600">
-                  Goi y: {suggestedSize}
+                  Gợi ý: {suggestedSize}
                 </span>
               )}
             </div>
@@ -260,20 +264,22 @@ export default function QuickViewModal() {
                 type="number"
                 value={weightInput}
                 onChange={(event) => handleWeightChange(event.target.value)}
-                placeholder="Nhap can nang cua ban (kg), vi du 52"
+                placeholder="Nhập cân nặng của bạn (kg), ví dụ 52"
                 className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
               />
             </div>
             <p className="text-[10px] leading-relaxed text-muted-foreground">
-              He thong se doi chieu can nang voi khoang kg co san trong tung size
-              cua san pham.
+              Hệ thống sẽ đối chiếu cân nặng với khoảng kg có sẵn trong từng
+              size của sản phẩm.
             </p>
           </div>
 
           <div className="space-y-2">
             <span className="text-xs font-bold text-slate-800">
-              Kich thuoc:{" "}
-              <span className="font-semibold text-violet-600">{selectedSize}</span>
+              Kích thước:{' '}
+              <span className="font-semibold text-violet-600">
+                {selectedSize}
+              </span>
             </span>
             <div className="flex flex-wrap gap-2">
               {sizes.map((sizeLabel) => {
@@ -284,13 +290,13 @@ export default function QuickViewModal() {
                     onClick={() => setSelectedSize(sizeLabel)}
                     className={`rounded-lg border px-4 py-2 text-xs font-bold transition-all ${
                       selectedSize === sizeLabel
-                        ? "scale-105 border-violet-600 bg-violet-600 text-white shadow-md"
+                        ? 'scale-105 border-violet-600 bg-violet-600 text-white shadow-md'
                         : isSuggested
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-200"
-                          : "border-slate-200 bg-white/60 text-slate-700 hover:bg-white"
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-200'
+                          : 'border-slate-200 bg-white/60 text-slate-700 hover:bg-white'
                     }`}
                   >
-                    {sizeLabel} {isSuggested && "✨"}
+                    {sizeLabel} {isSuggested && '✨'}
                   </button>
                 );
               })}
@@ -300,8 +306,10 @@ export default function QuickViewModal() {
           {colors.length > 0 && (
             <div className="space-y-2">
               <span className="text-xs font-bold text-slate-800">
-                Mau sac:{" "}
-                <span className="font-semibold text-violet-600">{selectedColor}</span>
+                Màu sắc:{' '}
+                <span className="font-semibold text-violet-600">
+                  {selectedColor}
+                </span>
               </span>
               <div className="flex flex-wrap gap-3">
                 {colors.map(([colorName, colorCode]) => (
@@ -310,10 +318,10 @@ export default function QuickViewModal() {
                     onClick={() => setSelectedColor(colorName)}
                     className={`relative flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all ${
                       selectedColor === colorName
-                        ? "scale-110 border-violet-600 shadow-md"
-                        : "border-transparent hover:scale-105"
+                        ? 'scale-110 border-violet-600 shadow-md'
+                        : 'border-transparent hover:scale-105'
                     }`}
-                    style={{ backgroundColor: colorCode || "#ccc" }}
+                    style={{ backgroundColor: colorCode || '#ccc' }}
                     title={colorName}
                   >
                     {selectedColor === colorName && (
@@ -326,13 +334,13 @@ export default function QuickViewModal() {
           )}
 
           <div className="text-xs font-medium">
-            Tinh trang:{" "}
+            Tình trạng:{' '}
             {currentVariant && currentVariant.stock > 0 ? (
               <span className="font-bold text-emerald-600">
-                Con hang ({currentVariant.stock})
+                Còn hàng ({currentVariant.stock})
               </span>
             ) : (
-              <span className="font-bold text-rose-500">Het hang</span>
+              <span className="font-bold text-rose-500">Hết hàng</span>
             )}
           </div>
 
@@ -356,23 +364,27 @@ export default function QuickViewModal() {
             </div>
 
             <button
-              onClick={handleAddToCart}
+              onClick={() => {
+                void handleAddToCart();
+              }}
               disabled={!currentVariant || currentVariant.stock <= 0}
               className="btn-primary flex-1 py-3 text-sm font-bold shadow-lg shadow-violet-500/10 transition-all hover:shadow-violet-500/20 flex items-center justify-center gap-2"
             >
               <ShoppingBag className="h-4 w-4" />
-              Them vao gio
+              Thêm vào giỏ
             </button>
 
             <button
               onClick={handleToggleWishlist}
               className={`rounded-xl border p-3 transition-all ${
                 isFavorite
-                  ? "border-rose-200 bg-rose-50 text-rose-500 shadow-sm"
-                  : "border-slate-200 bg-white/60 text-slate-600 hover:bg-white hover:text-rose-500"
+                  ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-sm'
+                  : 'border-slate-200 bg-white/60 text-slate-600 hover:bg-white hover:text-rose-500'
               }`}
             >
-              <Heart className={`h-5 w-5 ${isFavorite ? "fill-rose-500" : ""}`} />
+              <Heart
+                className={`h-5 w-5 ${isFavorite ? 'fill-rose-500' : ''}`}
+              />
             </button>
           </div>
         </div>

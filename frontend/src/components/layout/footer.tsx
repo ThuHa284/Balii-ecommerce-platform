@@ -4,27 +4,6 @@ import { Camera, Globe, Heart, Mail, MapPin, Phone } from 'lucide-react';
 export default function Footer() {
   return (
     <footer className="mt-20">
-      <div className="glass-card mx-4 mb-12 max-w-5xl p-8 text-center sm:mx-8 md:p-12 lg:mx-auto">
-        <h3 className="mb-3 font-heading text-2xl font-bold text-foreground md:text-3xl">
-          Đăng ký nhận tin
-        </h3>
-        <p className="mx-auto mb-6 max-w-md text-muted-foreground">
-          Nhận ngay ưu đãi{' '}
-          <span className="font-semibold text-primary">giảm 10%</span> cho đơn
-          hàng đầu tiên và cập nhật bộ sưu tập mới nhất
-        </p>
-        <form className="mx-auto flex max-w-md flex-col gap-3 sm:flex-row">
-          <input
-            type="email"
-            placeholder="Nhập email của bạn..."
-            className="flex-1 rounded-xl border border-white/50 bg-white/70 px-5 py-3 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-violet-300"
-          />
-          <button type="submit" className="btn-primary whitespace-nowrap">
-            Đăng ký
-          </button>
-        </form>
-      </div>
-
       <div className="glass-navbar border-b-0 border-t-0">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4">
@@ -38,8 +17,8 @@ export default function Footer() {
                 </span>
               </Link>
               <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
-                Đồ ngủ dành cho những giấc ngủ ngọt ngào. Chất liệu
-                lụa tự nhiên, thiết kế thanh lịch, giá cả hợp lý.
+                Đồ ngủ dành cho những giấc ngủ ngọt ngào. Chất liệu lụa tự
+                nhiên, thiết kế thanh lịch, giá cả hợp lý.
               </p>
               <div className="flex gap-3">
                 <a

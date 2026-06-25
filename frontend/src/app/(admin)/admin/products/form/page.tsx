@@ -4,15 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  GripVertical,
-  ImageIcon,
-  Plus,
-  Save,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { ArrowLeft, ImageIcon, Plus, Save, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { createCategory, getCategories } from '@/lib/api/categories.api';
 import { canDeleteAdminResource } from '@/lib/api/admin.utils';
@@ -24,8 +16,8 @@ import {
   getAdminProducts,
   getProductImages,
   ProductImageRecord,
-  updateProductImage,
   updateProduct,
+  updateProductImage,
   updateProductVariant,
   uploadProductImage,
 } from '@/lib/api/products.api';
@@ -33,25 +25,32 @@ import { formatCurrency } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { Category, Product } from '@/types/product.types';
 
-interface VariantRow {
+interface VariantSizeRow {
   id?: string;
   clientId: string;
   size: string;
-  color: string;
-  colorCode: string;
-  sku: string;
-  price: number;
-  salePrice: number | null;
   stock: number;
   isExisting: boolean;
 }
 
+interface VariantGroupRow {
+  clientId: string;
+  name: string;
+  colorCode: string;
+  price: number;
+  imageClientId?: string;
+  imageId?: string;
+  sizeRows: VariantSizeRow[];
+}
+
 interface ImageRow {
   id?: string;
+  clientId: string;
   url: string;
   file?: File;
   isExisting: boolean;
   variantId?: string;
+  variantClientId?: string;
   isPrimary?: boolean;
   altText?: string;
   sortOrder: number;
@@ -91,12 +90,33 @@ function buildInitials(value: string) {
     .join('');
 }
 
+function normalizeSlug(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+}
+
 function normalizeSkuPart(value: string) {
   return value
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+function buildSizeRows(groupClientId: string, sizes = WEIGHT_SIZE_PRESETS) {
+  return sizes.map((size, index) => ({
+    clientId: `${groupClientId}-size-${index}`,
+    size,
+    stock: 0,
+    isExisting: false,
+  }));
 }
 
 function ProductFormContent() {
@@ -133,7 +153,7 @@ function ProductFormContent() {
     '26_35',
   ]);
   const [images, setImages] = useState<ImageRow[]>([]);
-  const [variants, setVariants] = useState<VariantRow[]>([]);
+  const [variantGroups, setVariantGroups] = useState<VariantGroupRow[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const isEdit = !!existingProduct;
@@ -190,108 +210,183 @@ function ProductFormContent() {
         ? product.recommendedAgeGroups
         : ['under_18', '18_25', '26_35'],
     );
-    setImages(
-      imageData.map((image, index) => ({
-        id: image.id,
-        url: image.url,
-        isExisting: true,
-        variantId: image.variantId ?? undefined,
-        isPrimary: image.isPrimary,
-        altText: image.altText ?? '',
-        sortOrder: image.sortOrder ?? index,
-      })),
-    );
-    setVariants(
-      product.variants.map((variant) => ({
+
+    const imagesState: ImageRow[] = imageData.map((image, index) => ({
+      id: image.id,
+      clientId: image.id,
+      url: image.url,
+      isExisting: true,
+      variantId: image.variantId ?? undefined,
+      variantClientId: undefined,
+      isPrimary: image.isPrimary,
+      altText: image.altText ?? '',
+      sortOrder: image.sortOrder ?? index,
+    }));
+
+    const groupMap = new Map<string, VariantGroupRow>();
+    const variantToGroupId = new Map<string, string>();
+
+    for (const variant of product.variants) {
+      const linkedImage = imageData.find(
+        (image) => image.variantId === variant.id,
+      );
+      const groupKey = linkedImage
+        ? `image:${linkedImage.id}`
+        : `name:${variant.color || 'variant-default'}`;
+
+      let group = groupMap.get(groupKey);
+      if (!group) {
+        group = {
+          clientId: linkedImage?.id ?? `group-${variant.id}`,
+          name: variant.color || `Biến thể ${groupMap.size + 1}`,
+          colorCode: variant.colorCode || '#e5e7eb',
+          price: variant.price || Number(product.basePrice) || 0,
+          imageClientId: linkedImage?.id,
+          imageId: linkedImage?.id,
+          sizeRows: [],
+        };
+        groupMap.set(groupKey, group);
+      }
+
+      group.sizeRows.push({
         id: variant.id,
         clientId: variant.id,
-        size: variant.size,
-        color: variant.color,
-        colorCode: variant.colorCode,
-        sku: variant.sku,
-        price: variant.price,
-        salePrice: variant.salePrice,
+        size: variant.size || `Size ${group.sizeRows.length + 1}`,
         stock: variant.stock,
         isExisting: true,
-      })),
-    );
+      });
+      variantToGroupId.set(variant.id, group.clientId);
+    }
+
+    imagesState.forEach((image) => {
+      if (image.variantId) {
+        image.variantClientId = variantToGroupId.get(image.variantId);
+      }
+    });
+
+    setImages(imagesState);
+    setVariantGroups(Array.from(groupMap.values()));
   };
 
   const handleNameChange = (value: string) => {
     setName(value);
-    setVariants((current) =>
-      current.map((variant) => ({
-        ...variant,
-        sku: generateVariantSku(value, variant.color, variant.size),
-      })),
-    );
     if (!isEdit) {
-      setSlug(
-        value
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/đ/g, 'd')
-          .replace(/[^a-z0-9\s-]/g, '')
-          .replace(/\s+/g, '-')
-          .replace(/-+/g, '-')
-          .trim(),
-      );
+      setSlug(normalizeSlug(value));
     }
   };
 
   const handleCategoryNameChange = (value: string) => {
     setNewCategoryName(value);
-    setNewCategorySlug(
-      value
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/đ/g, 'd')
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .trim(),
-    );
+    setNewCategorySlug(normalizeSlug(value));
   };
 
   const generateVariantSku = (
     productName: string,
-    color: string,
+    variantName: string,
     size: string,
   ) => {
     const productPart = buildInitials(productName || 'SP');
-    const colorPart = buildInitials(color || 'MAU');
+    const variantPart = buildInitials(variantName || 'BT');
     const sizePart = normalizeSkuPart(size || 'SIZE');
-    return [productPart || 'SP', colorPart || 'MAU', sizePart || 'SIZE'].join(
+    return [productPart || 'SP', variantPart || 'BT', sizePart || 'SIZE'].join(
       '-',
     );
   };
+
+  const createVariantGroup = (
+    groupClientId: string,
+    imageClientId?: string,
+  ): VariantGroupRow => ({
+    clientId: groupClientId,
+    name: `Biến thể ${variantGroups.length + 1}`,
+    colorCode: '#e5e7eb',
+    price: Number(basePrice) || 0,
+    imageClientId,
+    sizeRows: buildSizeRows(groupClientId),
+  });
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
 
     const nextImages: ImageRow[] = [];
-    for (const file of files) {
+    const nextGroups: VariantGroupRow[] = [];
+    const timestamp = Date.now();
+
+    for (const [index, file] of files.entries()) {
       if (file.size > 10 * 1024 * 1024) {
         toast.error(`${file.name} quá lớn (tối đa 10MB).`);
         continue;
       }
 
+      const imageClientId = `image-${timestamp}-${index}`;
+      const groupClientId = `group-${timestamp}-${index}`;
+
       nextImages.push({
+        clientId: imageClientId,
         url: URL.createObjectURL(file),
         file,
         isExisting: false,
-        variantId: undefined,
+        variantClientId: groupClientId,
         isPrimary: images.length + nextImages.length === 0,
         altText: '',
         sortOrder: images.length + nextImages.length,
       });
+
+      nextGroups.push(createVariantGroup(groupClientId, imageClientId));
     }
 
     setImages((current) => [...current, ...nextImages]);
+    setVariantGroups((current) => [...current, ...nextGroups]);
     if (imageInputRef.current) imageInputRef.current.value = '';
+  };
+
+  const setPrimaryImage = (index: number) => {
+    setImages((current) =>
+      current.map((image, currentIndex) => ({
+        ...image,
+        isPrimary: currentIndex === index,
+      })),
+    );
+  };
+
+  const assignImageVariantGroup = (index: number, groupClientId?: string) => {
+    setImages((current) =>
+      current.map((image, currentIndex) =>
+        currentIndex === index
+          ? {
+              ...image,
+              variantClientId: groupClientId,
+            }
+          : image,
+      ),
+    );
+
+    const targetImage = images[index];
+    if (!targetImage) return;
+
+    setVariantGroups((current) =>
+      current.map((group) => {
+        if (group.imageClientId === targetImage.clientId) {
+          return {
+            ...group,
+            imageClientId:
+              group.clientId === groupClientId
+                ? targetImage.clientId
+                : undefined,
+          };
+        }
+
+        if (group.clientId === groupClientId) {
+          return {
+            ...group,
+            imageClientId: targetImage.clientId,
+          };
+        }
+
+        return group;
+      }),
+    );
   };
 
   const removeImage = async (index: number) => {
@@ -319,43 +414,164 @@ function ProductFormContent() {
     setImages((current) =>
       current.filter((_, currentIndex) => currentIndex !== index),
     );
-  };
-
-  const addVariant = () => {
-    setVariants((current) => [
-      ...current,
-      {
-        clientId: `new-${Date.now()}-${current.length}`,
-        size: WEIGHT_SIZE_PRESETS[0],
-        color: 'Hồng pastel',
-        colorCode: '#f8b4c7',
-        sku: generateVariantSku(name, 'Hồng pastel', WEIGHT_SIZE_PRESETS[0]),
-        price: Number(basePrice) || 0,
-        salePrice: salePrice ? Number(salePrice) : null,
-        stock: 0,
-        isExisting: false,
-      },
-    ]);
-  };
-
-  const updateImageField = (
-    index: number,
-    field: keyof ImageRow,
-    value: string | number | boolean | undefined,
-  ) => {
-    setImages((current) =>
-      current.map((image, currentIndex) =>
-        currentIndex === index ? { ...image, [field]: value } : image,
+    setVariantGroups((current) =>
+      current.map((group) =>
+        group.imageClientId === target.clientId
+          ? {
+              ...group,
+              imageClientId: undefined,
+            }
+          : group,
       ),
     );
   };
 
-  const setPrimaryImage = (index: number) => {
+  const addVariantGroup = () => {
+    const timestamp = Date.now();
+    const groupClientId = `group-manual-${timestamp}`;
+    setVariantGroups((current) => [
+      ...current,
+      createVariantGroup(groupClientId),
+    ]);
+  };
+
+  const updateVariantGroupField = (
+    groupIndex: number,
+    field: keyof Omit<VariantGroupRow, 'clientId' | 'sizeRows'>,
+    value: string | number | undefined,
+  ) => {
+    setVariantGroups((current) =>
+      current.map((group, currentIndex) =>
+        currentIndex === groupIndex
+          ? {
+              ...group,
+              [field]: value,
+            }
+          : group,
+      ),
+    );
+  };
+
+  const updateVariantSizeField = (
+    groupIndex: number,
+    sizeIndex: number,
+    field: keyof Omit<VariantSizeRow, 'clientId' | 'id' | 'isExisting'>,
+    value: string | number,
+  ) => {
+    setVariantGroups((current) =>
+      current.map((group, currentGroupIndex) => {
+        if (currentGroupIndex !== groupIndex) {
+          return group;
+        }
+
+        return {
+          ...group,
+          sizeRows: group.sizeRows.map((sizeRow, currentSizeIndex) =>
+            currentSizeIndex === sizeIndex
+              ? {
+                  ...sizeRow,
+                  [field]: value,
+                }
+              : sizeRow,
+          ),
+        };
+      }),
+    );
+  };
+
+  const addSizeRow = (groupIndex: number) => {
+    setVariantGroups((current) =>
+      current.map((group, currentIndex) => {
+        if (currentIndex !== groupIndex) {
+          return group;
+        }
+
+        return {
+          ...group,
+          sizeRows: [
+            ...group.sizeRows,
+            {
+              clientId: `${group.clientId}-size-${Date.now()}-${group.sizeRows.length}`,
+              size: '',
+              stock: 0,
+              isExisting: false,
+            },
+          ],
+        };
+      }),
+    );
+  };
+
+  const removeSizeRow = async (groupIndex: number, sizeIndex: number) => {
+    const targetGroup = variantGroups[groupIndex];
+    const targetSizeRow = targetGroup?.sizeRows[sizeIndex];
+    if (!targetGroup || !targetSizeRow) return;
+
+    if (targetSizeRow.isExisting && targetSizeRow.id) {
+      if (!canDelete) {
+        toast.error('Chỉ super admin mới có quyền xóa size đã lưu.');
+        return;
+      }
+
+      try {
+        await deleteProductVariant(targetSizeRow.id);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : 'Xóa size thất bại.',
+        );
+        return;
+      }
+    }
+
+    setVariantGroups((current) =>
+      current.map((group, currentIndex) =>
+        currentIndex === groupIndex
+          ? {
+              ...group,
+              sizeRows: group.sizeRows.filter(
+                (_, currentSizeIndex) => currentSizeIndex !== sizeIndex,
+              ),
+            }
+          : group,
+      ),
+    );
+  };
+
+  const removeVariantGroup = async (groupIndex: number) => {
+    const target = variantGroups[groupIndex];
+    if (!target) return;
+
+    for (const sizeRow of target.sizeRows) {
+      if (sizeRow.isExisting && sizeRow.id) {
+        if (!canDelete) {
+          toast.error('Chỉ super admin mới có quyền xóa biến thể đã lưu.');
+          return;
+        }
+
+        try {
+          await deleteProductVariant(sizeRow.id);
+        } catch (error) {
+          toast.error(
+            error instanceof Error ? error.message : 'Xóa biến thể thất bại.',
+          );
+          return;
+        }
+      }
+    }
+
+    setVariantGroups((current) =>
+      current.filter((_, currentIndex) => currentIndex !== groupIndex),
+    );
     setImages((current) =>
-      current.map((image, currentIndex) => ({
-        ...image,
-        isPrimary: currentIndex === index,
-      })),
+      current.map((image) =>
+        image.variantClientId === target.clientId
+          ? {
+              ...image,
+              variantClientId: undefined,
+              variantId: undefined,
+            }
+          : image,
+      ),
     );
   };
 
@@ -396,52 +612,11 @@ function ProductFormContent() {
     );
   };
 
-  const updateVariantField = (
-    index: number,
-    field: keyof VariantRow,
-    value: string | number | null | boolean,
-  ) => {
-    setVariants((current) =>
-      current.map((variant, currentIndex) => {
-        if (currentIndex !== index) {
-          return variant;
-        }
-
-        const nextVariant = { ...variant, [field]: value };
-        nextVariant.sku = generateVariantSku(
-          name,
-          nextVariant.color,
-          nextVariant.size,
-        );
-        return nextVariant;
-      }),
+  const getGroupTotalStock = (group: VariantGroupRow) =>
+    group.sizeRows.reduce(
+      (sum, sizeRow) => sum + Number(sizeRow.stock || 0),
+      0,
     );
-  };
-
-  const removeVariant = async (index: number) => {
-    const target = variants[index];
-    if (!target) return;
-
-    if (target.isExisting) {
-      if (!canDelete) {
-        toast.error('Chỉ super admin mới có quyền xóa biến thể đã lưu.');
-        return;
-      }
-
-      try {
-        await deleteProductVariant(target.id!);
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : 'Xóa biến thể thất bại.',
-        );
-        return;
-      }
-    }
-
-    setVariants((current) =>
-      current.filter((_, currentIndex) => currentIndex !== index),
-    );
-  };
 
   const validateForm = () => {
     if (!name.trim()) {
@@ -464,37 +639,69 @@ function ProductFormContent() {
       toast.error('Vui lòng chọn ít nhất một nhóm tuổi phù hợp.');
       return false;
     }
-    if (variants.some((variant) => !variant.sku.trim())) {
-      toast.error('Mỗi biến thể phải có SKU.');
+    if (!variantGroups.length) {
+      toast.error('Vui lòng tải lên ít nhất một biến thể.');
+      return false;
+    }
+    if (variantGroups.some((group) => !group.name.trim())) {
+      toast.error('Mỗi biến thể phải có tên riêng.');
+      return false;
+    }
+    if (
+      variantGroups.some(
+        (group) =>
+          group.sizeRows.length === 0 ||
+          group.sizeRows.some((sizeRow) => !sizeRow.size.trim()),
+      )
+    ) {
+      toast.error('Mỗi biến thể phải có ít nhất một size hợp lệ.');
       return false;
     }
     return true;
   };
 
   const syncVariants = async (savedProductId: string) => {
-    for (const variant of variants) {
-      const payload = {
-        sku: variant.sku.trim(),
-        price: variant.price || Number(basePrice),
-        stockQuantity: variant.stock,
-        itemType: 'SET' as const,
-        sizeLabel: variant.size,
-        colorName: variant.color,
-      };
+    const groupRepresentativeVariantIdMap = new Map<string, string>();
 
-      if (variant.isExisting && variant.id) {
-        await updateProductVariant(variant.id, payload);
-      } else {
-        await createProductVariant(savedProductId, payload);
+    for (const group of variantGroups) {
+      for (const sizeRow of group.sizeRows) {
+        const payload = {
+          sku: generateVariantSku(name, group.name, sizeRow.size),
+          price: group.price || Number(basePrice),
+          stockQuantity: Number(sizeRow.stock || 0),
+          itemType: 'SET' as const,
+          sizeLabel: sizeRow.size.trim(),
+          colorName: group.name.trim(),
+        };
+
+        const savedVariant =
+          sizeRow.isExisting && sizeRow.id
+            ? await updateProductVariant(sizeRow.id, payload)
+            : await createProductVariant(savedProductId, payload);
+
+        if (
+          savedVariant.id &&
+          !groupRepresentativeVariantIdMap.has(group.clientId)
+        ) {
+          groupRepresentativeVariantIdMap.set(group.clientId, savedVariant.id);
+        }
       }
     }
+
+    return groupRepresentativeVariantIdMap;
   };
 
-  const syncImages = async (savedProductId: string) => {
+  const syncImages = async (
+    savedProductId: string,
+    groupRepresentativeVariantIdMap: Map<string, string>,
+  ) => {
     for (let index = 0; index < images.length; index += 1) {
       const image = images[index];
+      const resolvedVariantId = image.variantClientId
+        ? groupRepresentativeVariantIdMap.get(image.variantClientId)
+        : image.variantId;
       const payload = {
-        variantId: image.variantId || undefined,
+        variantId: resolvedVariantId || undefined,
         altText: image.altText?.trim() || undefined,
         sortOrder: index,
         isPrimary: image.isPrimary ?? index === 0,
@@ -533,8 +740,10 @@ function ProductFormContent() {
           ? await updateProduct(existingProduct.id, payload)
           : await createProduct(payload);
 
-      await syncVariants(savedProduct.id);
-      await syncImages(savedProduct.id);
+      const groupRepresentativeVariantIdMap = await syncVariants(
+        savedProduct.id,
+      );
+      await syncImages(savedProduct.id, groupRepresentativeVariantIdMap);
 
       toast.success(
         isEdit ? 'Cập nhật sản phẩm thành công.' : 'Thêm sản phẩm thành công.',
@@ -556,28 +765,28 @@ function ProductFormContent() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-10 h-10 border-2 border-violet-300 border-t-violet-500 rounded-full animate-spin" />
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-violet-300 border-t-violet-500" />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="mb-8 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link
             href="/admin/products"
-            className="p-2.5 rounded-xl bg-white/60 border border-white/50 hover:bg-white/80 transition-all active:scale-95"
+            className="rounded-xl border border-white/50 bg-white/60 p-2.5 transition-all hover:bg-white/80 active:scale-95"
           >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
+            <ArrowLeft className="h-5 w-5 text-foreground" />
           </Link>
           <div>
-            <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground">
+            <h1 className="font-heading text-2xl font-bold text-foreground md:text-3xl">
               {isEdit ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}
             </h1>
             {isEdit && existingProduct ? (
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 {existingProduct.name}
               </p>
             ) : null}
@@ -589,23 +798,23 @@ function ProductFormContent() {
           className="btn-primary flex items-center gap-2 disabled:opacity-50"
         >
           {isSaving ? (
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
           ) : (
-            <Save className="w-4 h-4" />
+            <Save className="h-4 w-4" />
           )}
           {isSaving ? 'Đang lưu...' : isEdit ? 'Cập nhật' : 'Tạo sản phẩm'}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
           <div className="glass-card p-6">
-            <h2 className="font-heading text-lg font-semibold text-foreground mb-5">
+            <h2 className="mb-5 font-heading text-lg font-semibold text-foreground">
               Thông tin cơ bản
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
                   Tên sản phẩm <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -613,22 +822,22 @@ function ProductFormContent() {
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="VD: Bộ Đồ Ngủ Lụa Hồng Pastel"
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
+                  className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
                   Slug (URL)
                 </label>
                 <input
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/40 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm text-muted-foreground"
+                  className="w-full rounded-xl border border-white/50 bg-white/40 px-4 py-2.5 text-sm text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-300"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
                   Mô tả ngắn
                 </label>
                 <input
@@ -636,11 +845,11 @@ function ProductFormContent() {
                   value={shortDescription}
                   onChange={(e) => setShortDescription(e.target.value)}
                   placeholder="Mô tả ngắn hiển thị trên card sản phẩm"
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
+                  className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
                   Mô tả chi tiết
                 </label>
                 <textarea
@@ -648,16 +857,32 @@ function ProductFormContent() {
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
                   placeholder="Mô tả chi tiết sản phẩm..."
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm resize-none"
+                  className="w-full resize-none rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                 />
               </div>
             </div>
           </div>
 
           <div className="glass-card p-6">
-            <h2 className="font-heading text-lg font-semibold text-foreground mb-5">
-              Hình ảnh sản phẩm
-            </h2>
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-heading text-lg font-semibold text-foreground">
+                  Ảnh và biến thể
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Mỗi ảnh sẽ tự tạo một biến thể. Sau đó chỉ cần đặt tên biến
+                  thể và nhập số lượng cho từng size trong cùng một khối.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={addVariantGroup}
+                className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800"
+              >
+                <Plus className="h-3.5 w-3.5" /> Thêm biến thể thủ công
+              </button>
+            </div>
+
             <input
               ref={imageInputRef}
               type="file"
@@ -666,10 +891,11 @@ function ProductFormContent() {
               onChange={handleImageUpload}
               className="hidden"
             />
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+
+            <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {images.map((img, index) => (
                 <div
-                  key={`${img.id ?? 'new'}-${img.url}-${index}`}
+                  key={`${img.clientId}-${img.url}-${index}`}
                   className="glass-card group rounded-xl p-2"
                 >
                   <div className="relative aspect-square overflow-hidden rounded-xl">
@@ -681,24 +907,21 @@ function ProductFormContent() {
                       sizes="200px"
                     />
                     {img.isPrimary ? (
-                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-violet-500 text-white text-[10px] font-bold">
+                      <span className="absolute left-2 top-2 rounded-md bg-violet-500 px-2 py-0.5 text-[10px] font-bold text-white">
                         Chính
                       </span>
                     ) : null}
                     <button
                       onClick={() => void removeImage(index)}
-                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500/90 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 active:scale-90"
+                      className="absolute right-2 top-2 rounded-lg bg-red-500/90 p-1.5 text-white opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100"
                       title={
                         img.isExisting && !canDelete
                           ? 'Chỉ super admin mới được xóa ảnh đã lưu'
                           : 'Xóa ảnh'
                       }
                     >
-                      <X className="w-3 h-3" />
+                      <X className="h-3 w-3" />
                     </button>
-                    <div className="absolute bottom-2 left-2 p-1 rounded bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <GripVertical className="w-3 h-3" />
-                    </div>
                   </div>
                   <div className="mt-2 space-y-2">
                     <button
@@ -715,239 +938,250 @@ function ProductFormContent() {
                         : 'Đặt làm ảnh chính'}
                     </button>
                     <select
-                      value={img.variantId ?? ''}
+                      value={img.variantClientId ?? ''}
                       onChange={(e) =>
-                        updateImageField(
+                        assignImageVariantGroup(
                           index,
-                          'variantId',
                           e.target.value || undefined,
                         )
                       }
                       className="w-full rounded-lg border border-white/50 bg-white/80 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
                     >
-                      <option value="">Ảnh dùng chung cho mọi màu</option>
-                      {variants
-                        .filter((variant) => Boolean(variant.id))
-                        .map((variant) => (
-                          <option key={variant.clientId} value={variant.id}>
-                            {variant.color || 'Chưa đặt màu'} - {variant.size}
-                          </option>
-                        ))}
+                      <option value="">Ảnh dùng chung cho toàn sản phẩm</option>
+                      {variantGroups.map((group, groupIndex) => (
+                        <option key={group.clientId} value={group.clientId}>
+                          {group.name.trim() || `Biến thể ${groupIndex + 1}`}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
               ))}
+
               <button
                 onClick={() => imageInputRef.current?.click()}
-                className="aspect-square rounded-xl border-2 border-dashed border-violet-300/50 hover:border-violet-400 flex flex-col items-center justify-center gap-2 transition-all hover:bg-white/40 active:scale-95"
+                className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-violet-300/50 transition-all hover:border-violet-400 hover:bg-white/40 active:scale-95"
               >
-                <div className="p-2 rounded-lg bg-violet-100">
-                  <ImageIcon className="w-5 h-5 text-violet-400" />
+                <div className="rounded-lg bg-violet-100 p-2">
+                  <ImageIcon className="h-5 w-5 text-violet-400" />
                 </div>
                 <span className="text-xs text-muted-foreground">Thêm ảnh</span>
               </button>
             </div>
-          </div>
 
-          <div className="glass-card p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-heading text-lg font-semibold text-foreground">
-                Biến thể (Size & Màu)
-              </h2>
-              <button
-                onClick={addVariant}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500 text-white text-xs font-medium hover:bg-violet-600 transition-all active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5" /> Thêm biến thể
-              </button>
-            </div>
-            <p className="mb-4 text-xs text-muted-foreground">
-              Mỗi biến thể có tồn kho riêng và SKU riêng. SKU được tự sinh từ
-              tên sản phẩm, màu và size.
-            </p>
-
-            {variants.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground mb-3">
-                  Chưa có biến thể nào
+            {variantGroups.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/50 bg-white/20 px-4 py-10 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Chưa có biến thể nào. Tải ảnh lên để hệ thống tự tạo biến thể.
                 </p>
-                <button
-                  onClick={addVariant}
-                  className="text-sm text-violet-500 hover:text-violet-600 font-medium"
-                >
-                  + Thêm biến thể đầu tiên
-                </button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {variants.map((variant, index) => (
-                  <div
-                    key={variant.clientId}
-                    className="p-4 rounded-xl bg-white/40 border border-white/30"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Biến thể #{index + 1}
-                      </span>
-                      <button
-                        onClick={() => void removeVariant(index)}
-                        className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                        title={
-                          variant.isExisting && !canDelete
-                            ? 'Chỉ super admin mới được xóa biến thể đã lưu'
-                            : 'Xóa biến thể'
-                        }
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      {WEIGHT_SIZE_PRESETS.map((preset) => (
+              <div className="space-y-4">
+                {variantGroups.map((group, groupIndex) => {
+                  const previewImage = images.find(
+                    (image) => image.clientId === group.imageClientId,
+                  );
+
+                  return (
+                    <div
+                      key={group.clientId}
+                      className="rounded-2xl border border-white/40 bg-white/40 p-4"
+                    >
+                      <div className="mb-4 flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-slate-100">
+                            {previewImage ? (
+                              <Image
+                                src={previewImage.url}
+                                alt={group.name}
+                                fill
+                                className="object-cover"
+                                sizes="64px"
+                              />
+                            ) : (
+                              <div className="flex h-full items-center justify-center">
+                                <ImageIcon className="h-5 w-5 text-slate-400" />
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              Biến thể #{groupIndex + 1}
+                            </p>
+                            <p className="text-sm text-slate-600">
+                              Tổng tồn kho: {getGroupTotalStock(group)}
+                            </p>
+                          </div>
+                        </div>
                         <button
-                          key={preset}
-                          type="button"
-                          onClick={() =>
-                            updateVariantField(index, 'size', preset)
-                          }
-                          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                            variant.size === preset
-                              ? 'bg-violet-500 text-white'
-                              : 'bg-white/60 text-slate-700 hover:bg-white'
-                          }`}
+                          onClick={() => void removeVariantGroup(groupIndex)}
+                          className="rounded-lg p-1.5 text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          title="Xóa biến thể"
                         >
-                          {preset}
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">
-                          Khoảng cân nặng / size
-                        </label>
-                        <input
-                          type="text"
-                          value={variant.size}
-                          onChange={(e) =>
-                            updateVariantField(index, 'size', e.target.value)
-                          }
-                          placeholder="VD: 43-49kg"
-                          className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
-                        />
                       </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">
-                          Màu
-                        </label>
-                        <input
-                          type="text"
-                          value={variant.color}
-                          onChange={(e) =>
-                            updateVariantField(index, 'color', e.target.value)
-                          }
-                          placeholder="VD: Hồng phấn"
-                          className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">
-                          Mã màu
-                        </label>
-                        <div className="flex items-center gap-2 rounded-lg border border-white/50 bg-white/60 px-3 py-2">
-                          <input
-                            type="color"
-                            value={variant.colorCode || '#f8b4c7'}
-                            onChange={(e) =>
-                              updateVariantField(
-                                index,
-                                'colorCode',
-                                e.target.value,
-                              )
-                            }
-                            className="h-8 w-10 rounded border-0 bg-transparent p-0"
-                          />
+
+                      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div>
+                          <label className="mb-1 block text-xs text-muted-foreground">
+                            Tên biến thể
+                          </label>
                           <input
                             type="text"
-                            value={variant.colorCode}
+                            value={group.name}
                             onChange={(e) =>
-                              updateVariantField(
-                                index,
-                                'colorCode',
+                              updateVariantGroupField(
+                                groupIndex,
+                                'name',
                                 e.target.value,
                               )
                             }
-                            placeholder="#f8b4c7"
-                            className="w-full bg-transparent text-sm focus:outline-none"
+                            placeholder="VD: Hồng pastel / Mẫu 1"
+                            className="w-full rounded-lg border border-white/60 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                           />
                         </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-muted-foreground">
+                            Giá riêng cho biến thể
+                          </label>
+                          <input
+                            type="number"
+                            value={group.price}
+                            onChange={(e) =>
+                              updateVariantGroupField(
+                                groupIndex,
+                                'price',
+                                Number(e.target.value),
+                              )
+                            }
+                            className="w-full rounded-lg border border-white/60 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-muted-foreground">
+                            Mã màu hiển thị
+                          </label>
+                          <div className="flex items-center gap-2 rounded-lg border border-white/60 bg-white/80 px-3 py-2">
+                            <input
+                              type="color"
+                              value={group.colorCode || '#e5e7eb'}
+                              onChange={(e) =>
+                                updateVariantGroupField(
+                                  groupIndex,
+                                  'colorCode',
+                                  e.target.value,
+                                )
+                              }
+                              className="h-8 w-10 rounded border-0 bg-transparent p-0"
+                            />
+                            <input
+                              type="text"
+                              value={group.colorCode}
+                              onChange={(e) =>
+                                updateVariantGroupField(
+                                  groupIndex,
+                                  'colorCode',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="#e5e7eb"
+                              className="w-full bg-transparent text-sm focus:outline-none"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">
-                          SKU biến thể
-                        </label>
-                        <input
-                          type="text"
-                          value={variant.sku}
-                          readOnly
-                          placeholder="Tự sinh theo tên + màu + size"
-                          className="w-full cursor-not-allowed px-3 py-2 rounded-lg bg-slate-100 border border-white/50 text-sm text-slate-600 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">
-                          Tồn kho
-                        </label>
-                        <input
-                          type="number"
-                          value={variant.stock}
-                          onChange={(e) =>
-                            updateVariantField(
-                              index,
-                              'stock',
-                              Number(e.target.value),
-                            )
-                          }
-                          min={0}
-                          className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">
-                          Giá
-                        </label>
-                        <input
-                          type="number"
-                          value={variant.price}
-                          onChange={(e) =>
-                            updateVariantField(
-                              index,
-                              'price',
-                              Number(e.target.value),
-                            )
-                          }
-                          className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">
-                          Giá sale
-                        </label>
-                        <input
-                          type="number"
-                          value={variant.salePrice ?? ''}
-                          onChange={(e) =>
-                            updateVariantField(
-                              index,
-                              'salePrice',
-                              e.target.value ? Number(e.target.value) : null,
-                            )
-                          }
-                          placeholder="Bỏ trống nếu không sale"
-                          className="w-full px-3 py-2 rounded-lg bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
-                        />
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold text-foreground">
+                            Size và số lượng
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => addSizeRow(groupIndex)}
+                            className="text-xs font-medium text-violet-600 hover:text-violet-700"
+                          >
+                            + Thêm size
+                          </button>
+                        </div>
+
+                        {group.sizeRows.map((sizeRow, sizeIndex) => (
+                          <div
+                            key={sizeRow.clientId}
+                            className="grid grid-cols-1 gap-3 rounded-xl border border-white/50 bg-white/70 p-3 md:grid-cols-[1.2fr_0.9fr_1.2fr_auto]"
+                          >
+                            <div>
+                              <label className="mb-1 block text-xs text-muted-foreground">
+                                Size / khoảng cân nặng
+                              </label>
+                              <input
+                                type="text"
+                                value={sizeRow.size}
+                                onChange={(e) =>
+                                  updateVariantSizeField(
+                                    groupIndex,
+                                    sizeIndex,
+                                    'size',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="VD: 43-49kg"
+                                className="w-full rounded-lg border border-white/60 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs text-muted-foreground">
+                                Số lượng
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={sizeRow.stock}
+                                onChange={(e) =>
+                                  updateVariantSizeField(
+                                    groupIndex,
+                                    sizeIndex,
+                                    'stock',
+                                    Number(e.target.value),
+                                  )
+                                }
+                                className="w-full rounded-lg border border-white/60 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs text-muted-foreground">
+                                SKU tự sinh
+                              </label>
+                              <input
+                                type="text"
+                                value={generateVariantSku(
+                                  name,
+                                  group.name,
+                                  sizeRow.size,
+                                )}
+                                readOnly
+                                className="w-full cursor-not-allowed rounded-lg border border-white/50 bg-slate-100 px-3 py-2 text-sm text-slate-600 focus:outline-none"
+                              />
+                            </div>
+                            <div className="flex items-end">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void removeSizeRow(groupIndex, sizeIndex)
+                                }
+                                className="rounded-lg p-2 text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                title="Xóa size"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -955,18 +1189,18 @@ function ProductFormContent() {
 
         <div className="space-y-6">
           <div className="glass-card p-6">
-            <h2 className="font-heading text-lg font-semibold text-foreground mb-5">
-              Phân loại & Giá
+            <h2 className="mb-5 font-heading text-lg font-semibold text-foreground">
+              Phân loại và giá
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
                   Danh mục <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
+                  className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                 >
                   <option value="">Chọn danh mục</option>
                   {categories.map((category) => (
@@ -1019,7 +1253,7 @@ function ProductFormContent() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
                   Giá gốc (VND) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -1027,11 +1261,11 @@ function ProductFormContent() {
                   value={basePrice}
                   onChange={(e) => setBasePrice(e.target.value)}
                   placeholder="890000"
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
+                  className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
                   Giá sale (VND)
                 </label>
                 <input
@@ -1039,11 +1273,11 @@ function ProductFormContent() {
                   value={salePrice}
                   onChange={(e) => setSalePrice(e.target.value)}
                   placeholder="Bỏ trống nếu không sale"
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
+                  className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
                   Chất liệu
                 </label>
                 <input
@@ -1051,7 +1285,7 @@ function ProductFormContent() {
                   value={material}
                   onChange={(e) => setMaterial(e.target.value)}
                   placeholder="VD: Lụa satin"
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
+                  className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                 />
               </div>
               <div>
@@ -1097,8 +1331,8 @@ function ProductFormContent() {
                 </div>
               </div>
               {basePrice ? (
-                <div className="p-3 rounded-xl bg-violet-50/50">
-                  <p className="text-xs text-muted-foreground mb-1">
+                <div className="rounded-xl bg-violet-50/50 p-3">
+                  <p className="mb-1 text-xs text-muted-foreground">
                     Hiển thị:
                   </p>
                   <p className="text-lg font-bold text-primary">
@@ -1123,8 +1357,8 @@ export default function AdminProductFormPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center h-64">
-          <div className="w-10 h-10 border-2 border-violet-300 border-t-violet-500 rounded-full animate-spin" />
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-violet-300 border-t-violet-500" />
         </div>
       }
     >

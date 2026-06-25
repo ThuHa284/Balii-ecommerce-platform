@@ -8,7 +8,6 @@ import {
   RotateCcw,
   ShieldCheck,
   Sparkles,
-  Star,
   Truck,
   Wand2,
 } from 'lucide-react';
@@ -21,27 +20,6 @@ import { Category, Collection, Product } from '@/types/product.types';
 
 const HERO_VIDEO_URL =
   'https://res.cloudinary.com/ddbnubhxr/video/upload/f_auto,q_auto,ac_none/v1777210564/video_background_ijdowe.mp4';
-
-const TESTIMONIALS = [
-  {
-    name: 'Nguyễn Thị Mai',
-    review:
-      'Chất lụa mềm mại, mát lạnh trên da. Tôi rất hài lòng với sản phẩm của Balii!',
-    rating: 5,
-  },
-  {
-    name: 'Trần Văn Hùng',
-    review:
-      'Mua tặng vợ, cô ấy rất thích. Đóng gói đẹp, giao hàng nhanh. Sẽ mua thêm!',
-    rating: 5,
-  },
-  {
-    name: 'Lê Thị Hương',
-    review:
-      'Thiết kế đẹp, chất liệu tốt. Giá cả hợp lý so với chất lượng nhận được.',
-    rating: 4,
-  },
-];
 
 export default function HomePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -63,12 +41,13 @@ export default function HomePage() {
 
   useEffect(() => {
     async function loadData() {
-      const [featured, newest, categoryList, collectionList] = await Promise.all([
-        getFeaturedProducts(),
-        getNewProducts(),
-        getCategories(),
-        getCollections(),
-      ]);
+      const [featured, newest, categoryList, collectionList] =
+        await Promise.all([
+          getFeaturedProducts(),
+          getNewProducts(),
+          getCategories(),
+          getCollections(),
+        ]);
 
       setFeaturedProducts(featured);
       setNewProducts(newest);
@@ -115,7 +94,7 @@ export default function HomePage() {
           </h1>
 
           <p className="fade-in-up fade-in-up-delay-2 mx-auto mb-8 max-w-xl text-lg leading-relaxed text-foreground/80 md:text-xl">
-            Khám phá bộ sưu tập đồ ngủ lụa cao cấp - thiết kế thanh lịch, chất
+            Khám phá bộ sưu tập đồ ngủ  - thiết kế xinh xắn, chất
             liệu tự nhiên, giá cả hợp lý
           </p>
 
@@ -131,11 +110,10 @@ export default function HomePage() {
               href="/categories/do-ngu-lua"
               className="btn-outline px-8 py-3 text-base"
             >
-              Đồ ngủ lụa
+              Đồ ngủ mới nhất
             </Link>
           </div>
         </div>
-
       </section>
 
       <section className="relative z-20 -mt-16 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
@@ -171,41 +149,26 @@ export default function HomePage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mb-12 text-center">
+        <div className="mb-10 text-center">
           <h2 className="mb-3 font-heading text-3xl font-bold text-foreground md:text-4xl">
             Danh Mục <span className="text-gradient">Nổi Bật</span>
           </h2>
           <p className="mx-auto max-w-md text-muted-foreground">
-            Khám phá các dòng sản phẩm đồ ngủ lụa được yêu thích nhất
+            Khám phá các dòng sản phẩm đồ ngủ được yêu thích nhất
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
           {categories.map((category, index) => (
             <Link
               key={category.id}
               href={`/categories/${category.slug}`}
-              className="group glass-card-hover overflow-hidden fade-in-up"
-              style={{ animationDelay: `${index * 0.1}s` }}
+              className="group relative overflow-hidden rounded-full border border-violet-200/60 bg-white/60 backdrop-blur-sm px-6 py-3 font-medium text-foreground shadow-sm transition-all duration-300 hover:bg-violet-500 hover:text-white hover:border-violet-500 hover:shadow-lg hover:shadow-violet-300/25 hover:scale-[1.04] active:scale-95 fade-in-up"
+              style={{ animationDelay: `${index * 0.08}s` }}
             >
-              <div className="relative aspect-[4/5] overflow-hidden rounded-t-2xl">
-                <Image
-                  src={category.image}
-                  alt={category.name}
-                  fill
-                  className="object-cover transition-transform duration-700 group-hover:scale-110"
-                  sizes="(max-width: 640px) 100vw, 25vw"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                <div className="absolute right-4 bottom-4 left-4">
-                  <h3 className="mb-1 font-heading text-xl font-bold text-white">
-                    {category.name}
-                  </h3>
-                  <p className="text-sm text-white/80">
-                    {category.productCount} sản phẩm
-                  </p>
-                </div>
-              </div>
+              <span className="relative z-10 text-sm sm:text-base">
+                {category.name}
+              </span>
             </Link>
           ))}
         </div>
@@ -295,12 +258,12 @@ export default function HomePage() {
               Câu Chuyện <span className="text-gradient">Balii</span>
             </h2>
             <p className="mb-4 leading-relaxed text-muted-foreground">
-              Balii Sleepwear ra đời từ niềm đam mê tạo nên những bộ đồ ngủ lụa
-              cao cấp với giá cả hợp lý. Chúng tôi tin rằng mỗi người đều xứng
-              đáng được tận hưởng sự mềm mại và sang trọng của lụa mỗi đêm.
+              Balii Sleepwear ra đời từ niềm đam mê tạo nên những bộ đồ ngủ
+              xin xắn với giá cả hợp lý. Chúng tôi tin rằng mỗi người đều xứng
+              đáng được tận hưởng sự mềm mại và dễ chịu của mỗi đêm.
             </p>
             <p className="mb-6 leading-relaxed text-muted-foreground">
-              Với chất liệu lụa tự nhiên 100%, thiết kế thanh lịch và sự chú
+              Với chất liệu tự nhiên 100%, thiết kế thanh lịch và sự chú
               trọng đến từng chi tiết, Balii mang đến cho bạn giấc ngủ ngọt ngào
               nhất.
             </p>
@@ -381,42 +344,6 @@ export default function HomePage() {
           </p>
         </div>
         <ProductGrid products={newProducts} columns={3} />
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
-        <div className="mb-12 text-center">
-          <h2 className="font-heading text-3xl font-bold text-foreground md:text-4xl">
-            Khách Hàng <span className="text-gradient">Nói Gì</span>
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {TESTIMONIALS.map((testimonial, index) => (
-            <div
-              key={testimonial.name}
-              className="glass-card fade-in-up p-6"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              <div className="mb-3 flex gap-0.5">
-                {Array.from({ length: 5 }).map((_, starIndex) => (
-                  <Star
-                    key={starIndex}
-                    className={`h-4 w-4 ${
-                      starIndex < testimonial.rating
-                        ? 'fill-yellow-400 text-yellow-400'
-                        : 'text-gray-300'
-                    }`}
-                  />
-                ))}
-              </div>
-              <p className="mb-4 text-sm leading-relaxed text-foreground/80">
-                &ldquo;{testimonial.review}&rdquo;
-              </p>
-              <p className="text-sm font-medium text-foreground">
-                {testimonial.name}
-              </p>
-            </div>
-          ))}
-        </div>
       </section>
     </div>
   );

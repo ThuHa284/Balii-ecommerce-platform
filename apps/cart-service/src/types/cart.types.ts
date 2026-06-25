@@ -8,6 +8,8 @@ export interface CartItem {
   sku: string;
   thumbnailUrl?: string;
   variantLabel?: string;
+  variantSize?: string;
+  variantColor?: string;
   unitPrice: number;
   quantity: number;
   subtotal: number;

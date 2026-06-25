@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:modeler="http://camunda.org/schema/modeler/1.0"
+                  id="Definitions_Balii_Payment_Reconciliation"
+                  targetNamespace="http://balii-sleepwear/payment"
+                  exporter="Camunda Modeler"
+                  exporterVersion="5.45.0"
+                  modeler:executionPlatform="Camunda Platform"
+                  modeler:executionPlatformVersion="7.24.0">
+
+<bpmn:process id="Process_Payment_Reconciliation" name="Balii Payment Reconciliation Workflow" isExecutable="true" camunda:historyTimeToLive="180">
+    <bpmn:startEvent id="StartEvent_ReconciliationTimer" name="Every 5 Minutes">
+      <bpmn:outgoing>Flow_Start_FindPending</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_ReconciliationCycle">
+        <bpmn:timeCycle xsi:type="bpmn:tFormalExpression">R/PT5M</bpmn:timeCycle>
+      </bpmn:timerEventDefinition>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_FindPendingPayments" name="Find Pending / Processing Payments" camunda:type="external" camunda:topic="payment.find-pending-for-reconciliation">
+      <bpmn:incoming>Flow_Start_FindPending</bpmn:incoming>
+      <bpmn:outgoing>Flow_FindPending_HasPayments</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_HasPendingPayments" name="Has Payments?">
+      <bpmn:incoming>Flow_FindPending_HasPayments</bpmn:incoming>
+      <bpmn:outgoing>Flow_NoPayments_End</bpmn:outgoing>
+      <bpmn:outgoing>Flow_HasPayments_QueryGateway</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:endEvent id="EndEvent_NoPendingPayments" name="No Pending Payments">
+      <bpmn:incoming>Flow_NoPayments_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:serviceTask id="Task_QueryGatewayStatus" name="Query VNPay / MoMo Transaction Status" camunda:type="external" camunda:topic="payment.query-gateway-status">
+      <bpmn:incoming>Flow_HasPayments_QueryGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_QueryGateway_Result</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_GatewayResult" name="Gateway Result?">
+      <bpmn:incoming>Flow_QueryGateway_Result</bpmn:incoming>
+      <bpmn:outgoing>Flow_GatewaySuccess_PersistSuccess</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GatewayFailed_PersistFailed</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GatewayUnknown_IncreaseCheck</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_PersistSuccessTransaction" name="Persist SUCCESS Transaction" camunda:type="external" camunda:topic="payment.persist-reconciled-success">
+      <bpmn:incoming>Flow_GatewaySuccess_PersistSuccess</bpmn:incoming>
+      <bpmn:outgoing>Flow_PersistSuccess_SignalOutbox</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_SignalOutboxSuccess" name="Signal Outbox Publisher" camunda:type="external" camunda:topic="outbox.signal-publisher">
+      <bpmn:incoming>Flow_PersistSuccess_SignalOutbox</bpmn:incoming>
+      <bpmn:outgoing>Flow_SignalOutboxSuccess_CorrelateOrder</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CorrelateOrderSuccess" name="Correlate Order Workflow: payment.success" camunda:type="external" camunda:topic="workflow.correlate-payment-success">
+      <bpmn:incoming>Flow_SignalOutboxSuccess_CorrelateOrder</bpmn:incoming>
+      <bpmn:outgoing>Flow_CorrelateOrder_EndSuccess</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_ReconciledSuccess" name="Reconciled SUCCESS">
+      <bpmn:incoming>Flow_CorrelateOrder_EndSuccess</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:serviceTask id="Task_PersistFailedTransaction" name="Persist FAILED / EXPIRED Transaction" camunda:type="external" camunda:topic="payment.persist-reconciled-failed">
+      <bpmn:incoming>Flow_GatewayFailed_PersistFailed</bpmn:incoming>
+      <bpmn:outgoing>Flow_PersistFailed_CancelOrder</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CancelReleaseOrder" name="Cancel / Release Order" camunda:type="external" camunda:topic="order.cancel-release">
+      <bpmn:incoming>Flow_PersistFailed_CancelOrder</bpmn:incoming>
+      <bpmn:outgoing>Flow_CancelOrder_SignalOutboxFailed</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_SignalOutboxFailed" name="Signal Outbox Publisher" camunda:type="external" camunda:topic="outbox.signal-publisher">
+      <bpmn:incoming>Flow_CancelOrder_SignalOutboxFailed</bpmn:incoming>
+      <bpmn:outgoing>Flow_SignalOutboxFailed_EndFailed</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_ReconciledFailed" name="Reconciled FAILED / EXPIRED">
+      <bpmn:incoming>Flow_SignalOutboxFailed_EndFailed</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:serviceTask id="Task_IncreaseReconciliationAttempt" name="Increase Reconciliation Attempt" camunda:type="external" camunda:topic="payment.increase-reconciliation-attempt">
+      <bpmn:incoming>Flow_GatewayUnknown_IncreaseCheck</bpmn:incoming>
+      <bpmn:outgoing>Flow_IncreaseAttempt_TooMany</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_TooManyAttempts" name="Too Many Attempts?">
+      <bpmn:incoming>Flow_IncreaseAttempt_TooMany</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotTooMany_EndWaitNext</bpmn:outgoing>
+      <bpmn:outgoing>Flow_TooMany_ManualReview</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:endEvent id="EndEvent_WaitNextSchedule" name="Wait Next Schedule">
+      <bpmn:incoming>Flow_NotTooMany_EndWaitNext</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:userTask id="UserTask_ManualReconciliationReview" name="Manual Reconciliation Review" camunda:assignee="payment-admin">
+      <bpmn:incoming>Flow_TooMany_ManualReview</bpmn:incoming>
+      <bpmn:outgoing>Flow_ManualReview_EndReviewRequired</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:endEvent id="EndEvent_ReconciliationReviewRequired" name="Review Required">
+      <bpmn:incoming>Flow_ManualReview_EndReviewRequired</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Start_FindPending" sourceRef="StartEvent_ReconciliationTimer" targetRef="Task_FindPendingPayments" />
+    <bpmn:sequenceFlow id="Flow_FindPending_HasPayments" sourceRef="Task_FindPendingPayments" targetRef="Gateway_HasPendingPayments" />
+    <bpmn:sequenceFlow id="Flow_NoPayments_End" name="No" sourceRef="Gateway_HasPendingPayments" targetRef="EndEvent_NoPendingPayments">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${hasPendingPayments == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_HasPayments_QueryGateway" name="Yes" sourceRef="Gateway_HasPendingPayments" targetRef="Task_QueryGatewayStatus">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${hasPendingPayments == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_QueryGateway_Result" sourceRef="Task_QueryGatewayStatus" targetRef="Gateway_GatewayResult" />
+    <bpmn:sequenceFlow id="Flow_GatewaySuccess_PersistSuccess" name="SUCCESS" sourceRef="Gateway_GatewayResult" targetRef="Task_PersistSuccessTransaction">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${gatewayResult == "SUCCESS"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GatewayFailed_PersistFailed" name="FAILED / EXPIRED" sourceRef="Gateway_GatewayResult" targetRef="Task_PersistFailedTransaction">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${gatewayResult == "FAILED" || gatewayResult == "EXPIRED" || gatewayResult == "CANCELLED"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GatewayUnknown_IncreaseCheck" name="UNKNOWN" sourceRef="Gateway_GatewayResult" targetRef="Task_IncreaseReconciliationAttempt">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${gatewayResult == "UNKNOWN"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_PersistSuccess_SignalOutbox" sourceRef="Task_PersistSuccessTransaction" targetRef="Task_SignalOutboxSuccess" />
+    <bpmn:sequenceFlow id="Flow_SignalOutboxSuccess_CorrelateOrder" sourceRef="Task_SignalOutboxSuccess" targetRef="Task_CorrelateOrderSuccess" />
+    <bpmn:sequenceFlow id="Flow_CorrelateOrder_EndSuccess" sourceRef="Task_CorrelateOrderSuccess" targetRef="EndEvent_ReconciledSuccess" />
+    <bpmn:sequenceFlow id="Flow_PersistFailed_CancelOrder" sourceRef="Task_PersistFailedTransaction" targetRef="Task_CancelReleaseOrder" />
+    <bpmn:sequenceFlow id="Flow_CancelOrder_SignalOutboxFailed" sourceRef="Task_CancelReleaseOrder" targetRef="Task_SignalOutboxFailed" />
+    <bpmn:sequenceFlow id="Flow_SignalOutboxFailed_EndFailed" sourceRef="Task_SignalOutboxFailed" targetRef="EndEvent_ReconciledFailed" />
+    <bpmn:sequenceFlow id="Flow_IncreaseAttempt_TooMany" sourceRef="Task_IncreaseReconciliationAttempt" targetRef="Gateway_TooManyAttempts" />
+    <bpmn:sequenceFlow id="Flow_NotTooMany_EndWaitNext" name="No" sourceRef="Gateway_TooManyAttempts" targetRef="EndEvent_WaitNextSchedule">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${tooManyAttempts == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_TooMany_ManualReview" name="Yes" sourceRef="Gateway_TooManyAttempts" targetRef="UserTask_ManualReconciliationReview">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${tooManyAttempts == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ManualReview_EndReviewRequired" sourceRef="UserTask_ManualReconciliationReview" targetRef="EndEvent_ReconciliationReviewRequired" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Payment_Reconciliation">
+    <bpmndi:BPMNPlane id="BPMNPlane_Payment_Reconciliation" bpmnElement="Process_Payment_Reconciliation">
+      <bpmndi:BPMNShape id="StartEvent_ReconciliationTimer_di" bpmnElement="StartEvent_ReconciliationTimer">
+        <dc:Bounds x="160" y="245" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FindPendingPayments_di" bpmnElement="Task_FindPendingPayments">
+        <dc:Bounds x="240" y="223" width="190" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_HasPendingPayments_di" bpmnElement="Gateway_HasPendingPayments" isMarkerVisible="true">
+        <dc:Bounds x="490" y="238" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_NoPendingPayments_di" bpmnElement="EndEvent_NoPendingPayments">
+        <dc:Bounds x="600" y="125" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_QueryGatewayStatus_di" bpmnElement="Task_QueryGatewayStatus">
+        <dc:Bounds x="600" y="223" width="220" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_GatewayResult_di" bpmnElement="Gateway_GatewayResult" isMarkerVisible="true">
+        <dc:Bounds x="880" y="238" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PersistSuccessTransaction_di" bpmnElement="Task_PersistSuccessTransaction">
+        <dc:Bounds x="990" y="120" width="190" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SignalOutboxSuccess_di" bpmnElement="Task_SignalOutboxSuccess">
+        <dc:Bounds x="1230" y="120" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CorrelateOrderSuccess_di" bpmnElement="Task_CorrelateOrderSuccess">
+        <dc:Bounds x="1450" y="120" width="220" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_ReconciledSuccess_di" bpmnElement="EndEvent_ReconciledSuccess">
+        <dc:Bounds x="1720" y="142" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PersistFailedTransaction_di" bpmnElement="Task_PersistFailedTransaction">
+        <dc:Bounds x="990" y="280" width="210" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CancelReleaseOrder_di" bpmnElement="Task_CancelReleaseOrder">
+        <dc:Bounds x="1250" y="280" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SignalOutboxFailed_di" bpmnElement="Task_SignalOutboxFailed">
+        <dc:Bounds x="1470" y="280" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_ReconciledFailed_di" bpmnElement="EndEvent_ReconciledFailed">
+        <dc:Bounds x="1720" y="302" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_IncreaseReconciliationAttempt_di" bpmnElement="Task_IncreaseReconciliationAttempt">
+        <dc:Bounds x="990" y="460" width="210" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_TooManyAttempts_di" bpmnElement="Gateway_TooManyAttempts" isMarkerVisible="true">
+        <dc:Bounds x="1260" y="475" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_WaitNextSchedule_di" bpmnElement="EndEvent_WaitNextSchedule">
+        <dc:Bounds x="1390" y="395" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ManualReconciliationReview_di" bpmnElement="UserTask_ManualReconciliationReview">
+        <dc:Bounds x="1390" y="520" width="210" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_ReconciliationReviewRequired_di" bpmnElement="EndEvent_ReconciliationReviewRequired">
+        <dc:Bounds x="1660" y="542" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_FindPending_di" bpmnElement="Flow_Start_FindPending">
+        <di:waypoint x="196" y="263" />
+        <di:waypoint x="240" y="263" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FindPending_HasPayments_di" bpmnElement="Flow_FindPending_HasPayments">
+        <di:waypoint x="430" y="263" />
+        <di:waypoint x="490" y="263" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NoPayments_End_di" bpmnElement="Flow_NoPayments_End">
+        <di:waypoint x="515" y="238" />
+        <di:waypoint x="515" y="143" />
+        <di:waypoint x="600" y="143" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_HasPayments_QueryGateway_di" bpmnElement="Flow_HasPayments_QueryGateway">
+        <di:waypoint x="540" y="263" />
+        <di:waypoint x="600" y="263" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_QueryGateway_Result_di" bpmnElement="Flow_QueryGateway_Result">
+        <di:waypoint x="820" y="263" />
+        <di:waypoint x="880" y="263" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GatewaySuccess_PersistSuccess_di" bpmnElement="Flow_GatewaySuccess_PersistSuccess">
+        <di:waypoint x="905" y="238" />
+        <di:waypoint x="905" y="160" />
+        <di:waypoint x="990" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PersistSuccess_SignalOutbox_di" bpmnElement="Flow_PersistSuccess_SignalOutbox">
+        <di:waypoint x="1180" y="160" />
+        <di:waypoint x="1230" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignalOutboxSuccess_CorrelateOrder_di" bpmnElement="Flow_SignalOutboxSuccess_CorrelateOrder">
+        <di:waypoint x="1400" y="160" />
+        <di:waypoint x="1450" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CorrelateOrder_EndSuccess_di" bpmnElement="Flow_CorrelateOrder_EndSuccess">
+        <di:waypoint x="1670" y="160" />
+        <di:waypoint x="1720" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GatewayFailed_PersistFailed_di" bpmnElement="Flow_GatewayFailed_PersistFailed">
+        <di:waypoint x="930" y="263" />
+        <di:waypoint x="960" y="263" />
+        <di:waypoint x="960" y="320" />
+        <di:waypoint x="990" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PersistFailed_CancelOrder_di" bpmnElement="Flow_PersistFailed_CancelOrder">
+        <di:waypoint x="1200" y="320" />
+        <di:waypoint x="1250" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CancelOrder_SignalOutboxFailed_di" bpmnElement="Flow_CancelOrder_SignalOutboxFailed">
+        <di:waypoint x="1420" y="320" />
+        <di:waypoint x="1470" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignalOutboxFailed_EndFailed_di" bpmnElement="Flow_SignalOutboxFailed_EndFailed">
+        <di:waypoint x="1640" y="320" />
+        <di:waypoint x="1720" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GatewayUnknown_IncreaseCheck_di" bpmnElement="Flow_GatewayUnknown_IncreaseCheck">
+        <di:waypoint x="905" y="288" />
+        <di:waypoint x="905" y="500" />
+        <di:waypoint x="990" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_IncreaseAttempt_TooMany_di" bpmnElement="Flow_IncreaseAttempt_TooMany">
+        <di:waypoint x="1200" y="500" />
+        <di:waypoint x="1260" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotTooMany_EndWaitNext_di" bpmnElement="Flow_NotTooMany_EndWaitNext">
+        <di:waypoint x="1285" y="475" />
+        <di:waypoint x="1285" y="413" />
+        <di:waypoint x="1390" y="413" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_TooMany_ManualReview_di" bpmnElement="Flow_TooMany_ManualReview">
+        <di:waypoint x="1310" y="500" />
+        <di:waypoint x="1350" y="500" />
+        <di:waypoint x="1350" y="560" />
+        <di:waypoint x="1390" y="560" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ManualReview_EndReviewRequired_di" bpmnElement="Flow_ManualReview_EndReviewRequired">
+        <di:waypoint x="1600" y="560" />
+        <di:waypoint x="1660" y="560" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

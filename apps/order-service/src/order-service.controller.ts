@@ -60,8 +60,8 @@ export class OrderServiceController {
     @Param('id') orderId: string,
     @Body()
     body: {
-      paymentStatus: 'unpaid' | 'pending' | 'paid' | 'failed';
-      status?: 'pending' | 'confirmed' | 'cancelled';
+      paymentStatus: 'unpaid' | 'pending' | 'paid' | 'failed' | 'refunded';
+      status?: 'pending' | 'confirmed' | 'cancelled' | 'refunded';
     },
   ) {
     return this.orderServiceService.updatePaymentStatus(

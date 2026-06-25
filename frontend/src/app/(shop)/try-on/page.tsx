@@ -23,6 +23,7 @@ import {
   getRecommendedProducts,
   RecommendedProduct,
 } from '@/lib/api/products.api';
+import { getUserErrorMessage } from '@/lib/error-utils';
 import { submitTryOnRequest } from '@/lib/api/tryon.api';
 import { cn } from '@/lib/utils';
 import { useTryOnStore } from '@/store/tryon.store';
@@ -286,9 +287,7 @@ function TryOnContent() {
 
       handleTryOnSuccess(response);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Không thể tiếp tục thử đồ.',
-      );
+      toast.error(getUserErrorMessage(error, 'Không thể tiếp tục thử đồ.'));
     } finally {
       window.clearInterval(timer);
       setIsGenerating(false);

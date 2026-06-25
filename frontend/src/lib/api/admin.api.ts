@@ -41,6 +41,26 @@ export interface AdminUser extends User {
   totalSpent: number | null;
 }
 
+export interface AdminRefund {
+  id: string;
+  paymentId: string;
+  orderId: string;
+  userId: string;
+  paymentAmount: number;
+  refundAmount: number;
+  paymentStatus: string;
+  refundStatus: string;
+  provider: string;
+  providerRefundId: string | null;
+  reason: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  refundedAt: string | null;
+  gatewayStatus: string | null;
+  workflowResolution: string | null;
+  retryCount: number;
+}
+
 export interface AdminDashboardStats {
   totalRevenue: number;
   totalOrders: number;
@@ -85,7 +105,9 @@ type BackendAdminOrder = Parameters<typeof mapOrder>[0] & {
 };
 
 export async function getAdminOrders(): Promise<AdminOrder[]> {
-  const { data } = await apiClient.get<BackendAdminOrder[]>('/orders/admin/orders');
+  const { data } = await apiClient.get<BackendAdminOrder[]>(
+    '/orders/admin/orders',
+  );
   return data.map((item) => ({
     ...mapOrder(item),
     customerName: item.customerName,
@@ -102,4 +124,11 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
     orderCount: null,
     totalSpent: null,
   }));
+}
+
+export async function getAdminRefunds(): Promise<AdminRefund[]> {
+  const { data } = await apiClient.get<AdminRefund[]>(
+    '/payments/admin/refunds',
+  );
+  return data;
 }

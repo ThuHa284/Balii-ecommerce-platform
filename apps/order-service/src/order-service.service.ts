@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
@@ -7,9 +8,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import * as nodemailer from 'nodemailer';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
@@ -65,6 +69,11 @@ type AdminOrderListItem = ReturnType<OrderServiceService['mapOrder']> & {
   customerEmail: string | null;
 };
 
+type CustomerContact = {
+  fullName: string;
+  email: string | null;
+};
+
 type RevenuePoint = {
   month: string;
   revenue: number;
@@ -109,6 +118,8 @@ type AdminAnalyticsStats = {
 
 @Injectable()
 export class OrderServiceService {
+  private readonly logger = new Logger(OrderServiceService.name);
+
   constructor(
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
@@ -116,6 +127,7 @@ export class OrderServiceService {
     private readonly orderItemRepository: Repository<OrderItem>,
     private readonly cartClientService: CartClientService,
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
   ) {}
 
   async createOrder(userId: string | undefined, dto: CreateOrderDto) {
@@ -262,8 +274,8 @@ export class OrderServiceService {
 
   async updatePaymentStatus(
     orderId: string,
-    paymentStatus: 'unpaid' | 'pending' | 'paid' | 'failed',
-    status?: 'pending' | 'confirmed' | 'cancelled',
+    paymentStatus: 'unpaid' | 'pending' | 'paid' | 'failed' | 'refunded',
+    status?: 'pending' | 'confirmed' | 'cancelled' | 'refunded',
   ) {
     const order = await this.orderRepository.findOne({
       where: { id: orderId },
@@ -272,13 +284,17 @@ export class OrderServiceService {
       throw new NotFoundException('Order not found');
     }
 
+    const previousPaymentStatus = await this.getCurrentPaymentStatus(order.id);
+
     const nextStatusCode =
       status ??
       (paymentStatus === 'paid'
         ? 'confirmed'
-        : paymentStatus === 'failed'
-          ? 'pending'
-          : undefined);
+        : paymentStatus === 'refunded'
+          ? 'refunded'
+          : paymentStatus === 'failed'
+            ? 'pending'
+            : undefined);
 
     if (nextStatusCode) {
       const nextStatusId = await this.getOrderStatusId(nextStatusCode);
@@ -306,7 +322,19 @@ export class OrderServiceService {
       }
     }
 
-    return this.findMyOrderById(order.userId, order.id);
+    const response = await this.findMyOrderById(order.userId, order.id);
+
+    if (paymentStatus === 'paid' && previousPaymentStatus !== 'paid') {
+      void this.sendPaymentSuccessNotifications(response).catch((error) => {
+        const message =
+          error instanceof Error ? error.message : 'Unknown email error';
+        this.logger.warn(
+          `Unable to send payment success emails for order ${order.id}: ${message}`,
+        );
+      });
+    }
+
+    return response;
   }
 
   async getAdminDashboardStats(): Promise<AdminDashboardStats> {
@@ -383,8 +411,13 @@ export class OrderServiceService {
     );
 
     const orders = await Promise.all(
-      rows.map((row: OrderRow & { customerName?: string | null; customerEmail?: string | null }) =>
-        this.loadOrderAggregate(row),
+      rows.map(
+        (
+          row: OrderRow & {
+            customerName?: string | null;
+            customerEmail?: string | null;
+          },
+        ) => this.loadOrderAggregate(row),
       ),
     );
 
@@ -398,7 +431,8 @@ export class OrderServiceService {
         ...this.mapOrder(order),
         customerName:
           order.customerName ||
-          String(order.shippingAddress?.recipientName ?? 'Khách hàng'),
+          safeString(order.shippingAddress?.recipientName) ||
+          'Khách hàng',
         customerEmail: order.customerEmail ?? null,
       }),
     );
@@ -479,6 +513,24 @@ export class OrderServiceService {
     return result.length ? Number(result[0].id) : null;
   }
 
+  private async getCurrentPaymentStatus(
+    orderId: string,
+  ): Promise<string | null> {
+    const rows = await this.dataSource.query(
+      `
+      SELECT COALESCE(ps.code, 'pending') AS status
+      FROM payment_service.payments p
+      LEFT JOIN payment_service.payment_statuses ps ON ps.id = p.status_id
+      WHERE p.order_id = $1
+      ORDER BY p.created_at DESC
+      LIMIT 1
+      `,
+      [orderId],
+    );
+
+    return rows.length ? String(rows[0].status) : null;
+  }
+
   private async loadOrderAggregate(row: OrderRow): Promise<OrderRow> {
     const items = await this.dataSource.query(
       `
@@ -508,6 +560,217 @@ export class OrderServiceService {
       ...row,
       items: items as OrderItemRow[],
     };
+  }
+
+  private async loadCustomerContact(userId: string): Promise<CustomerContact> {
+    const rows = await this.dataSource.query(
+      `
+      SELECT full_name AS "fullName", email
+      FROM user_service.users
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [userId],
+    );
+
+    const fallbackName = String(
+      rows[0]?.fullName ?? rows[0]?.email ?? 'Khách hàng',
+    );
+
+    return {
+      fullName: fallbackName,
+      email: rows[0]?.email ? String(rows[0].email) : null,
+    };
+  }
+
+  private isMailEnabled() {
+    return Boolean(
+      this.configService.get<string>('MAIL_HOST') &&
+      this.configService.get<string>('MAIL_PORT') &&
+      this.configService.get<string>('MAIL_USER') &&
+      this.configService.get<string>('MAIL_PASS'),
+    );
+  }
+
+  private createMailerTransport() {
+    return nodemailer.createTransport({
+      host: this.configService.get<string>('MAIL_HOST'),
+      port: Number(this.configService.get<string>('MAIL_PORT')),
+      secure: false,
+      auth: {
+        user: this.configService.get<string>('MAIL_USER'),
+        pass: this.configService.get<string>('MAIL_PASS'),
+      },
+    });
+  }
+
+  private formatCurrency(value: number) {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      maximumFractionDigits: 0,
+    }).format(value);
+  }
+
+  private buildShippingAddressText(shippingAddress: Record<string, unknown>) {
+    return [
+      shippingAddress.streetAddress,
+      shippingAddress.ward,
+      shippingAddress.district,
+      shippingAddress.province,
+    ]
+      .filter(Boolean)
+      .map((item) => String(item))
+      .join(', ');
+  }
+
+  private buildInvoiceHtml(
+    order: ReturnType<OrderServiceService['mapOrder']>,
+    customerName: string,
+  ) {
+    const shippingAddress = this.buildShippingAddressText(
+      order.shippingAddress,
+    );
+    const rows = order.items
+      .map(
+        (item) => `
+          <tr>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.productName}<br /><span style="color:#64748b;font-size:12px;">${item.variantLabel ?? ''}</span></td>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;">${item.quantity}</td>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${this.formatCurrency(item.unitPrice)}</td>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${this.formatCurrency(item.lineTotal)}</td>
+          </tr>
+        `,
+      )
+      .join('');
+
+    return `
+      <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;color:#0f172a;">
+        <h2 style="margin-bottom:8px;">Balii Sleepwear - Hóa đơn thanh toán</h2>
+        <p>Xin chào ${customerName}, đơn hàng <strong>#${order.orderNumber}</strong> đã được thanh toán thành công.</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;">
+          <p style="margin:0 0 6px;"><strong>Người nhận:</strong> ${safeString(order.shippingAddress.recipientName) || customerName}</p>
+          <p style="margin:0 0 6px;"><strong>Số điện thoại:</strong> ${safeString(order.shippingAddress.phone)}</p>
+          <p style="margin:0;"><strong>Địa chỉ:</strong> ${shippingAddress}</p>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+          <thead>
+            <tr style="background:#f1f5f9;">
+              <th style="padding:10px;text-align:left;">Sản phẩm</th>
+              <th style="padding:10px;text-align:center;">SL</th>
+              <th style="padding:10px;text-align:right;">Đơn giá</th>
+              <th style="padding:10px;text-align:right;">Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div style="margin-top:20px;display:flex;justify-content:flex-end;">
+          <div style="min-width:280px;">
+            <p style="display:flex;justify-content:space-between;"><span>Tạm tính</span><strong>${this.formatCurrency(order.subtotal)}</strong></p>
+            <p style="display:flex;justify-content:space-between;"><span>Giảm giá</span><strong>${this.formatCurrency(order.discountAmount)}</strong></p>
+            <p style="display:flex;justify-content:space-between;"><span>Phí vận chuyển</span><strong>${this.formatCurrency(order.shippingFee)}</strong></p>
+            <p style="display:flex;justify-content:space-between;font-size:18px;"><span>Tổng thanh toán</span><strong>${this.formatCurrency(order.totalAmount)}</strong></p>
+          </div>
+        </div>
+        <p style="margin-top:24px;color:#475569;">Balii sẽ sớm chuẩn bị và đóng gói đơn hàng của bạn.</p>
+      </div>
+    `;
+  }
+
+  private buildAdminOrderHtml(
+    order: ReturnType<OrderServiceService['mapOrder']>,
+    customerName: string,
+    customerEmail: string | null,
+  ) {
+    const shippingAddress = this.buildShippingAddressText(
+      order.shippingAddress,
+    );
+    const itemList = order.items
+      .map(
+        (item) =>
+          `<li>${item.productName} - ${item.variantLabel ?? ''} - SL ${item.quantity}</li>`,
+      )
+      .join('');
+
+    return `
+      <div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;color:#0f172a;">
+        <h2>Đơn hàng mới đã thanh toán - cần đóng gói</h2>
+        <p><strong>Mã đơn:</strong> #${order.orderNumber}</p>
+        <p><strong>Khách hàng:</strong> ${customerName}</p>
+        <p><strong>Email:</strong> ${customerEmail ?? 'Không có'}</p>
+        <p><strong>SĐT:</strong> ${safeString(order.shippingAddress.phone)}</p>
+        <p><strong>Địa chỉ giao hàng:</strong> ${shippingAddress}</p>
+        <p><strong>Tổng thanh toán:</strong> ${this.formatCurrency(order.totalAmount)}</p>
+        <p><strong>Phương thức thanh toán:</strong> ${order.paymentMethod}</p>
+        <h3>Danh sách sản phẩm</h3>
+        <ul>${itemList}</ul>
+        ${
+          order.customerNote
+            ? `<p><strong>Ghi chú khách hàng:</strong> ${order.customerNote}</p>`
+            : ''
+        }
+      </div>
+    `;
+  }
+
+  private async sendPaymentSuccessNotifications(
+    order: ReturnType<OrderServiceService['mapOrder']>,
+  ) {
+    if (!this.isMailEnabled()) {
+      this.logger.warn(
+        `MAIL_HOST/MAIL_PORT/MAIL_USER/MAIL_PASS chưa cấu hình. Bỏ qua gửi mail cho đơn ${order.id}.`,
+      );
+      return;
+    }
+
+    const transporter = this.createMailerTransport();
+    const customer = await this.loadCustomerContact(order.userId);
+    const from =
+      this.configService.get<string>('MAIL_FROM') || 'no-reply@balii.com';
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const invoiceHtml = this.buildInvoiceHtml(order, customer.fullName);
+    const adminRecipients = (
+      this.configService.get<string>('ADMIN_ORDER_EMAILS') || ''
+    )
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (customer.email) {
+      await transporter.sendMail({
+        from,
+        to: customer.email,
+        subject: `Thanh toán thành công cho đơn #${order.orderNumber}`,
+        html: `
+          ${invoiceHtml}
+          <p style="font-family:Arial,sans-serif;color:#475569;margin-top:24px;">
+            Bạn có thể theo dõi đơn hàng tại:
+            <a href="${frontendUrl}/account/orders/${order.id}">${frontendUrl}/account/orders/${order.id}</a>
+          </p>
+        `,
+        attachments: [
+          {
+            filename: `hoa-don-${order.orderNumber}.html`,
+            content: invoiceHtml,
+            contentType: 'text/html; charset=utf-8',
+          },
+        ],
+      });
+    }
+
+    if (adminRecipients.length > 0) {
+      await transporter.sendMail({
+        from,
+        to: adminRecipients.join(', '),
+        subject: `Đơn mới cần đóng gói #${order.orderNumber}`,
+        html: this.buildAdminOrderHtml(
+          order,
+          customer.fullName,
+          customer.email,
+        ),
+      });
+    }
   }
 
   private async getAdminSummary(): Promise<{
@@ -729,4 +992,15 @@ export class OrderServiceService {
 
     return Number((((current - previous) / previous) * 100).toFixed(1));
   }
+}
+function safeString(value: unknown): string {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return '';
 }

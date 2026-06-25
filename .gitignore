@@ -67,6 +67,7 @@ minio_data/
 # Runtime
 tmp/
 temp/
+runtime-logs/
 uploads/
 storage/
 public/uploads/
@@ -75,6 +76,7 @@ frontend/out/
 frontend/coverage/
 frontend/.turbo/
 frontend/.cache/
+frontend/next-env.d.ts
 
 # Python virtual environment
 venv/
@@ -122,6 +124,7 @@ test-results/
 *.ckpt
 *.onnx
 *.h5
+ai-service/**/models/
 
 # Archives
 *.zip

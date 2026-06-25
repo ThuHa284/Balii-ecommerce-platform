@@ -86,17 +86,43 @@ export class ProductsService {
       p.name AS "productName",
       p.slug AS "productSlug",
       pv.sku AS "sku",
+      COALESCE(pv.size_label, '') AS "variantSize",
+      COALESCE(pv.color_name, '') AS "variantColor",
       COALESCE(pv.price, p.base_price) AS "unitPrice",
       pv.stock_quantity AS "stockQuantity",
       pv.reserved_quantity AS "reservedQuantity",
       pv.is_active AS "variantActive",
       p.is_active AS "productActive",
-      pi.url AS "thumbnailUrl",
+      COALESCE(
+        (
+          SELECT img.url
+          FROM product_service.product_images img
+          WHERE img.variant_id = pv.id
+          ORDER BY img.is_primary DESC, img.sort_order ASC
+          LIMIT 1
+        ),
+        (
+          SELECT img.url
+          FROM product_service.product_images img
+          JOIN product_service.product_variants linked_variant
+            ON linked_variant.id = img.variant_id
+          WHERE linked_variant.product_id = p.id
+            AND COALESCE(linked_variant.color_name, '') = COALESCE(pv.color_name, '')
+          ORDER BY img.is_primary DESC, img.sort_order ASC
+          LIMIT 1
+        ),
+        (
+          SELECT img.url
+          FROM product_service.product_images img
+          WHERE img.product_id = p.id
+          ORDER BY img.is_primary DESC, img.sort_order ASC
+          LIMIT 1
+        ),
+        ''
+      ) AS "thumbnailUrl",
       STRING_AGG(av.value, ' / ' ORDER BY a.name) AS "variantLabel"
     FROM product_service.product_variants pv
     JOIN product_service.products p ON p.id = pv.product_id
-    LEFT JOIN product_service.product_images pi
-      ON pi.variant_id = pv.id AND pi.is_primary = TRUE
     LEFT JOIN product_service.variant_attribute_values vav
       ON vav.variant_id = pv.id
     LEFT JOIN product_service.attribute_values av
@@ -106,7 +132,7 @@ export class ProductsService {
     WHERE pv.id = $1
     GROUP BY pv.id, p.id, p.name, pv.sku, pv.price, p.base_price,
              pv.stock_quantity, pv.reserved_quantity,
-             pv.is_active, p.is_active, pi.url
+             pv.is_active, p.is_active
     `,
       [variantId],
     );
@@ -124,6 +150,8 @@ export class ProductsService {
       productSlug: row.productSlug,
       sku: row.sku,
       variantLabel: row.variantLabel || '',
+      variantSize: row.variantSize || '',
+      variantColor: row.variantColor || '',
       thumbnailUrl: row.thumbnailUrl || '',
       unitPrice: Number(row.unitPrice),
       stockQuantity: Number(row.stockQuantity),
@@ -196,7 +224,10 @@ export class ProductsService {
                   (
                     SELECT json_agg(vi.url ORDER BY vi.sort_order ASC)
                     FROM product_service.product_images vi
-                    WHERE vi.variant_id = pv.id
+                    JOIN product_service.product_variants linked_variant
+                      ON linked_variant.id = vi.variant_id
+                    WHERE linked_variant.product_id = p.id
+                      AND COALESCE(linked_variant.color_name, '') = COALESCE(pv.color_name, '')
                   ),
                   '[]'::json
                 )

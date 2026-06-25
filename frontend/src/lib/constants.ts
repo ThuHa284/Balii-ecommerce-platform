@@ -57,6 +57,32 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   bank_transfer: 'Chuyển khoản',
 };
 
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Chờ thanh toán',
+  paid: 'Đã thanh toán',
+  failed: 'Thanh toán thất bại',
+  refunded: 'Đã hoàn tiền',
+};
+
+export const PAYMENT_STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  paid: 'bg-emerald-100 text-emerald-800',
+  failed: 'bg-rose-100 text-rose-800',
+  refunded: 'bg-slate-100 text-slate-800',
+};
+
+export const REFUND_STATUS_LABELS: Record<string, string> = {
+  pending: 'Chờ xử lý',
+  failed: 'Thất bại',
+  refunded: 'Đã hoàn tiền',
+};
+
+export const REFUND_STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-800',
+  failed: 'bg-rose-100 text-rose-800',
+  refunded: 'bg-emerald-100 text-emerald-800',
+};
+
 export const VOUCHER_STATUS_LABELS: Record<string, string> = {
   active: 'Đang hoạt động',
   expired: 'Đã hết hạn',

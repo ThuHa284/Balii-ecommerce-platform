@@ -3,13 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, Eye, Ban } from "lucide-react";
 import { toast } from "sonner";
+import {
+  canDeleteAdminResource,
+  getAdminRoleLabel,
+} from "@/lib/api/admin.utils";
 import { getAdminUsers, type AdminUser } from "@/lib/api/admin.api";
+import { getUserErrorMessage } from "@/lib/error-utils";
 import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
 
 export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const userRole = useAuthStore((state) => state.user?.role);
+  const canModerate = canDeleteAdminResource(userRole);
+  const roleLabel = getAdminRoleLabel(userRole);
 
   useEffect(() => {
     async function loadUsers() {
@@ -19,9 +28,7 @@ export default function AdminUsersPage() {
         setUsers(data);
       } catch (error) {
         toast.error(
-          error instanceof Error
-            ? error.message
-            : "Không tải được danh sách khách hàng.",
+          getUserErrorMessage(error, "Không tải được danh sách khách hàng."),
         );
       } finally {
         setIsLoading(false);
@@ -46,7 +53,16 @@ export default function AdminUsersPage() {
       <h1 className="mb-2 font-heading text-3xl font-bold text-foreground">
         Quản lý khách hàng
       </h1>
+      <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">
+        {roleLabel}
+      </span>
       <p className="mb-8 text-muted-foreground">{users.length} khách hàng</p>
+      {!canModerate ? (
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          Quản trị viên có thể xem danh sách khách hàng. Các thao tác can thiệp
+          tài khoản như khóa người dùng được dành riêng cho quản trị hệ thống.
+        </div>
+      ) : null}
 
       <div className="glass-card mb-6 p-4">
         <div className="relative">
@@ -69,7 +85,7 @@ export default function AdminUsersPage() {
                 Khách hàng
               </th>
               <th className="px-6 py-4 text-left text-sm font-medium text-muted-foreground">
-                SDT
+                SĐT
               </th>
               <th className="px-6 py-4 text-left text-sm font-medium text-muted-foreground">
                 Đơn hàng
@@ -148,7 +164,27 @@ export default function AdminUsersPage() {
                     <button className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50">
                       <Eye className="h-4 w-4" />
                     </button>
-                    <button className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50">
+                    <button
+                      disabled={!canModerate}
+                      onClick={() => {
+                        if (!canModerate) {
+                          toast.error(
+                            "Chỉ quản trị hệ thống mới có quyền khóa tài khoản.",
+                          );
+                          return;
+                        }
+
+                        toast.info(
+                          "Chức năng khóa tài khoản chưa được kết nối backend.",
+                        );
+                      }}
+                      className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      title={
+                        canModerate
+                          ? "Khóa tài khoản"
+                          : "Chỉ quản trị hệ thống mới được khóa tài khoản"
+                      }
+                    >
                       <Ban className="h-4 w-4" />
                     </button>
                   </div>

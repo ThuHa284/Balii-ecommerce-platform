@@ -13,9 +13,10 @@ import {
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createOrder } from '@/lib/api/orders.api';
-import { completePayment, createPayment } from '@/lib/api/payment.api';
+import { createPayment } from '@/lib/api/payment.api';
 import { getComboTier, isEligibleForFreeShipping } from '@/lib/combo-utils';
 import { PAYMENT_METHOD_LABELS } from '@/lib/constants';
+import { getUserErrorMessage } from '@/lib/error-utils';
 import { formatCurrency } from '@/lib/utils';
 import { useCartStore } from '@/store/cart.store';
 import { useAuthStore, useSelectedAddress } from '@/store/auth.store';
@@ -61,19 +62,29 @@ export default function CheckoutPage() {
         note,
       });
 
-      let paymentStatus = 'pending';
-      let checkoutMode = 'cod';
+      const paymentStatus = 'pending';
+      const checkoutMode = 'cod';
 
       if (paymentMethod !== 'cod') {
         const payment = await createPayment(
           order.id,
           paymentMethod,
-          `${window.location.origin}/checkout/success`,
+          `${window.location.origin}/checkout/result`,
         );
 
-        await completePayment(payment.id);
-        paymentStatus = 'paid';
-        checkoutMode = 'online';
+        if (!payment.paymentUrl) {
+          throw new Error('Khong nhan duoc duong dan thanh toan VNPay.');
+        }
+
+        await clearCart();
+        const params = new URLSearchParams({
+          orderId: order.id,
+          orderCode: order.orderCode,
+          paymentId: payment.id,
+          transactionId: payment.transactionId,
+        });
+        router.push(`/checkout/vnpay?${params.toString()}`);
+        return;
       }
 
       await clearCart();
@@ -87,9 +98,7 @@ export default function CheckoutPage() {
 
       router.push(`/checkout/success?${params.toString()}`);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Không thể hoàn tất đặt hàng.',
-      );
+      toast.error(getUserErrorMessage(error, 'Không thể hoàn tất đặt hàng.'));
     } finally {
       setIsLoading(false);
     }

@@ -16,6 +16,7 @@ export const ROUTE_TARGETS: RouteTarget[] = [
   { prefix: '/vouchers', targetEnv: 'VOUCHER_SERVICE_URL' },
   { prefix: '/admin/vouchers', targetEnv: 'VOUCHER_SERVICE_URL' },
   { prefix: '/try-on', targetEnv: 'TRYON_SERVICE_URL' },
+  { prefix: '/chatbot', targetEnv: 'CHATBOT_SERVICE_URL' },
   { prefix: '/market-analysis', targetEnv: 'MARKET_ANALYSIS_SERVICE_URL' },
 ];
 

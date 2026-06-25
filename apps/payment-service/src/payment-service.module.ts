@@ -6,6 +6,9 @@ import { PaymentServiceController } from './payment-service.controller';
 import { PaymentServiceService } from './payment-service.service';
 import { Payment } from './entities/payment.entity';
 import { OrderClientService } from './clients/order-client.service';
+import { CamundaClientService } from './camunda/camunda-client.service';
+import { PaymentProcessingWorker } from './camunda/payment-processing.worker';
+import { PaymentOutboxPublisher } from './kafka';
 
 @Module({
   imports: [
@@ -25,6 +28,12 @@ import { OrderClientService } from './clients/order-client.service';
     HttpModule,
   ],
   controllers: [PaymentServiceController],
-  providers: [PaymentServiceService, OrderClientService],
+  providers: [
+    PaymentServiceService,
+    OrderClientService,
+    CamundaClientService,
+    PaymentProcessingWorker,
+    PaymentOutboxPublisher,
+  ],
 })
 export class PaymentServiceModule {}

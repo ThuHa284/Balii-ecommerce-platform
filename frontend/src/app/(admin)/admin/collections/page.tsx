@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Check, Library, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { canDeleteAdminResource } from '@/lib/api/admin.utils';
+import {
+  canDeleteAdminResource,
+  getAdminRoleLabel,
+} from '@/lib/api/admin.utils';
 import {
   createCollection,
   deleteCollection,
@@ -12,6 +15,7 @@ import {
   updateCollection,
   uploadCollectionImage,
 } from '@/lib/api/collections.api';
+import { getUserErrorMessage } from '@/lib/error-utils';
 import { getAdminProducts } from '@/lib/api/products.api';
 import { formatCurrency } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
@@ -31,6 +35,7 @@ export default function AdminCollectionsPage() {
   const [deleting, setDeleting] = useState(false);
   const userRole = useAuthStore((state) => state.user?.role);
   const canDelete = canDeleteAdminResource(userRole);
+  const roleLabel = getAdminRoleLabel(userRole);
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -210,9 +215,7 @@ export default function AdminCollectionsPage() {
       setShowModal(false);
       resetForm();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Lưu bộ sưu tập thất bại.',
-      );
+      toast.error(getUserErrorMessage(error, 'Lưu bộ sưu tập thất bại.'));
     } finally {
       setSaving(false);
     }
@@ -234,9 +237,7 @@ export default function AdminCollectionsPage() {
       setDeleteId(null);
       toast.success('Đã xóa bộ sưu tập.');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Xóa bộ sưu tập thất bại.',
-      );
+      toast.error(getUserErrorMessage(error, 'Xóa bộ sưu tập thất bại.'));
     } finally {
       setDeleting(false);
     }
@@ -250,6 +251,9 @@ export default function AdminCollectionsPage() {
             <p className="mb-2 text-xs uppercase tracking-[0.24em] text-amber-700/70">
               Trưng bày và chiến dịch
             </p>
+            <span className="inline-flex rounded-full border border-amber-900/10 bg-white/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-900/70">
+              {roleLabel}
+            </span>
             <h1 className="font-heading text-3xl font-bold text-slate-900">
               Quản lý bộ sưu tập
             </h1>
@@ -257,6 +261,12 @@ export default function AdminCollectionsPage() {
               Gom nhóm sản phẩm theo mùa vụ, concept hoặc chiến dịch bán hàng để
               đội nội dung và vận hành phối hợp nhanh hơn.
             </p>
+            {!canDelete ? (
+              <p className="mt-3 max-w-2xl rounded-2xl border border-amber-200 bg-white/70 px-4 py-3 text-sm text-slate-600">
+                Admin có thể tạo và cập nhật bộ sưu tập. Xóa bộ sưu tập được giữ
+                riêng cho super admin.
+              </p>
+            ) : null}
           </div>
           <button
             onClick={handleOpenAddModal}

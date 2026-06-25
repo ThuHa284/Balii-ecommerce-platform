@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:modeler="http://camunda.org/schema/modeler/1.0"
+                  id="Definitions_Balii_Refund_Workflow"
+                  targetNamespace="http://balii-sleepwear/payment"
+                  exporter="Camunda Modeler"
+                  exporterVersion="5.45.0"
+                  modeler:executionPlatform="Camunda Platform"
+                  modeler:executionPlatformVersion="7.24.0">
+
+  <bpmn:message id="Message_RefundResultReceived" name="refund.result.received" />
+
+  <bpmn:process id="Process_Refund_Workflow" name="Balii Refund Workflow - Auto and Admin Review" isExecutable="true" camunda:historyTimeToLive="180">
+
+    <bpmn:startEvent id="StartEvent_RefundRequested" name="Refund Requested">
+      <bpmn:outgoing>Flow_Start_ValidateRequest</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_ValidateRefundRequest" name="Validate Refund Request" camunda:type="external" camunda:topic="refund.validate-request">
+      <bpmn:incoming>Flow_Start_ValidateRequest</bpmn:incoming>
+      <bpmn:outgoing>Flow_Validate_CheckPayment</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CheckPaymentStatus" name="Check Payment Status" camunda:type="external" camunda:topic="refund.check-payment-status">
+      <bpmn:incoming>Flow_Validate_CheckPayment</bpmn:incoming>
+      <bpmn:outgoing>Flow_CheckPayment_CheckOrder</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CheckOrderFulfillmentStatus" name="Check Order / Delivery Status" camunda:type="external" camunda:topic="refund.check-order-fulfillment-status">
+      <bpmn:incoming>Flow_CheckPayment_CheckOrder</bpmn:incoming>
+      <bpmn:outgoing>Flow_CheckOrder_Route</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_RefundRoute" name="Refund Route?">
+      <bpmn:incoming>Flow_CheckOrder_Route</bpmn:incoming>
+      <bpmn:outgoing>Flow_Route_AutoRefund</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Route_AdminReview</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Route_Reject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="UserTask_AdminReviewRefundRequest" name="Admin Review Refund Request" camunda:candidateGroups="payment-admin,order-admin">
+      <bpmn:documentation>Admin checks order status, delivery status, customer evidence, stock availability, and decides whether to approve refund, partial refund, reject refund, or exchange product.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="adminDecision" label="Admin Decision" type="enum">
+            <camunda:value id="APPROVE_REFUND" name="Approve Refund" />
+            <camunda:value id="PARTIAL_REFUND" name="Partial Refund" />
+            <camunda:value id="REJECT" name="Reject Refund" />
+            <camunda:value id="EXCHANGE_PRODUCT" name="Exchange Product" />
+          </camunda:formField>
+          <camunda:formField id="adminNote" label="Admin Note" type="string" />
+          <camunda:formField id="approvedRefundAmount" label="Approved Refund Amount" type="long" />
+        </camunda:formData>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Route_AdminReview</bpmn:incoming>
+      <bpmn:incoming>Flow_RetryNo_AdminReview</bpmn:incoming>
+      <bpmn:outgoing>Flow_AdminReview_Decision</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_AdminDecision" name="Admin Decision?">
+      <bpmn:incoming>Flow_AdminReview_Decision</bpmn:incoming>
+      <bpmn:outgoing>Flow_Admin_ApproveRefund</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Admin_RejectRefund</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Admin_ExchangeProduct</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_CheckRefundIdempotency" name="Check Refund Idempotency" camunda:type="external" camunda:topic="refund.check-idempotency">
+      <bpmn:incoming>Flow_Route_AutoRefund</bpmn:incoming>
+      <bpmn:incoming>Flow_Admin_ApproveRefund</bpmn:incoming>
+      <bpmn:outgoing>Flow_CheckIdempotency_CreateRecord</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CreateRefundRecord" name="Create Refund Record" camunda:type="external" camunda:topic="refund.create-record">
+      <bpmn:incoming>Flow_CheckIdempotency_CreateRecord</bpmn:incoming>
+      <bpmn:outgoing>Flow_CreateRecord_CallGateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CallGatewayRefundApi" name="Call VNPay / MoMo Refund API" camunda:type="external" camunda:topic="refund.call-gateway-api">
+      <bpmn:incoming>Flow_CreateRecord_CallGateway</bpmn:incoming>
+      <bpmn:incoming>Flow_IncreaseRetry_CallGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_CallGateway_WaitResult</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:intermediateCatchEvent id="Event_WaitRefundResult" name="Wait Refund Result">
+      <bpmn:incoming>Flow_CallGateway_WaitResult</bpmn:incoming>
+      <bpmn:outgoing>Flow_WaitResult_PersistResult</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_RefundResult" messageRef="Message_RefundResultReceived" />
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:boundaryEvent id="BoundaryEvent_RefundResultTimeout" name="Refund Result Timeout" attachedToRef="Event_WaitRefundResult" cancelActivity="true">
+      <bpmn:outgoing>Flow_RefundTimeout_RetryGateway</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_RefundTimeout">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT30M</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="Task_PersistRefundResultTransaction" name="Persist Refund Result Transaction" camunda:type="external" camunda:topic="refund.persist-result-transaction">
+      <bpmn:incoming>Flow_WaitResult_PersistResult</bpmn:incoming>
+      <bpmn:outgoing>Flow_PersistResult_IsSuccess</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_IsRefundSuccessful" name="Refund Success?">
+      <bpmn:incoming>Flow_PersistResult_IsSuccess</bpmn:incoming>
+      <bpmn:outgoing>Flow_RefundSuccess_Outbox</bpmn:outgoing>
+      <bpmn:outgoing>Flow_RefundFailed_RetryDecision</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:exclusiveGateway id="Gateway_RetryRefund" name="Retry Refund?">
+      <bpmn:incoming>Flow_RefundFailed_RetryDecision</bpmn:incoming>
+      <bpmn:incoming>Flow_RefundTimeout_RetryGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_RetryYes_IncreaseRetry</bpmn:outgoing>
+      <bpmn:outgoing>Flow_RetryNo_AdminReview</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_IncreaseRefundRetry" name="Increase Refund Retry Count" camunda:type="external" camunda:topic="refund.increase-retry-count">
+      <bpmn:incoming>Flow_RetryYes_IncreaseRetry</bpmn:incoming>
+      <bpmn:outgoing>Flow_IncreaseRetry_CallGateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_SignalOutboxPublisherRefunded" name="Signal Outbox Publisher" camunda:type="external" camunda:topic="outbox.signal-publisher">
+      <bpmn:incoming>Flow_RefundSuccess_Outbox</bpmn:incoming>
+      <bpmn:outgoing>Flow_Outbox_NotifyRefundCompleted</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyCustomerRefunded" name="Notify Customer: Refund Completed" camunda:type="external" camunda:topic="notification.refund-completed">
+      <bpmn:incoming>Flow_Outbox_NotifyRefundCompleted</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyRefundCompleted_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_RefundCompleted" name="Refund Completed">
+      <bpmn:incoming>Flow_NotifyRefundCompleted_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:serviceTask id="Task_UpdateRefundRejected" name="Update Refund Rejected" camunda:type="external" camunda:topic="refund.update-rejected">
+      <bpmn:incoming>Flow_Route_Reject</bpmn:incoming>
+      <bpmn:incoming>Flow_Admin_RejectRefund</bpmn:incoming>
+      <bpmn:outgoing>Flow_UpdateRejected_NotifyRejected</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyCustomerRefundRejected" name="Notify Customer: Refund Rejected" camunda:type="external" camunda:topic="notification.refund-rejected">
+      <bpmn:incoming>Flow_UpdateRejected_NotifyRejected</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyRejected_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_RefundRejected" name="Refund Rejected">
+      <bpmn:incoming>Flow_NotifyRejected_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:serviceTask id="Task_CreateExchangeRequest" name="Create Exchange Request" camunda:type="external" camunda:topic="refund.create-exchange-request">
+      <bpmn:incoming>Flow_Admin_ExchangeProduct</bpmn:incoming>
+      <bpmn:outgoing>Flow_CreateExchange_UpdateOrderInventory</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_UpdateOrderInventoryForExchange" name="Update Order / Inventory for Exchange" camunda:type="external" camunda:topic="refund.update-order-inventory-exchange">
+      <bpmn:incoming>Flow_CreateExchange_UpdateOrderInventory</bpmn:incoming>
+      <bpmn:outgoing>Flow_UpdateExchange_NotifyExchange</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyCustomerExchange" name="Notify Customer: Exchange Created" camunda:type="external" camunda:topic="notification.exchange-created">
+      <bpmn:incoming>Flow_UpdateExchange_NotifyExchange</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyExchange_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_ExchangeCreated" name="Exchange Created">
+      <bpmn:incoming>Flow_NotifyExchange_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Start_ValidateRequest" sourceRef="StartEvent_RefundRequested" targetRef="Task_ValidateRefundRequest" />
+    <bpmn:sequenceFlow id="Flow_Validate_CheckPayment" sourceRef="Task_ValidateRefundRequest" targetRef="Task_CheckPaymentStatus" />
+    <bpmn:sequenceFlow id="Flow_CheckPayment_CheckOrder" sourceRef="Task_CheckPaymentStatus" targetRef="Task_CheckOrderFulfillmentStatus" />
+    <bpmn:sequenceFlow id="Flow_CheckOrder_Route" sourceRef="Task_CheckOrderFulfillmentStatus" targetRef="Gateway_RefundRoute" />
+
+    <bpmn:sequenceFlow id="Flow_Route_AutoRefund" name="Auto Refund" sourceRef="Gateway_RefundRoute" targetRef="Task_CheckRefundIdempotency">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundRoute == "AUTO_REFUND"}]]></bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Route_AdminReview" name="Need Admin Review" sourceRef="Gateway_RefundRoute" targetRef="UserTask_AdminReviewRefundRequest">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundRoute == "ADMIN_REVIEW"}]]></bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Route_Reject" name="Reject" sourceRef="Gateway_RefundRoute" targetRef="Task_UpdateRefundRejected">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundRoute == "REJECT"}]]></bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="Flow_AdminReview_Decision" sourceRef="UserTask_AdminReviewRefundRequest" targetRef="Gateway_AdminDecision" />
+    <bpmn:sequenceFlow id="Flow_Admin_ApproveRefund" name="Approve / Partial Refund" sourceRef="Gateway_AdminDecision" targetRef="Task_CheckRefundIdempotency">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${adminDecision == "APPROVE_REFUND" || adminDecision == "PARTIAL_REFUND"}]]></bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Admin_RejectRefund" name="Reject" sourceRef="Gateway_AdminDecision" targetRef="Task_UpdateRefundRejected">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${adminDecision == "REJECT"}]]></bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Admin_ExchangeProduct" name="Exchange Product" sourceRef="Gateway_AdminDecision" targetRef="Task_CreateExchangeRequest">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${adminDecision == "EXCHANGE_PRODUCT"}]]></bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="Flow_CheckIdempotency_CreateRecord" sourceRef="Task_CheckRefundIdempotency" targetRef="Task_CreateRefundRecord" />
+    <bpmn:sequenceFlow id="Flow_CreateRecord_CallGateway" sourceRef="Task_CreateRefundRecord" targetRef="Task_CallGatewayRefundApi" />
+    <bpmn:sequenceFlow id="Flow_CallGateway_WaitResult" sourceRef="Task_CallGatewayRefundApi" targetRef="Event_WaitRefundResult" />
+    <bpmn:sequenceFlow id="Flow_WaitResult_PersistResult" sourceRef="Event_WaitRefundResult" targetRef="Task_PersistRefundResultTransaction" />
+    <bpmn:sequenceFlow id="Flow_PersistResult_IsSuccess" sourceRef="Task_PersistRefundResultTransaction" targetRef="Gateway_IsRefundSuccessful" />
+
+    <bpmn:sequenceFlow id="Flow_RefundSuccess_Outbox" name="Yes" sourceRef="Gateway_IsRefundSuccessful" targetRef="Task_SignalOutboxPublisherRefunded">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundStatus == "SUCCESS"}]]></bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_RefundFailed_RetryDecision" name="No" sourceRef="Gateway_IsRefundSuccessful" targetRef="Gateway_RetryRefund">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundStatus != "SUCCESS"}]]></bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_RefundTimeout_RetryGateway" sourceRef="BoundaryEvent_RefundResultTimeout" targetRef="Gateway_RetryRefund" />
+
+    <bpmn:sequenceFlow id="Flow_RetryYes_IncreaseRetry" name="Yes" sourceRef="Gateway_RetryRefund" targetRef="Task_IncreaseRefundRetry">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundRetryAllowed == true}]]></bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_RetryNo_AdminReview" name="No" sourceRef="Gateway_RetryRefund" targetRef="UserTask_AdminReviewRefundRequest">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundRetryAllowed == false}]]></bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_IncreaseRetry_CallGateway" sourceRef="Task_IncreaseRefundRetry" targetRef="Task_CallGatewayRefundApi" />
+
+    <bpmn:sequenceFlow id="Flow_Outbox_NotifyRefundCompleted" sourceRef="Task_SignalOutboxPublisherRefunded" targetRef="Task_NotifyCustomerRefunded" />
+    <bpmn:sequenceFlow id="Flow_NotifyRefundCompleted_End" sourceRef="Task_NotifyCustomerRefunded" targetRef="EndEvent_RefundCompleted" />
+
+    <bpmn:sequenceFlow id="Flow_UpdateRejected_NotifyRejected" sourceRef="Task_UpdateRefundRejected" targetRef="Task_NotifyCustomerRefundRejected" />
+    <bpmn:sequenceFlow id="Flow_NotifyRejected_End" sourceRef="Task_NotifyCustomerRefundRejected" targetRef="EndEvent_RefundRejected" />
+
+    <bpmn:sequenceFlow id="Flow_CreateExchange_UpdateOrderInventory" sourceRef="Task_CreateExchangeRequest" targetRef="Task_UpdateOrderInventoryForExchange" />
+    <bpmn:sequenceFlow id="Flow_UpdateExchange_NotifyExchange" sourceRef="Task_UpdateOrderInventoryForExchange" targetRef="Task_NotifyCustomerExchange" />
+    <bpmn:sequenceFlow id="Flow_NotifyExchange_End" sourceRef="Task_NotifyCustomerExchange" targetRef="EndEvent_ExchangeCreated" />
+
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Refund_Workflow">
+    <bpmndi:BPMNPlane id="BPMNPlane_Refund_Workflow" bpmnElement="Process_Refund_Workflow">
+
+      <bpmndi:BPMNShape id="StartEvent_RefundRequested_di" bpmnElement="StartEvent_RefundRequested"><dc:Bounds x="120" y="260" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ValidateRefundRequest_di" bpmnElement="Task_ValidateRefundRequest"><dc:Bounds x="200" y="238" width="180" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckPaymentStatus_di" bpmnElement="Task_CheckPaymentStatus"><dc:Bounds x="430" y="238" width="180" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckOrderFulfillmentStatus_di" bpmnElement="Task_CheckOrderFulfillmentStatus"><dc:Bounds x="660" y="238" width="210" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_RefundRoute_di" bpmnElement="Gateway_RefundRoute" isMarkerVisible="true"><dc:Bounds x="930" y="253" width="50" height="50" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="UserTask_AdminReviewRefundRequest_di" bpmnElement="UserTask_AdminReviewRefundRequest"><dc:Bounds x="1070" y="420" width="220" height="90" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_AdminDecision_di" bpmnElement="Gateway_AdminDecision" isMarkerVisible="true"><dc:Bounds x="1360" y="440" width="50" height="50" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_CheckRefundIdempotency_di" bpmnElement="Task_CheckRefundIdempotency"><dc:Bounds x="1070" y="238" width="190" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CreateRefundRecord_di" bpmnElement="Task_CreateRefundRecord"><dc:Bounds x="1310" y="238" width="180" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CallGatewayRefundApi_di" bpmnElement="Task_CallGatewayRefundApi"><dc:Bounds x="1540" y="238" width="210" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_WaitRefundResult_di" bpmnElement="Event_WaitRefundResult"><dc:Bounds x="1810" y="260" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BoundaryEvent_RefundResultTimeout_di" bpmnElement="BoundaryEvent_RefundResultTimeout"><dc:Bounds x="1810" y="302" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PersistRefundResultTransaction_di" bpmnElement="Task_PersistRefundResultTransaction"><dc:Bounds x="1910" y="238" width="230" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_IsRefundSuccessful_di" bpmnElement="Gateway_IsRefundSuccessful" isMarkerVisible="true"><dc:Bounds x="2200" y="253" width="50" height="50" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_RetryRefund_di" bpmnElement="Gateway_RetryRefund" isMarkerVisible="true"><dc:Bounds x="2350" y="420" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_IncreaseRefundRetry_di" bpmnElement="Task_IncreaseRefundRetry"><dc:Bounds x="2500" y="390" width="200" height="80" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_SignalOutboxPublisherRefunded_di" bpmnElement="Task_SignalOutboxPublisherRefunded"><dc:Bounds x="2320" y="120" width="190" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyCustomerRefunded_di" bpmnElement="Task_NotifyCustomerRefunded"><dc:Bounds x="2560" y="120" width="230" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_RefundCompleted_di" bpmnElement="EndEvent_RefundCompleted"><dc:Bounds x="2840" y="142" width="36" height="36" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_UpdateRefundRejected_di" bpmnElement="Task_UpdateRefundRejected"><dc:Bounds x="1510" y="590" width="200" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyCustomerRefundRejected_di" bpmnElement="Task_NotifyCustomerRefundRejected"><dc:Bounds x="1770" y="590" width="240" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_RefundRejected_di" bpmnElement="EndEvent_RefundRejected"><dc:Bounds x="2070" y="612" width="36" height="36" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_CreateExchangeRequest_di" bpmnElement="Task_CreateExchangeRequest"><dc:Bounds x="1510" y="740" width="210" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_UpdateOrderInventoryForExchange_di" bpmnElement="Task_UpdateOrderInventoryForExchange"><dc:Bounds x="1780" y="740" width="250" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyCustomerExchange_di" bpmnElement="Task_NotifyCustomerExchange"><dc:Bounds x="2090" y="740" width="240" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_ExchangeCreated_di" bpmnElement="EndEvent_ExchangeCreated"><dc:Bounds x="2390" y="762" width="36" height="36" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="Flow_Start_ValidateRequest_di" bpmnElement="Flow_Start_ValidateRequest"><di:waypoint x="156" y="278" /><di:waypoint x="200" y="278" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Validate_CheckPayment_di" bpmnElement="Flow_Validate_CheckPayment"><di:waypoint x="380" y="278" /><di:waypoint x="430" y="278" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CheckPayment_CheckOrder_di" bpmnElement="Flow_CheckPayment_CheckOrder"><di:waypoint x="610" y="278" /><di:waypoint x="660" y="278" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CheckOrder_Route_di" bpmnElement="Flow_CheckOrder_Route"><di:waypoint x="870" y="278" /><di:waypoint x="930" y="278" /></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Route_AutoRefund_di" bpmnElement="Flow_Route_AutoRefund"><di:waypoint x="980" y="278" /><di:waypoint x="1070" y="278" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Route_AdminReview_di" bpmnElement="Flow_Route_AdminReview"><di:waypoint x="955" y="303" /><di:waypoint x="955" y="465" /><di:waypoint x="1070" y="465" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Route_Reject_di" bpmnElement="Flow_Route_Reject"><di:waypoint x="955" y="303" /><di:waypoint x="955" y="630" /><di:waypoint x="1510" y="630" /></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_AdminReview_Decision_di" bpmnElement="Flow_AdminReview_Decision"><di:waypoint x="1290" y="465" /><di:waypoint x="1360" y="465" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Admin_ApproveRefund_di" bpmnElement="Flow_Admin_ApproveRefund"><di:waypoint x="1385" y="440" /><di:waypoint x="1385" y="350" /><di:waypoint x="1165" y="350" /><di:waypoint x="1165" y="318" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Admin_RejectRefund_di" bpmnElement="Flow_Admin_RejectRefund"><di:waypoint x="1385" y="490" /><di:waypoint x="1385" y="630" /><di:waypoint x="1510" y="630" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Admin_ExchangeProduct_di" bpmnElement="Flow_Admin_ExchangeProduct"><di:waypoint x="1410" y="465" /><di:waypoint x="1450" y="465" /><di:waypoint x="1450" y="780" /><di:waypoint x="1510" y="780" /></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_CheckIdempotency_CreateRecord_di" bpmnElement="Flow_CheckIdempotency_CreateRecord"><di:waypoint x="1260" y="278" /><di:waypoint x="1310" y="278" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CreateRecord_CallGateway_di" bpmnElement="Flow_CreateRecord_CallGateway"><di:waypoint x="1490" y="278" /><di:waypoint x="1540" y="278" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CallGateway_WaitResult_di" bpmnElement="Flow_CallGateway_WaitResult"><di:waypoint x="1750" y="278" /><di:waypoint x="1810" y="278" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WaitResult_PersistResult_di" bpmnElement="Flow_WaitResult_PersistResult"><di:waypoint x="1846" y="278" /><di:waypoint x="1910" y="278" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PersistResult_IsSuccess_di" bpmnElement="Flow_PersistResult_IsSuccess"><di:waypoint x="2140" y="278" /><di:waypoint x="2200" y="278" /></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_RefundSuccess_Outbox_di" bpmnElement="Flow_RefundSuccess_Outbox"><di:waypoint x="2225" y="253" /><di:waypoint x="2225" y="160" /><di:waypoint x="2320" y="160" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RefundFailed_RetryDecision_di" bpmnElement="Flow_RefundFailed_RetryDecision"><di:waypoint x="2250" y="278" /><di:waypoint x="2310" y="278" /><di:waypoint x="2310" y="445" /><di:waypoint x="2350" y="445" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RefundTimeout_RetryGateway_di" bpmnElement="Flow_RefundTimeout_RetryGateway"><di:waypoint x="1828" y="338" /><di:waypoint x="1828" y="445" /><di:waypoint x="2350" y="445" /></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_RetryYes_IncreaseRetry_di" bpmnElement="Flow_RetryYes_IncreaseRetry"><di:waypoint x="2400" y="445" /><di:waypoint x="2500" y="430" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_IncreaseRetry_CallGateway_di" bpmnElement="Flow_IncreaseRetry_CallGateway"><di:waypoint x="2700" y="430" /><di:waypoint x="2740" y="430" /><di:waypoint x="2740" y="90" /><di:waypoint x="1645" y="90" /><di:waypoint x="1645" y="238" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RetryNo_AdminReview_di" bpmnElement="Flow_RetryNo_AdminReview"><di:waypoint x="2375" y="470" /><di:waypoint x="2375" y="530" /><di:waypoint x="1180" y="530" /><di:waypoint x="1180" y="510" /></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Outbox_NotifyRefundCompleted_di" bpmnElement="Flow_Outbox_NotifyRefundCompleted"><di:waypoint x="2510" y="160" /><di:waypoint x="2560" y="160" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotifyRefundCompleted_End_di" bpmnElement="Flow_NotifyRefundCompleted_End"><di:waypoint x="2790" y="160" /><di:waypoint x="2840" y="160" /></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_UpdateRejected_NotifyRejected_di" bpmnElement="Flow_UpdateRejected_NotifyRejected"><di:waypoint x="1710" y="630" /><di:waypoint x="1770" y="630" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotifyRejected_End_di" bpmnElement="Flow_NotifyRejected_End"><di:waypoint x="2010" y="630" /><di:waypoint x="2070" y="630" /></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_CreateExchange_UpdateOrderInventory_di" bpmnElement="Flow_CreateExchange_UpdateOrderInventory"><di:waypoint x="1720" y="780" /><di:waypoint x="1780" y="780" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_UpdateExchange_NotifyExchange_di" bpmnElement="Flow_UpdateExchange_NotifyExchange"><di:waypoint x="2030" y="780" /><di:waypoint x="2090" y="780" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotifyExchange_End_di" bpmnElement="Flow_NotifyExchange_End"><di:waypoint x="2330" y="780" /><di:waypoint x="2390" y="780" /></bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

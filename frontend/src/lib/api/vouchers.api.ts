@@ -4,6 +4,9 @@ import {
   UserVoucher,
   Voucher,
   VoucherDiscountType,
+  VoucherRedeemResult,
+  VoucherUsage,
+  VoucherValidationResult,
 } from '@/types/voucher.types';
 
 type VoucherApiResponse = {
@@ -30,6 +33,32 @@ type UserVoucherApiResponse = {
   savedAt: string;
   isUsed: boolean;
   usedAt: string | null;
+};
+
+type VoucherValidationApiResponse = {
+  valid: boolean;
+  discountAmount: number;
+  finalAmount: number;
+  voucher: VoucherApiResponse;
+};
+
+type VoucherUsageApiResponse = {
+  id: string;
+  voucherId: string;
+  userId: string;
+  orderId: string;
+  discountApplied: number;
+  usedAt: string;
+  voucherCode: string;
+  voucherType: VoucherDiscountType;
+};
+
+type VoucherRedeemApiResponse = {
+  success: boolean;
+  discountAmount: number;
+  finalAmount: number;
+  usage: VoucherUsageApiResponse;
+  voucher: VoucherApiResponse;
 };
 
 function mapVoucher(input: VoucherApiResponse): Voucher {
@@ -62,6 +91,42 @@ function mapUserVoucher(input: UserVoucherApiResponse): UserVoucher {
   };
 }
 
+function mapVoucherValidation(
+  input: VoucherValidationApiResponse,
+): VoucherValidationResult {
+  return {
+    valid: Boolean(input.valid),
+    discountAmount: Number(input.discountAmount ?? 0),
+    finalAmount: Number(input.finalAmount ?? 0),
+    voucher: mapVoucher(input.voucher),
+  };
+}
+
+function mapVoucherUsage(input: VoucherUsageApiResponse): VoucherUsage {
+  return {
+    id: input.id,
+    voucherId: input.voucherId,
+    userId: input.userId,
+    orderId: input.orderId,
+    discountApplied: Number(input.discountApplied ?? 0),
+    usedAt: input.usedAt,
+    voucherCode: input.voucherCode,
+    voucherType: input.voucherType,
+  };
+}
+
+function mapVoucherRedeem(
+  input: VoucherRedeemApiResponse,
+): VoucherRedeemResult {
+  return {
+    success: Boolean(input.success),
+    discountAmount: Number(input.discountAmount ?? 0),
+    finalAmount: Number(input.finalAmount ?? 0),
+    usage: mapVoucherUsage(input.usage),
+    voucher: mapVoucher(input.voucher),
+  };
+}
+
 function toVoucherPayload(data: CreateVoucherData) {
   return {
     code: data.code,
@@ -83,6 +148,11 @@ export async function getAvailableVouchers(): Promise<Voucher[]> {
   return (data as VoucherApiResponse[]).map(mapVoucher);
 }
 
+export async function getVoucherByCode(code: string): Promise<Voucher> {
+  const { data } = await apiClient.get(`/vouchers/code/${code}`);
+  return mapVoucher(data as VoucherApiResponse);
+}
+
 export async function getMyVouchers(): Promise<UserVoucher[]> {
   const { data } = await apiClient.get('/vouchers/me');
   return (data as UserVoucherApiResponse[]).map(mapUserVoucher);
@@ -91,6 +161,37 @@ export async function getMyVouchers(): Promise<UserVoucher[]> {
 export async function saveVoucher(code: string): Promise<UserVoucher> {
   const { data } = await apiClient.post(`/vouchers/${code}/save`);
   return mapUserVoucher(data as UserVoucherApiResponse);
+}
+
+export async function validateVoucher(
+  code: string,
+  orderAmount: number,
+  userId?: string,
+): Promise<VoucherValidationResult> {
+  const { data } = await apiClient.post('/vouchers/validate', {
+    code,
+    orderAmount,
+    userId,
+  });
+  return mapVoucherValidation(data as VoucherValidationApiResponse);
+}
+
+export async function redeemVoucher(
+  code: string,
+  orderId: string,
+  orderAmount: number,
+): Promise<VoucherRedeemResult> {
+  const { data } = await apiClient.post('/vouchers/redeem', {
+    code,
+    orderId,
+    orderAmount,
+  });
+  return mapVoucherRedeem(data as VoucherRedeemApiResponse);
+}
+
+export async function getMyVoucherUsages(): Promise<VoucherUsage[]> {
+  const { data } = await apiClient.get('/vouchers/usages/me');
+  return (data as VoucherUsageApiResponse[]).map(mapVoucherUsage);
 }
 
 export async function getAdminVouchers(): Promise<Voucher[]> {

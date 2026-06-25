@@ -54,11 +54,25 @@ export class GatewayRouteService {
       PAYMENT_SERVICE_URL: 'PAYMENT_SERVICE_PORT',
       VOUCHER_SERVICE_URL: 'VOUCHER_SERVICE_PORT',
       TRYON_SERVICE_URL: 'TRYON_SERVICE_PORT',
+      CHATBOT_SERVICE_URL: 'CHATBOT_SERVICE_PORT',
       MARKET_ANALYSIS_SERVICE_URL: 'MARKET_ANALYSIS_SERVICE_PORT',
+    };
+    const defaultPorts: Record<string, string> = {
+      USER_SERVICE_PORT: '3001',
+      PRODUCT_SERVICE_PORT: '3002',
+      CART_SERVICE_PORT: '3003',
+      ORDER_SERVICE_PORT: '3004',
+      PAYMENT_SERVICE_PORT: '3005',
+      VOUCHER_SERVICE_PORT: '3007',
+      TRYON_SERVICE_PORT: '3010',
+      CHATBOT_SERVICE_PORT: '3012',
+      MARKET_ANALYSIS_SERVICE_PORT: '3011',
     };
 
     const portKey = envToPortKey[targetEnv];
-    const port = portKey ? this.configService.get<string>(portKey) : null;
+    const port = portKey
+      ? this.configService.get<string>(portKey) || defaultPorts[portKey]
+      : null;
 
     return port ? `http://localhost:${port}` : null;
   }

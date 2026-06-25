@@ -28,10 +28,15 @@ import {
   updateVoucher,
 } from '@/lib/api/vouchers.api';
 import {
+  canDeleteAdminResource,
+  getAdminRoleLabel,
+} from '@/lib/api/admin.utils';
+import {
   Voucher,
   VoucherDiscountType,
   CreateVoucherData,
 } from '@/types/voucher.types';
+import { useAuthStore } from '@/store/auth.store';
 
 function getVoucherStatus(voucher: Voucher): string {
   if (!voucher.isActive) return 'inactive';
@@ -55,6 +60,9 @@ const EMPTY_FORM: CreateVoucherData = {
 };
 
 export default function AdminVouchersPage() {
+  const userRole = useAuthStore((state) => state.user?.role);
+  const canDelete = canDeleteAdminResource(userRole);
+  const roleLabel = getAdminRoleLabel(userRole);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -122,7 +130,7 @@ export default function AdminVouchersPage() {
   }
 
   async function handleDelete() {
-    if (!deleteId) return;
+    if (!deleteId || !canDelete) return;
     await deleteVoucher(deleteId);
     setVouchers((prev) => prev.filter((v) => v.id !== deleteId));
     setDeleteId(null);
@@ -150,7 +158,16 @@ export default function AdminVouchersPage() {
           <h1 className="font-heading text-3xl font-bold text-foreground mb-2">
             Quản lý Voucher
           </h1>
+          <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">
+            {roleLabel}
+          </span>
           <p className="text-muted-foreground">{vouchers.length} voucher</p>
+          {!canDelete ? (
+            <p className="mt-3 max-w-2xl rounded-2xl border border-violet-100 bg-violet-50/60 px-4 py-3 text-sm text-slate-600">
+              Admin có thể tạo và cập nhật voucher. Xóa voucher được tách riêng
+              cho super admin.
+            </p>
+          ) : null}
         </div>
         <button
           onClick={openCreate}
@@ -284,12 +301,14 @@ export default function AdminVouchersPage() {
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => setDeleteId(voucher.id)}
-                            className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {canDelete && (
+                            <button
+                              onClick={() => setDeleteId(voucher.id)}
+                              className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -601,7 +620,7 @@ export default function AdminVouchersPage() {
       )}
 
       {/* Delete Confirmation */}
-      {deleteId && (
+      {deleteId && canDelete && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
           onClick={() => setDeleteId(null)}

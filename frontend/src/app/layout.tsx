@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Lato, Playfair_Display } from 'next/font/google';
+import { Be_Vietnam_Pro, Playfair_Display } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/providers/auth.provider';
 import { QueryProvider } from '@/providers/query.provider';
@@ -11,10 +11,10 @@ const playfair = Playfair_Display({
   display: 'swap',
 });
 
-const lato = Lato({
-  subsets: ['latin', 'latin-ext'],
-  weight: ['300', '400', '700', '900'],
-  variable: '--font-lato',
+const beVietnamPro = Be_Vietnam_Pro({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-body',
   display: 'swap',
 });
 
@@ -43,7 +43,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body className={`${playfair.variable} ${lato.variable}`}>
+      <body className={`${playfair.variable} ${beVietnamPro.variable}`}>
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </QueryProvider>

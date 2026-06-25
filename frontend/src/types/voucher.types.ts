@@ -16,6 +16,32 @@ export interface Voucher {
   updatedAt: string;
 }
 
+export interface VoucherValidationResult {
+  valid: boolean;
+  discountAmount: number;
+  finalAmount: number;
+  voucher: Voucher;
+}
+
+export interface VoucherUsage {
+  id: string;
+  voucherId: string;
+  userId: string;
+  orderId: string;
+  discountApplied: number;
+  usedAt: string;
+  voucherCode: string;
+  voucherType: VoucherDiscountType;
+}
+
+export interface VoucherRedeemResult {
+  success: boolean;
+  discountAmount: number;
+  finalAmount: number;
+  usage: VoucherUsage;
+  voucher: Voucher;
+}
+
 export enum VoucherDiscountType {
   PERCENT = "percent",
   FIXED = "fixed",

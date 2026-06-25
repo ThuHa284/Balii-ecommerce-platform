@@ -15,6 +15,9 @@ import {
   Ticket,
   Users,
 } from 'lucide-react';
+import { hasRoleAccess } from '@/lib/api/admin.utils';
+import { useAuthStore } from '@/store/auth.store';
+import { UserRole } from '@/types/user.types';
 
 interface NavOption {
   label: string;
@@ -22,6 +25,7 @@ interface NavOption {
   category: string;
   icon: React.ElementType;
   keywords: string;
+  roles?: UserRole[];
 }
 
 const NAV_OPTIONS: NavOption[] = [
@@ -54,7 +58,7 @@ const NAV_OPTIONS: NavOption[] = [
     keywords: 'don hang orders van don bill hoa don',
   },
   {
-    label: 'Quản lý Voucher & Giảm giá',
+    label: 'Quản lý Voucher',
     href: '/admin/vouchers',
     category: 'Khuyến mãi',
     icon: Ticket,
@@ -75,11 +79,11 @@ const NAV_OPTIONS: NavOption[] = [
     keywords: 'phan tich analytics bao cao doanh thu bieu do',
   },
   {
-    label: 'Trợ lý ảo AI Agent',
+    label: 'AI Agent',
     href: '/admin/ai-agent',
-    category: 'Trí tuệ nhân tạo',
+    category: 'AI',
     icon: Brain,
-    keywords: 'ai agent tro ly ao tu van chat gpt',
+    keywords: 'ai agent tro ly ao tu van',
   },
   {
     label: 'Cài đặt hệ thống',
@@ -87,11 +91,13 @@ const NAV_OPTIONS: NavOption[] = [
     category: 'Hệ thống',
     icon: Settings,
     keywords: 'cai dat settings cau hinh mat khau',
+    roles: [UserRole.SUPER_ADMIN],
   },
 ];
 
 export default function CommandPalette() {
   const router = useRouter();
+  const userRole = useAuthStore((state) => state.user?.role ?? null);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -131,6 +137,10 @@ export default function CommandPalette() {
   }, [isOpen]);
 
   const filtered = NAV_OPTIONS.filter((option) => {
+    if (!hasRoleAccess(userRole, option.roles)) {
+      return false;
+    }
+
     const term = search.toLowerCase().trim();
     if (!term) return true;
 
@@ -177,7 +187,7 @@ export default function CommandPalette() {
         onClick={() => setIsOpen(false)}
       />
 
-      <div className="fixed top-1/4 left-1/2 z-50 flex max-h-[450px] w-full max-w-xl -translate-x-1/2 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl">
+      <div className="fixed left-1/2 top-1/4 z-50 flex max-h-[450px] w-full max-w-xl -translate-x-1/2 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl">
         <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5">
           <Search className="h-5 w-5 shrink-0 text-slate-400" />
           <input
@@ -189,7 +199,7 @@ export default function CommandPalette() {
               setSelectedIndex(0);
             }}
             onKeyDown={handleInputKeyDown}
-            placeholder="Tìm kiếm trang quản trị... (ví dụ: sản phẩm, đơn hàng...)"
+            placeholder="Tìm kiếm trang quản trị..."
             className="flex-1 border-none bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
           />
           <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-400 shadow-sm">
@@ -250,12 +260,12 @@ export default function CommandPalette() {
 
         <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-2 text-[10px] font-medium text-slate-400">
           <div className="flex items-center gap-2">
-            <span>Sử dụng phím</span>
+            <span>Phím</span>
             <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono shadow-sm">
-              ↑
+              Up
             </kbd>
             <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono shadow-sm">
-              ↓
+              Down
             </kbd>
             <span>để di chuyển,</span>
             <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono shadow-sm">

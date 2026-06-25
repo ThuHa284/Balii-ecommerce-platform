@@ -110,25 +110,6 @@ services:
       - balii-network
 
   # ============================================================
-  # MinIO
-  # ============================================================
-  minio:
-    image: minio/minio:latest
-    container_name: balii-minio
-    restart: always
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - balii-network
-
-  # ============================================================
   # Camunda BPMN
   # ============================================================
   camunda:
@@ -139,7 +120,7 @@ services:
       - "8080:8080"
     environment:
       DB_DRIVER: org.postgresql.Driver
-      DB_URL: jdbc:postgresql://postgres:5433/balii_sleepwear
+      DB_URL: jdbc:postgresql://postgres:5432/balii_sleepwear
       DB_USERNAME: balii_admin
       DB_PASSWORD: 123456
     depends_on:

@@ -249,12 +249,20 @@ export async function deleteProductImage(id: string): Promise<void> {
 
 export async function getFeaturedProducts(): Promise<Product[]> {
   const { products } = await getProducts({ page: 1, limit: 8 });
-  return products.slice(0, 6);
+  return [...products]
+    .sort(
+      (a, b) =>
+        b.totalReviews - a.totalReviews ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    .slice(0, 6);
 }
 
 export async function getNewProducts(): Promise<Product[]> {
   const { products } = await getProducts({ page: 1, limit: 8 });
-  return products;
+  return [...products].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
 }
 
 export async function getRecommendedProducts(
