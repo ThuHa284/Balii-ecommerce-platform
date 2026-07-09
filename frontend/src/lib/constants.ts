@@ -1,7 +1,11 @@
+const isProduction = process.env.NODE_ENV === 'production';
+
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  process.env.NEXT_PUBLIC_API_URL ||
+  (isProduction ? 'https://api.ntthuha.id.vn' : 'http://localhost:4000');
 export const SOCKET_URL =
-  process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4006';
+  process.env.NEXT_PUBLIC_SOCKET_URL ||
+  (isProduction ? 'https://api.ntthuha.id.vn' : 'http://localhost:4006');
 
 export const ROUTES = {
   HOME: '/',

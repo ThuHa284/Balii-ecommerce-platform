@@ -38,11 +38,19 @@ function loadRootEnv() {
 
 loadRootEnv();
 
+const defaultApiUrl =
+  process.env.NODE_ENV === "production"
+    ? "https://api.ntthuha.id.vn"
+    : `http://localhost:${process.env.API_GATEWAY_PORT || "4000"}`;
+const defaultSocketUrl =
+  process.env.NODE_ENV === "production"
+    ? "https://api.ntthuha.id.vn"
+    : "http://localhost:4006";
+
 process.env.NEXT_PUBLIC_API_URL ??=
-  process.env.API_GATEWAY_URL ||
-  `http://localhost:${process.env.API_GATEWAY_PORT || "4000"}`;
+  process.env.API_GATEWAY_URL || defaultApiUrl;
 process.env.NEXT_PUBLIC_SOCKET_URL ??=
-  process.env.TRYON_SERVICE_URL || "http://localhost:4006";
+  process.env.TRYON_SERVICE_URL || defaultSocketUrl;
 
 const nextConfig: NextConfig = {
   turbopack: {
