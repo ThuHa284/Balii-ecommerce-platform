@@ -2,6 +2,7 @@ import { Cart, CartItem } from '@/types/cart.types';
 import { parseStoredAddress } from '@/lib/address-utils';
 import { Order } from '@/types/order.types';
 import {
+  Campaign,
   Category,
   Collection,
   Product,
@@ -44,6 +45,10 @@ type BackendProduct = {
   shortDescription?: string;
   basePrice: number;
   salePrice?: number | null;
+  scheduledSalePrice?: number | null;
+  saleStartAt?: string | null;
+  saleEndAt?: string | null;
+  isSaleActive?: boolean;
   targetGender?: 'male' | 'female' | 'unisex';
   recommendedAgeGroups?: string[];
   categoryId?: string | null;
@@ -57,6 +62,20 @@ type BackendProduct = {
   isFeatured?: boolean;
   isNew?: boolean;
   tags?: string[];
+  activeCampaign?: {
+    id: string;
+    name: string;
+    slug: string;
+    discountType?: Product['activeCampaign'] extends infer T
+      ? T extends { discountType: infer U }
+        ? U
+        : never
+      : never;
+    discountValue?: number | null;
+    giftName?: string;
+    giftDescription?: string;
+    badgeText?: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -72,6 +91,11 @@ type BackendCart = {
     variantLabel?: string;
     variantSize?: string;
     variantColor?: string;
+    campaignId?: string | null;
+    campaignName?: string | null;
+    campaignDiscountType?: 'PERCENT' | 'AMOUNT' | 'GIFT' | null;
+    campaignDiscountValue?: number | null;
+    campaignBadgeText?: string | null;
     unitPrice: number;
     quantity: number;
     subtotal: number;
@@ -93,6 +117,11 @@ type BackendOrder = {
     productSlug?: string | null;
     thumbnailUrl?: string | null;
     variantLabel?: string;
+    campaignId?: string | null;
+    campaignName?: string | null;
+    campaignDiscountType?: 'PERCENT' | 'AMOUNT' | 'GIFT' | null;
+    campaignDiscountValue?: number | null;
+    campaignBadgeText?: string | null;
     sku: string;
     unitPrice: number;
     quantity: number;
@@ -137,6 +166,31 @@ type BackendCollection = {
   productIds?: string[];
   season?: string;
   isActive?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+type BackendCampaign = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  shortDescription?: string;
+  image?: string;
+  imageUrl?: string;
+  bannerImage?: string;
+  bannerImageUrl?: string;
+  productIds?: string[];
+  discountType?: Campaign['discountType'];
+  discountValue?: number | null;
+  giftName?: string;
+  giftDescription?: string;
+  badgeText?: string;
+  priorityOrder?: number;
+  startAt: string;
+  endAt: string;
+  isActive?: boolean;
+  isLive?: boolean;
   createdAt: string;
   updatedAt?: string;
 };
@@ -244,6 +298,13 @@ export function mapProduct(input: BackendProduct): Product {
     shortDescription: input.shortDescription ?? input.description ?? '',
     basePrice: Number(input.basePrice ?? 0),
     salePrice: input.salePrice != null ? Number(input.salePrice) : null,
+    scheduledSalePrice:
+      input.scheduledSalePrice != null
+        ? Number(input.scheduledSalePrice)
+        : null,
+    saleStartAt: input.saleStartAt ?? null,
+    saleEndAt: input.saleEndAt ?? null,
+    isSaleActive: input.isSaleActive ?? false,
     targetGender: input.targetGender ?? 'female',
     recommendedAgeGroups: input.recommendedAgeGroups ?? [],
     categoryId: input.categoryId ?? category.id,
@@ -257,6 +318,21 @@ export function mapProduct(input: BackendProduct): Product {
     isFeatured: input.isFeatured ?? false,
     isNew: input.isNew ?? false,
     tags: input.tags ?? [],
+    activeCampaign: input.activeCampaign
+      ? {
+          id: input.activeCampaign.id,
+          name: input.activeCampaign.name,
+          slug: input.activeCampaign.slug,
+          discountType: input.activeCampaign.discountType ?? 'PERCENT',
+          discountValue:
+            input.activeCampaign.discountValue != null
+              ? Number(input.activeCampaign.discountValue)
+              : null,
+          giftName: input.activeCampaign.giftName ?? '',
+          giftDescription: input.activeCampaign.giftDescription ?? '',
+          badgeText: input.activeCampaign.badgeText ?? '',
+        }
+      : null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };
@@ -274,6 +350,32 @@ export function mapCollection(input: BackendCollection): Collection {
     productIds: input.productIds ?? [],
     season: input.season ?? '',
     isActive: input.isActive ?? true,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt ?? input.createdAt,
+  };
+}
+
+export function mapCampaign(input: BackendCampaign): Campaign {
+  return {
+    id: input.id,
+    name: input.name,
+    slug: input.slug,
+    description: input.description ?? '',
+    shortDescription: input.shortDescription ?? '',
+    image: input.image ?? input.imageUrl ?? '',
+    bannerImage: input.bannerImage ?? input.bannerImageUrl ?? '',
+    productIds: input.productIds ?? [],
+    discountType: input.discountType ?? 'PERCENT',
+    discountValue:
+      input.discountValue != null ? Number(input.discountValue) : null,
+    giftName: input.giftName ?? '',
+    giftDescription: input.giftDescription ?? '',
+    badgeText: input.badgeText ?? '',
+    priorityOrder: Number(input.priorityOrder ?? 0),
+    startAt: input.startAt,
+    endAt: input.endAt,
+    isActive: input.isActive ?? true,
+    isLive: input.isLive ?? false,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt ?? input.createdAt,
   };
@@ -307,6 +409,19 @@ export function mapCart(input: BackendCart): Cart {
         stock: 0,
         images: [],
       },
+      campaign:
+        item.campaignId || item.campaignName
+          ? {
+              id: item.campaignId ?? null,
+              name: item.campaignName ?? null,
+              discountType: item.campaignDiscountType ?? null,
+              discountValue:
+                item.campaignDiscountValue != null
+                  ? Number(item.campaignDiscountValue)
+                  : null,
+              badgeText: item.campaignBadgeText ?? null,
+            }
+          : null,
       quantity: item.quantity,
       price: Number(item.unitPrice),
       totalPrice: Number(item.subtotal),
@@ -336,7 +451,8 @@ export function mapAddress(input: BackendAddress): Address {
     fullName: input.recipientName,
     phone: input.phone,
     province:
-      input.provinceName ?? humanizeLocation('Tỉnh/Thành phố', input.provinceId),
+      input.provinceName ??
+      humanizeLocation('Tỉnh/Thành phố', input.provinceId),
     district:
       input.districtName ?? humanizeLocation('Quận/Huyện', input.districtId),
     ward:
@@ -389,6 +505,14 @@ export function mapOrder(input: BackendOrder): Order {
         variantSize: parsed.size,
         variantColor: parsed.color,
         sku: item.sku,
+        campaignId: item.campaignId ?? null,
+        campaignName: item.campaignName ?? null,
+        campaignDiscountType: item.campaignDiscountType ?? null,
+        campaignDiscountValue:
+          item.campaignDiscountValue != null
+            ? Number(item.campaignDiscountValue)
+            : null,
+        campaignBadgeText: item.campaignBadgeText ?? null,
         price: Number(item.unitPrice),
         quantity: item.quantity,
         totalPrice: Number(item.lineTotal ?? item.subtotal ?? 0),
@@ -416,7 +540,10 @@ export function mapOrder(input: BackendOrder): Order {
         ),
       ward:
         safeString(input.shippingAddress.ward) ||
-        humanizeLocation('Phường/Xã', Number(input.shippingAddress.wardId ?? 0)),
+        humanizeLocation(
+          'Phường/Xã',
+          Number(input.shippingAddress.wardId ?? 0),
+        ),
       street: safeString(input.shippingAddress.streetAddress),
       isDefault: false,
     },

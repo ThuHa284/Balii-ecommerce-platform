@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AlertCircle, Check, MapPin, Plus, X } from 'lucide-react';
 
 import { formatAddressLine } from '@/lib/address-utils';
@@ -39,9 +39,7 @@ function AddressCard({
         <div
           className={cn(
             'mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border-2 transition-all',
-            selected
-              ? 'border-primary bg-primary'
-              : 'border-muted-foreground/40',
+            selected ? 'border-primary bg-primary' : 'border-muted-foreground/40',
           )}
         >
           {selected && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />}
@@ -76,20 +74,20 @@ export default function AddressSelectorModal({
   const { addresses, selectedAddressId, setSelectedAddress, hydrateAddresses } =
     useAuthStore();
   const [showAddForm, setShowAddForm] = useState(false);
-  const [localSelected, setLocalSelected] = useState(selectedAddressId);
+  const [localSelected, setLocalSelected] = useState<string | null>(null);
   const atLimit = addresses.length >= MAX_ADDRESSES;
+  const draftSelectedId = localSelected ?? selectedAddressId;
 
-  useEffect(() => {
-    if (open) {
-      setLocalSelected(selectedAddressId);
-    }
-  }, [open, selectedAddressId]);
+  const handleClose = () => {
+    setLocalSelected(null);
+    onClose();
+  };
 
   const handleConfirm = () => {
-    if (localSelected) {
-      setSelectedAddress(localSelected);
+    if (draftSelectedId) {
+      setSelectedAddress(draftSelectedId);
     }
-    onClose();
+    handleClose();
   };
 
   if (!open) return null;
@@ -98,7 +96,7 @@ export default function AddressSelectorModal({
     <>
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       >
         <div
           className="glass-card flex max-h-[80vh] w-full max-w-lg flex-col"
@@ -112,7 +110,7 @@ export default function AddressSelectorModal({
               </h2>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-white/40 hover:text-foreground"
             >
               <X className="h-5 w-5" />
@@ -124,7 +122,7 @@ export default function AddressSelectorModal({
               <AddressCard
                 key={addr.id}
                 address={addr}
-                selected={localSelected === addr.id}
+                selected={draftSelectedId === addr.id}
                 onSelect={() => setLocalSelected(addr.id)}
               />
             ))}
@@ -158,14 +156,14 @@ export default function AddressSelectorModal({
 
           <div className="flex shrink-0 gap-3 border-t border-white/30 p-6">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1 rounded-xl border-2 border-white/50 px-4 py-3 text-sm font-medium text-foreground transition-all hover:bg-white/40"
             >
               Hủy
             </button>
             <button
               onClick={handleConfirm}
-              disabled={!localSelected}
+              disabled={!draftSelectedId}
               className="btn-primary flex-1 text-sm"
             >
               Xác nhận
@@ -182,9 +180,7 @@ export default function AddressSelectorModal({
           void (async () => {
             await hydrateAddresses();
             const latestAddress =
-              useAuthStore
-                .getState()
-                .addresses.find((item) => item.isDefault) ??
+              useAuthStore.getState().addresses.find((item) => item.isDefault) ??
               useAuthStore.getState().addresses.at(-1);
             if (latestAddress) {
               setLocalSelected(latestAddress.id);

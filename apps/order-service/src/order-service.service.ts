@@ -30,6 +30,11 @@ type OrderItemRow = {
   sku: string;
   variantLabel?: string | null;
   thumbnailUrl?: string | null;
+  campaignId?: string | null;
+  campaignName?: string | null;
+  campaignDiscountType?: 'PERCENT' | 'AMOUNT' | 'GIFT' | null;
+  campaignDiscountValue?: number | string | null;
+  campaignBadgeText?: string | null;
   unitPrice: number | string;
   quantity: number;
   subtotal: number | string;
@@ -85,6 +90,9 @@ type TopProductPoint = {
   thumbnail: string;
   quantitySold: number;
   revenue: number;
+  campaignQuantitySold: number;
+  campaignRevenue: number;
+  campaignOrderCount: number;
 };
 
 type OrderStatusPoint = {
@@ -188,6 +196,11 @@ export class OrderServiceService {
           sku: item.sku,
           variantLabel: item.variantLabel ?? null,
           thumbnailUrl: item.thumbnailUrl ?? null,
+          campaignId: item.campaignId ?? null,
+          campaignName: item.campaignName ?? null,
+          campaignDiscountType: item.campaignDiscountType ?? null,
+          campaignDiscountValue: item.campaignDiscountValue ?? null,
+          campaignBadgeText: item.campaignBadgeText ?? null,
           unitPrice: item.unitPrice,
           quantity: item.quantity,
           subtotal: item.subtotal,
@@ -725,6 +738,11 @@ export class OrderServiceService {
       productSlug?: string | null;
       thumbnailUrl?: string | null;
       variantLabel?: string | null;
+      campaignId?: string | null;
+      campaignName?: string | null;
+      campaignDiscountType?: 'PERCENT' | 'AMOUNT' | 'GIFT' | null;
+      campaignDiscountValue?: number | null;
+      campaignBadgeText?: string | null;
       sku: string;
       unitPrice: number;
       quantity: number;
@@ -753,6 +771,14 @@ export class OrderServiceService {
         productSlug: item.productSlug ?? null,
         thumbnailUrl: item.thumbnailUrl ?? null,
         variantLabel: item.variantLabel ?? null,
+        campaignId: item.campaignId ?? null,
+        campaignName: item.campaignName ?? null,
+        campaignDiscountType: item.campaignDiscountType ?? null,
+        campaignDiscountValue:
+          item.campaignDiscountValue != null
+            ? Number(item.campaignDiscountValue)
+            : null,
+        campaignBadgeText: item.campaignBadgeText ?? null,
         sku: item.sku,
         unitPrice: Number(item.unitPrice),
         quantity: item.quantity,
@@ -906,6 +932,11 @@ export class OrderServiceService {
         oi.sku,
         oi.variant_label AS "variantLabel",
         oi.thumbnail_url AS "thumbnailUrl",
+        oi.campaign_id AS "campaignId",
+        oi.campaign_name AS "campaignName",
+        oi.campaign_discount_type AS "campaignDiscountType",
+        oi.campaign_discount_value AS "campaignDiscountValue",
+        oi.campaign_badge_text AS "campaignBadgeText",
         oi.unit_price AS "unitPrice",
         oi.quantity,
         oi.subtotal
@@ -1377,7 +1408,44 @@ export class OrderServiceService {
           ''
         ) AS thumbnail,
         SUM(oi.quantity)::int AS "quantitySold",
-        SUM(oi.subtotal) AS revenue
+        SUM(oi.subtotal) AS revenue,
+        SUM(
+          CASE
+            WHEN EXISTS (
+              SELECT 1
+              FROM product_service.campaigns c
+              WHERE p.id = ANY(c.product_ids)
+                AND o.created_at >= c.start_at
+                AND o.created_at <= c.end_at
+            )
+            THEN oi.quantity
+            ELSE 0
+          END
+        )::int AS "campaignQuantitySold",
+        SUM(
+          CASE
+            WHEN EXISTS (
+              SELECT 1
+              FROM product_service.campaigns c
+              WHERE p.id = ANY(c.product_ids)
+                AND o.created_at >= c.start_at
+                AND o.created_at <= c.end_at
+            )
+            THEN oi.subtotal
+            ELSE 0
+          END
+        ) AS "campaignRevenue",
+        COUNT(DISTINCT CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM product_service.campaigns c
+            WHERE p.id = ANY(c.product_ids)
+              AND o.created_at >= c.start_at
+              AND o.created_at <= c.end_at
+          )
+          THEN o.id
+          ELSE NULL
+        END)::int AS "campaignOrderCount"
       FROM order_service.order_items oi
       JOIN order_service.orders o ON o.id = oi.order_id
       JOIN order_service.order_statuses os ON os.id = o.status_id
@@ -1397,12 +1465,18 @@ export class OrderServiceService {
         thumbnail: string;
         quantitySold: number;
         revenue: number | string;
+        campaignQuantitySold: number;
+        campaignRevenue: number | string;
+        campaignOrderCount: number;
       }) => ({
         productId: row.productId,
         productName: row.productName,
         thumbnail: row.thumbnail ?? '',
         quantitySold: Number(row.quantitySold ?? 0),
         revenue: Number(row.revenue ?? 0),
+        campaignQuantitySold: Number(row.campaignQuantitySold ?? 0),
+        campaignRevenue: Number(row.campaignRevenue ?? 0),
+        campaignOrderCount: Number(row.campaignOrderCount ?? 0),
       }),
     );
   }

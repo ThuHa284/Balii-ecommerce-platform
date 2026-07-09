@@ -88,8 +88,8 @@ export default function ProductsPage() {
   });
 
   const sortedProducts = [...filteredProducts].sort((a, b) => {
-    const priceA = a.salePrice || a.basePrice;
-    const priceB = b.salePrice || b.basePrice;
+    const priceA = a.salePrice ?? a.basePrice;
+    const priceB = b.salePrice ?? b.basePrice;
 
     switch (sortBy) {
       case 'best_seller':
@@ -117,8 +117,8 @@ export default function ProductsPage() {
             Tất Cả <span className="text-gradient">Sản Phẩm</span>
           </h1>
           <p className="text-muted-foreground">
-            Danh mục các sản phẩm được hiển thị theo số lượng sản phẩm, hàng mới nhất
-            theo ngày thêm.
+            Danh mục các sản phẩm được hiển thị theo số lượng sản phẩm, hàng mới
+            nhất theo ngày thêm.
           </p>
         </div>
 

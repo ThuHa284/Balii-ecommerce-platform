@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { loadEnv } from '@app/common';
+
+loadEnv();
 
 @Module({
   imports: [

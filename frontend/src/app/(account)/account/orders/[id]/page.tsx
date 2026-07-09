@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -99,11 +100,7 @@ export default function OrderDetailPage() {
   const [returnImages, setReturnImages] = useState<string[]>([]);
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
-  useEffect(() => {
-    void loadOrder();
-  }, [params.id]);
-
-  async function loadOrder() {
+  const loadOrder = useEffectEvent(async () => {
     setLoading(true);
     try {
       const [orderData, returnData] = await Promise.all([
@@ -115,7 +112,11 @@ export default function OrderDetailPage() {
     } finally {
       setLoading(false);
     }
-  }
+  });
+
+  useEffect(() => {
+    void loadOrder();
+  }, [params.id]);
 
   async function handleReturnImageChange(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []).slice(0, 5);

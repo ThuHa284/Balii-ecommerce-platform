@@ -1,7 +1,9 @@
-import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { loadEnv } from '@app/common';
 import { PaymentServiceModule } from './payment-service.module';
+
+loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(PaymentServiceModule);
@@ -14,4 +16,4 @@ async function bootstrap() {
   );
   await app.listen(process.env.PAYMENT_SERVICE_PORT ?? 3005);
 }
-bootstrap();
+void bootstrap();

@@ -234,8 +234,14 @@ export class PaymentProcessingMockWorker implements OnModuleInit {
         console.log('[Camunda] refund.validate-request');
 
         const variables = new Variables();
-        variables.set('orderId', task.variables.get('orderId') || `order_${Date.now()}`);
-        variables.set('userId', task.variables.get('userId') || `user_${Date.now()}`);
+        variables.set(
+          'orderId',
+          task.variables.get('orderId') || `order_${Date.now()}`,
+        );
+        variables.set(
+          'userId',
+          task.variables.get('userId') || `user_${Date.now()}`,
+        );
         variables.set('method', 'vnpay');
 
         await taskService.complete(task, variables);
@@ -302,24 +308,21 @@ export class PaymentProcessingMockWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
-      'refund.create-record',
-      async ({ task, taskService }) => {
-        console.log('[Camunda] refund.create-record');
+    client.subscribe('refund.create-record', async ({ task, taskService }) => {
+      console.log('[Camunda] refund.create-record');
 
-        const variables = new Variables();
-        variables.set('refundId', `refund_mock_${Date.now()}`);
-        variables.set('providerRefundId', `provider_refund_${Date.now()}`);
-        variables.set(
-          'effectiveRefundAmount',
-          task.variables.get('approvedRefundAmount') ??
-            task.variables.get('amount') ??
-            399000,
-        );
+      const variables = new Variables();
+      variables.set('refundId', `refund_mock_${Date.now()}`);
+      variables.set('providerRefundId', `provider_refund_${Date.now()}`);
+      variables.set(
+        'effectiveRefundAmount',
+        task.variables.get('approvedRefundAmount') ??
+          task.variables.get('amount') ??
+          399000,
+      );
 
-        await taskService.complete(task, variables);
-      },
-    );
+      await taskService.complete(task, variables);
+    });
 
     client.subscribe(
       'refund.call-gateway-api',
@@ -366,7 +369,10 @@ export class PaymentProcessingMockWorker implements OnModuleInit {
         console.log('[Camunda] refund.update-rejected');
 
         const variables = new Variables();
-        variables.set('refundId', task.variables.get('refundId') || `refund_rejected_${Date.now()}`);
+        variables.set(
+          'refundId',
+          task.variables.get('refundId') || `refund_rejected_${Date.now()}`,
+        );
         variables.set(
           'rejectionReason',
           task.variables.get('refundRouteReason') ||

@@ -184,6 +184,14 @@ function normalizeApiErrorMessage(
     return 'Thông tin bạn nhập chưa hợp lệ. Vui lòng kiểm tra lại.';
   }
 
+  if (status === 429) {
+    if (requestUrl.includes('/try-on')) {
+      return 'Dịch vụ AI try-on đang tạm hết quota hoặc bị giới hạn tần suất. Vui lòng thử lại sau.';
+    }
+
+    return 'Hệ thống đang tạm giới hạn yêu cầu. Vui lòng thử lại sau.';
+  }
+
   if (status >= 500) {
     return 'Hệ thống đang gặp sự cố. Vui lòng thử lại sau.';
   }

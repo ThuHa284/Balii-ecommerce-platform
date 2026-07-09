@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsDateString,
   IsIn,
   IsNumber,
   IsOptional,
@@ -33,6 +34,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsNumber()
   salePrice?: number;
+
+  @IsOptional()
+  @IsDateString()
+  saleStartAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  saleEndAt?: string;
 
   @IsOptional()
   @IsString()

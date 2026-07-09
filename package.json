@@ -27,12 +27,20 @@
     "start:cart": "nest start cart-service --watch",
     "start:chatbot": "nest start chatbot-service --watch",
     "start:tryon": "nest start virtual-tryon-service --watch",
+    "start:market": "nest start market-analysis-service --watch",
+    "check:gemini-models": "node scripts/check-gemini-models.js",
+    "start:lens-worker": "powershell -ExecutionPolicy Bypass -Command \"Set-Location 'ai-service/google-lens-worker'; $env:USE_MOCK_LENS='false'; & '.venv/Scripts/python.exe' -m uvicorn main:app --host 0.0.0.0 --port 8020\"",
+    "start:gender-age": "powershell -ExecutionPolicy Bypass -Command \"Set-Location 'ai-service/ai-gender-age-service'; & '.venv/Scripts/python.exe' -m uvicorn app:app --host 0.0.0.0 --port 8010\"",
     "start:all": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1",
+    "start:all:local": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1 -AppEnv local",
+    "start:all:production": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1 -AppEnv production",
     "camunda:deploy": "powershell -ExecutionPolicy Bypass -File infra/camunda/deploy-bpmn.ps1",
-    "migration:generate": "typeorm-ts-node-commonjs migration:generate libs/database/src/migrations/AutoMigration -d libs/database/src/data-source.ts",
-    "migration:create": "typeorm-ts-node-commonjs migration:create libs/database/src/migrations/NewMigration",
-    "migration:run": "typeorm-ts-node-commonjs migration:run -d libs/database/src/data-source.ts",
-    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d libs/database/src/data-source.ts"
+    "init:prod-env": "powershell -ExecutionPolicy Bypass -File scripts/bootstrap-production-env.ps1",
+    "validate:prod-env": "node scripts/validate-production-env.js",
+    "migration:generate": "node -r ts-node/register -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate libs/database/src/migrations/AutoMigration -d libs/database/src/data-source.ts",
+    "migration:create": "node ./node_modules/typeorm/cli.js migration:create libs/database/src/migrations/NewMigration",
+    "migration:run": "node -r ts-node/register -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d libs/database/src/data-source.ts",
+    "migration:revert": "node -r ts-node/register -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d libs/database/src/data-source.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1055.0",
@@ -121,6 +129,12 @@
     "testEnvironment": "node",
     "roots": [
       "<rootDir>/apps/"
-    ]
+    ],
+    "moduleNameMapper": {
+      "^@app/common$": "<rootDir>/libs/common/src",
+      "^@app/database$": "<rootDir>/libs/database/src",
+      "^@app/kafka$": "<rootDir>/libs/kafka/src",
+      "^@app/redis$": "<rootDir>/libs/redis/src"
+    }
   }
 }

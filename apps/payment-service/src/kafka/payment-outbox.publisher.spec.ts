@@ -29,8 +29,9 @@ describe('PaymentOutboxPublisher', () => {
     };
 
     const dataSource: MockDataSource = {
-      transaction: jest.fn(async (callback: (manager: QueryManager) => unknown) =>
-        callback(manager),
+      transaction: jest.fn(
+        async (callback: (manager: QueryManager) => unknown) =>
+          callback(manager),
       ),
       query: jest.fn(),
     };

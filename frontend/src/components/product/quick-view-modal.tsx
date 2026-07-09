@@ -9,8 +9,6 @@ import { useEffect, useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 
-
-
 export default function QuickViewModal() {
   const { isOpen, selectedProduct, closeQuickView } = useQuickViewStore();
   const { addItem, setCartDrawerOpen } = useCartStore();
@@ -61,8 +59,6 @@ export default function QuickViewModal() {
     ).entries(),
   );
 
-
-
   const currentVariant =
     selectedProduct.variants.find(
       (variant) =>
@@ -73,11 +69,11 @@ export default function QuickViewModal() {
     selectedProduct.variants[0];
 
   const price =
-    currentVariant?.salePrice ||
-    currentVariant?.price ||
-    selectedProduct.salePrice ||
+    currentVariant?.salePrice ??
+    currentVariant?.price ??
+    selectedProduct.salePrice ??
     selectedProduct.basePrice;
-  const originalPrice = currentVariant?.price || selectedProduct.basePrice;
+  const originalPrice = currentVariant?.price ?? selectedProduct.basePrice;
   const hasDiscount = currentVariant
     ? currentVariant.salePrice !== null &&
       currentVariant.salePrice < currentVariant.price
@@ -109,6 +105,15 @@ export default function QuickViewModal() {
       productSlug: selectedProduct.slug,
       thumbnail: imagesToDisplay[activeImageIndex] || selectedProduct.thumbnail,
       variant: currentVariant,
+      campaign: selectedProduct.activeCampaign
+        ? {
+            id: selectedProduct.activeCampaign.id,
+            name: selectedProduct.activeCampaign.name,
+            discountType: selectedProduct.activeCampaign.discountType,
+            discountValue: selectedProduct.activeCampaign.discountValue,
+            badgeText: selectedProduct.activeCampaign.badgeText,
+          }
+        : null,
       quantity,
       price,
       totalPrice: price * quantity,
@@ -213,7 +218,6 @@ export default function QuickViewModal() {
             )}
           </div>
 
-
           <div className="space-y-2">
             <span className="text-xs font-bold text-slate-800">
               Kích thước:{' '}
@@ -223,17 +227,17 @@ export default function QuickViewModal() {
             </span>
             <div className="flex flex-wrap gap-2">
               {sizes.map((sizeLabel) => (
-                  <button
-                    key={sizeLabel}
-                    onClick={() => setSelectedSize(sizeLabel)}
-                    className={`rounded-lg border px-4 py-2 text-xs font-bold transition-all ${
-                      selectedSize === sizeLabel
-                        ? 'scale-105 border-violet-600 bg-violet-600 text-white shadow-md'
-                        : 'border-slate-200 bg-white/60 text-slate-700 hover:bg-white'
-                    }`}
-                  >
-                    {sizeLabel}
-                  </button>
+                <button
+                  key={sizeLabel}
+                  onClick={() => setSelectedSize(sizeLabel)}
+                  className={`rounded-lg border px-4 py-2 text-xs font-bold transition-all ${
+                    selectedSize === sizeLabel
+                      ? 'scale-105 border-violet-600 bg-violet-600 text-white shadow-md'
+                      : 'border-slate-200 bg-white/60 text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  {sizeLabel}
+                </button>
               ))}
             </div>
           </div>

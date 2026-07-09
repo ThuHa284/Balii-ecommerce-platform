@@ -66,7 +66,16 @@ export default function AdminDashboardPage() {
     void loadDashboard();
   }, []);
 
-  const revenueByMonth = dashboardStats?.revenueByMonth ?? [];
+  const revenueByMonth = useMemo(
+    () => dashboardStats?.revenueByMonth ?? [],
+    [dashboardStats?.revenueByMonth],
+  );
+  const recentOrders = dashboardStats?.recentOrders ?? [];
+  const topProducts = analyticsStats?.topProducts ?? [];
+  const orderStatusBreakdown = useMemo(
+    () => analyticsStats?.orderStatusBreakdown ?? [],
+    [analyticsStats?.orderStatusBreakdown],
+  );
   const maxRevenue = useMemo(() => {
     if (!revenueByMonth.length) return 1;
     return Math.max(...revenueByMonth.map((item) => item.revenue), 1);
@@ -81,12 +90,8 @@ export default function AdminDashboardPage() {
   );
 
   const totalStatusOrders = useMemo(
-    () =>
-      (analyticsStats?.orderStatusBreakdown ?? []).reduce(
-        (sum, item) => sum + item.count,
-        0,
-      ),
-    [analyticsStats],
+    () => orderStatusBreakdown.reduce((sum, item) => sum + item.count, 0),
+    [orderStatusBreakdown],
   );
 
   return (
@@ -228,14 +233,13 @@ export default function AdminDashboardPage() {
                 </div>
               ))}
 
-            {!isLoading &&
-              (dashboardStats?.recentOrders?.length ?? 0) === 0 && (
-                <div className="rounded-xl bg-white/40 p-4 text-sm text-muted-foreground">
-                  Chưa có đơn hàng nào trong hệ thống.
-                </div>
-              )}
+            {!isLoading && recentOrders.length === 0 && (
+              <div className="rounded-xl bg-white/40 p-4 text-sm text-muted-foreground">
+                Chưa có đơn hàng nào trong hệ thống.
+              </div>
+            )}
 
-            {dashboardStats?.recentOrders.map((order) => (
+            {recentOrders.map((order) => (
               <div
                 key={order.id}
                 className="flex items-center justify-between rounded-xl bg-white/40 p-3 transition-colors hover:bg-white/60"
@@ -342,13 +346,13 @@ export default function AdminDashboardPage() {
                 </div>
               ))}
 
-            {!isLoading && (analyticsStats?.topProducts.length ?? 0) === 0 && (
+            {!isLoading && topProducts.length === 0 && (
               <div className="rounded-xl bg-white/40 p-4 text-sm text-muted-foreground">
                 Chưa có dữ liệu sản phẩm bán chạy.
               </div>
             )}
 
-            {analyticsStats?.topProducts.map((product, index) => (
+            {topProducts.map((product, index) => (
               <div
                 key={product.productId}
                 className="flex items-center justify-between rounded-xl bg-white/40 p-3 transition-colors hover:bg-white/60"
@@ -377,12 +381,27 @@ export default function AdminDashboardPage() {
                         {product.quantitySold}
                       </strong>
                     </p>
+                    {product.campaignQuantitySold > 0 ? (
+                      <p className="text-[10px] text-rose-600">
+                        Campaign: {product.campaignQuantitySold} sp /{' '}
+                        {product.campaignOrderCount} đơn
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground">
+                        Campaign: chưa ghi nhận
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-xs font-bold text-primary">
                     {formatCurrency(product.revenue)}
                   </p>
+                  {product.campaignRevenue > 0 ? (
+                    <p className="text-[10px] text-rose-600">
+                      {formatCurrency(product.campaignRevenue)}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -395,7 +414,7 @@ export default function AdminDashboardPage() {
           Trạng thái đơn hàng
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {(analyticsStats?.orderStatusBreakdown ?? []).map((item) => {
+          {orderStatusBreakdown.map((item) => {
             const percent =
               totalStatusOrders > 0
                 ? Math.round((item.count / totalStatusOrders) * 100)

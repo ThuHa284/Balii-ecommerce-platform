@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { loadEnv } from '@app/common';
 
 import { UserServiceController } from './user-service.controller';
 import { UserServiceService } from './user-service.service';
@@ -10,12 +11,13 @@ import { UsersModule } from './users/users.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { LocationsModule } from './locations/locations.module';
 
+loadEnv();
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
-      
+      ignoreEnvFile: true,
     }),
 
     TypeOrmModule.forRootAsync({

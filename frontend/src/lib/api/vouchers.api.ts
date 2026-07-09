@@ -144,23 +144,28 @@ function toVoucherPayload(data: CreateVoucherData) {
 }
 
 export async function getAvailableVouchers(): Promise<Voucher[]> {
-  const { data } = await apiClient.get('/vouchers');
-  return (data as VoucherApiResponse[]).map(mapVoucher);
+  const { data } = await apiClient.get<VoucherApiResponse[]>('/vouchers');
+  return data.map(mapVoucher);
 }
 
 export async function getVoucherByCode(code: string): Promise<Voucher> {
-  const { data } = await apiClient.get(`/vouchers/code/${code}`);
-  return mapVoucher(data as VoucherApiResponse);
+  const { data } = await apiClient.get<VoucherApiResponse>(
+    `/vouchers/code/${code}`,
+  );
+  return mapVoucher(data);
 }
 
 export async function getMyVouchers(): Promise<UserVoucher[]> {
-  const { data } = await apiClient.get('/vouchers/me');
-  return (data as UserVoucherApiResponse[]).map(mapUserVoucher);
+  const { data } =
+    await apiClient.get<UserVoucherApiResponse[]>('/vouchers/me');
+  return data.map(mapUserVoucher);
 }
 
 export async function saveVoucher(code: string): Promise<UserVoucher> {
-  const { data } = await apiClient.post(`/vouchers/${code}/save`);
-  return mapUserVoucher(data as UserVoucherApiResponse);
+  const { data } = await apiClient.post<UserVoucherApiResponse>(
+    `/vouchers/${code}/save`,
+  );
+  return mapUserVoucher(data);
 }
 
 export async function validateVoucher(
@@ -168,12 +173,15 @@ export async function validateVoucher(
   orderAmount: number,
   userId?: string,
 ): Promise<VoucherValidationResult> {
-  const { data } = await apiClient.post('/vouchers/validate', {
-    code,
-    orderAmount,
-    userId,
-  });
-  return mapVoucherValidation(data as VoucherValidationApiResponse);
+  const { data } = await apiClient.post<VoucherValidationApiResponse>(
+    '/vouchers/validate',
+    {
+      code,
+      orderAmount,
+      userId,
+    },
+  );
+  return mapVoucherValidation(data);
 }
 
 export async function redeemVoucher(
@@ -181,41 +189,46 @@ export async function redeemVoucher(
   orderId: string,
   orderAmount: number,
 ): Promise<VoucherRedeemResult> {
-  const { data } = await apiClient.post('/vouchers/redeem', {
-    code,
-    orderId,
-    orderAmount,
-  });
-  return mapVoucherRedeem(data as VoucherRedeemApiResponse);
+  const { data } = await apiClient.post<VoucherRedeemApiResponse>(
+    '/vouchers/redeem',
+    {
+      code,
+      orderId,
+      orderAmount,
+    },
+  );
+  return mapVoucherRedeem(data);
 }
 
 export async function getMyVoucherUsages(): Promise<VoucherUsage[]> {
-  const { data } = await apiClient.get('/vouchers/usages/me');
-  return (data as VoucherUsageApiResponse[]).map(mapVoucherUsage);
+  const { data } = await apiClient.get<VoucherUsageApiResponse[]>(
+    '/vouchers/usages/me',
+  );
+  return data.map(mapVoucherUsage);
 }
 
 export async function getAdminVouchers(): Promise<Voucher[]> {
-  const { data } = await apiClient.get('/admin/vouchers');
-  return (data as VoucherApiResponse[]).map(mapVoucher);
+  const { data } = await apiClient.get<VoucherApiResponse[]>('/admin/vouchers');
+  return data.map(mapVoucher);
 }
 
 export async function createVoucher(data: CreateVoucherData): Promise<Voucher> {
-  const { data: response } = await apiClient.post(
+  const { data: response } = await apiClient.post<VoucherApiResponse>(
     '/admin/vouchers',
     toVoucherPayload(data),
   );
-  return mapVoucher(response as VoucherApiResponse);
+  return mapVoucher(response);
 }
 
 export async function updateVoucher(
   id: string,
   data: Partial<CreateVoucherData>,
 ): Promise<Voucher> {
-  const { data: response } = await apiClient.patch(
+  const { data: response } = await apiClient.patch<VoucherApiResponse>(
     `/admin/vouchers/${id}`,
     data,
   );
-  return mapVoucher(response as VoucherApiResponse);
+  return mapVoucher(response);
 }
 
 export async function deleteVoucher(id: string): Promise<void> {

@@ -10,15 +10,22 @@ export const ROUTE_TARGETS: RouteTarget[] = [
   { prefix: '/products', targetEnv: 'PRODUCT_SERVICE_URL' },
   { prefix: '/variants', targetEnv: 'PRODUCT_SERVICE_URL' },
   { prefix: '/categories', targetEnv: 'PRODUCT_SERVICE_URL' },
+  { prefix: '/campaigns', targetEnv: 'PRODUCT_SERVICE_URL' },
   { prefix: '/collections', targetEnv: 'PRODUCT_SERVICE_URL' },
   { prefix: '/cart', targetEnv: 'CART_SERVICE_URL' },
   { prefix: '/orders', targetEnv: 'ORDER_SERVICE_URL' },
   { prefix: '/payments', targetEnv: 'PAYMENT_SERVICE_URL' },
   { prefix: '/vouchers', targetEnv: 'VOUCHER_SERVICE_URL' },
   { prefix: '/admin/vouchers', targetEnv: 'VOUCHER_SERVICE_URL' },
+  {
+    prefix: '/admin/market-analysis',
+    targetEnv: 'MARKET_ANALYSIS_SERVICE_URL',
+  },
   { prefix: '/try-on', targetEnv: 'TRYON_SERVICE_URL' },
   { prefix: '/chatbot', targetEnv: 'CHATBOT_SERVICE_URL' },
   { prefix: '/market-analysis', targetEnv: 'MARKET_ANALYSIS_SERVICE_URL' },
 ];
 
-export const GATEWAY_TIMEOUT_MS = 15000;
+export const GATEWAY_TIMEOUT_MS = Number(
+  process.env.GATEWAY_TIMEOUT_MS ?? '60000',
+);

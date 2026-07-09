@@ -1,22 +1,40 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CartServiceController } from './cart-service.controller';
-import { CartServiceService } from './cart-service.service';
+import { CartController } from './cart-service.controller';
+import { CartService } from './cart-service.service';
 
-describe('CartServiceController', () => {
-  let cartServiceController: CartServiceController;
+describe('CartController', () => {
+  let cartServiceController: CartController;
+  const cartService = {
+    getCart: jest.fn(),
+  };
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
-      controllers: [CartServiceController],
-      providers: [CartServiceService],
+      controllers: [CartController],
+      providers: [
+        {
+          provide: CartService,
+          useValue: cartService,
+        },
+      ],
     }).compile();
 
-    cartServiceController = app.get<CartServiceController>(CartServiceController);
+    cartServiceController = app.get<CartController>(CartController);
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(cartServiceController.getHello()).toBe('Hello World!');
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('getCart', () => {
+    it('should delegate to cart service', async () => {
+      const cart = { items: [], totalAmount: 0 };
+      cartService.getCart.mockResolvedValue(cart);
+
+      await expect(
+        cartServiceController.getCart('user-1', undefined),
+      ).resolves.toBe(cart);
+      expect(cartService.getCart).toHaveBeenCalledWith('user-1', undefined);
     });
   });
 });

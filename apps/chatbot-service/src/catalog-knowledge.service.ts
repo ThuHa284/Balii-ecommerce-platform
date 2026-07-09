@@ -4,6 +4,7 @@ import {
   KnowledgeDocument,
   KnowledgeSearchResult,
   ProductContext,
+  ProductVariantContext,
   RetrievedDocument,
 } from './knowledge.types';
 
@@ -16,8 +17,21 @@ type ProductQueryRow = {
   salePrice: number | string | null;
   material: string;
   targetGender: string;
+  recommendedAgeGroups: string[] | null;
   thumbnail: string;
   updatedAt: string;
+  variants: ProductVariantQueryRow[] | null;
+};
+
+type ProductVariantQueryRow = {
+  id: string;
+  sku: string;
+  size: string;
+  color: string;
+  itemType: string;
+  price: number | string | null;
+  stock: number | string | null;
+  attributeSummary: string;
 };
 
 type SearchableKnowledgeDocument = KnowledgeDocument & {
@@ -30,7 +44,7 @@ const STATIC_KNOWLEDGE: KnowledgeDocument[] = [
     type: 'faq',
     title: 'Hướng dẫn chọn size',
     content:
-      'Khi tư vấn size, hãy ưu tiên hỏi chiều cao, cân nặng và form mặc mong muốn. Nếu chưa đủ dữ liệu, hãy nhẹ nhàng gợi ý khách xem bảng size chi tiết tại trang sản phẩm trước khi đặt.',
+      'Khi tư vấn size, hãy ưu tiên hỏi chiều cao, cân nặng và form mặc mong muốn. Nếu chưa đủ dữ liệu, hãy gợi ý khách xem bảng size chi tiết tại trang sản phẩm trước khi đặt.',
   },
   {
     id: 'faq-material',
@@ -104,11 +118,27 @@ export class CatalogKnowledgeService {
   ): KnowledgeDocument[] {
     const productDocs = products.map((product) => {
       const price = product.salePrice ?? product.price;
+      const sizes = this.collectDistinctValues(product.variants, 'size');
+      const colors = this.collectDistinctValues(product.variants, 'color');
+      const ageGroups = product.recommendedAgeGroups.map((value) =>
+        this.formatAgeGroup(value),
+      );
+      const variantSummary = product.variants.length
+        ? product.variants
+            .slice(0, 12)
+            .map((variant) => this.formatVariantSummary(variant, product.price))
+            .join(' | ')
+        : 'Chưa có dữ liệu biến thể chi tiết.';
+
       const content =
         `${product.name}. ${product.description || 'Chưa có mô tả chi tiết.'} ` +
         `Chất liệu: ${product.material || 'chưa cập nhật'}. ` +
         `Giá hiện tại: ${price.toLocaleString('vi-VN')}đ. ` +
-        `Đối tượng phù hợp: ${product.targetGender || 'unisex'}.`;
+        `Giới tính phù hợp: ${this.formatGender(product.targetGender)}. ` +
+        `Độ tuổi phù hợp: ${ageGroups.join(', ') || 'chưa cập nhật'}. ` +
+        `Size đang có: ${sizes.join(', ') || 'chưa cập nhật'}. ` +
+        `Màu đang có: ${colors.join(', ') || 'chưa cập nhật'}. ` +
+        `Biến thể: ${variantSummary}`;
 
       return {
         id: `product-${product.id}`,
@@ -121,6 +151,11 @@ export class CatalogKnowledgeService {
           thumbnail: product.thumbnail,
           price,
           salePrice: product.salePrice,
+          targetGender: product.targetGender,
+          recommendedAgeGroups: product.recommendedAgeGroups,
+          sizes,
+          colors,
+          variantCount: product.variants.length,
         },
       };
     });
@@ -143,6 +178,14 @@ export class CatalogKnowledgeService {
               product.description,
               product.material,
               product.targetGender,
+              ...product.recommendedAgeGroups,
+              ...product.variants.flatMap((variant) => [
+                variant.sku,
+                variant.size,
+                variant.color,
+                variant.itemType,
+                variant.attributeSummary,
+              ]),
             ].join(' '),
           ),
         ),
@@ -168,7 +211,40 @@ export class CatalogKnowledgeService {
         p.sale_price AS "salePrice",
         COALESCE(p.material, '') AS material,
         COALESCE(p.target_gender, 'unisex') AS "targetGender",
+        COALESCE(p.recommended_age_groups, ARRAY[]::text[]) AS "recommendedAgeGroups",
         p.updated_at AS "updatedAt",
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id', pv.id,
+                'sku', pv.sku,
+                'size', COALESCE(pv.size_label, ''),
+                'color', COALESCE(pv.color_name, ''),
+                'itemType', COALESCE(pv.item_type, ''),
+                'price', pv.price,
+                'stock', pv.stock_quantity,
+                'attributeSummary', COALESCE(
+                  (
+                    SELECT STRING_AGG(av.value, ', ' ORDER BY a.name, av.display_order, av.value)
+                    FROM product_service.variant_attribute_values vav
+                    JOIN product_service.attribute_values av
+                      ON av.id = vav.attribute_value_id
+                    JOIN product_service.attributes a
+                      ON a.id = av.attribute_id
+                    WHERE vav.variant_id = pv.id
+                  ),
+                  ''
+                )
+              )
+              ORDER BY pv.sku ASC
+            )
+            FROM product_service.product_variants pv
+            WHERE pv.product_id = p.id
+              AND pv.is_active = TRUE
+          ),
+          '[]'::json
+        ) AS variants,
         COALESCE(
           (
             SELECT img.url
@@ -193,9 +269,85 @@ export class CatalogKnowledgeService {
       salePrice: row.salePrice == null ? null : Number(row.salePrice),
       material: row.material ?? '',
       targetGender: row.targetGender ?? 'unisex',
+      recommendedAgeGroups: Array.isArray(row.recommendedAgeGroups)
+        ? row.recommendedAgeGroups.map((value) => String(value))
+        : [],
       thumbnail: row.thumbnail ?? '',
       updatedAt: row.updatedAt,
+      variants: Array.isArray(row.variants)
+        ? row.variants.map((variant) => this.mapVariant(variant))
+        : [],
     }));
+  }
+
+  private mapVariant(variant: ProductVariantQueryRow): ProductVariantContext {
+    return {
+      id: String(variant.id),
+      sku: String(variant.sku ?? ''),
+      size: String(variant.size ?? ''),
+      color: String(variant.color ?? ''),
+      itemType: String(variant.itemType ?? ''),
+      price: variant.price == null ? null : Number(variant.price),
+      stock: Number(variant.stock ?? 0),
+      attributeSummary: String(variant.attributeSummary ?? ''),
+    };
+  }
+
+  private collectDistinctValues(
+    variants: ProductVariantContext[],
+    field: 'size' | 'color',
+  ) {
+    return [
+      ...new Set(variants.map((variant) => variant[field]).filter(Boolean)),
+    ];
+  }
+
+  private formatGender(value: string) {
+    switch (value?.trim().toLowerCase()) {
+      case 'male':
+        return 'nam';
+      case 'female':
+        return 'nữ';
+      case 'kids':
+        return 'trẻ em';
+      case 'unisex':
+        return 'unisex';
+      default:
+        return value || 'chưa cập nhật';
+    }
+  }
+
+  private formatAgeGroup(value: string) {
+    const normalized = value?.trim();
+    const ageMap: Record<string, string> = {
+      '0_2': '0-2 tuổi',
+      '3_5': '3-5 tuổi',
+      '6_12': '6-12 tuổi',
+      '13_17': '13-17 tuổi',
+      '18_25': '18-25 tuổi',
+      '26_35': '26-35 tuổi',
+      '36_45': '36-45 tuổi',
+      '46_plus': '46 tuổi trở lên',
+    };
+
+    return ageMap[normalized] || normalized || 'chưa cập nhật';
+  }
+
+  private formatVariantSummary(
+    variant: ProductVariantContext,
+    defaultPrice: number,
+  ) {
+    const parts = [
+      variant.sku ? `SKU ${variant.sku}` : '',
+      variant.size ? `size ${variant.size}` : '',
+      variant.color ? `màu ${variant.color}` : '',
+      variant.itemType ? `loại ${variant.itemType}` : '',
+      variant.attributeSummary ? `thuộc tính ${variant.attributeSummary}` : '',
+      `giá ${(variant.price ?? defaultPrice).toLocaleString('vi-VN')}đ`,
+      `tồn ${variant.stock}`,
+    ].filter(Boolean);
+
+    return parts.join(', ');
   }
 
   private tokenize(value: string) {

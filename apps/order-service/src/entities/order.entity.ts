@@ -18,10 +18,22 @@ export class Order {
   @Column({ name: 'subtotal', type: 'numeric', precision: 12, scale: 2 })
   subtotal!: number;
 
-  @Column({ name: 'discount_amount', type: 'numeric', precision: 12, scale: 2, default: 0 })
+  @Column({
+    name: 'discount_amount',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0,
+  })
   discountAmount!: number;
 
-  @Column({ name: 'shipping_fee', type: 'numeric', precision: 12, scale: 2, default: 0 })
+  @Column({
+    name: 'shipping_fee',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0,
+  })
   shippingFee!: number;
 
   @Column({ name: 'total_amount', type: 'numeric', precision: 12, scale: 2 })

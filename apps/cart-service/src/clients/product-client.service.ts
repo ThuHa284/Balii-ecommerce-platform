@@ -12,6 +12,11 @@ export interface ProductVariantSnapshot {
   variantSize?: string;
   variantColor?: string;
   thumbnailUrl?: string;
+  campaignId?: string | null;
+  campaignName?: string | null;
+  campaignDiscountType?: 'PERCENT' | 'AMOUNT' | 'GIFT' | null;
+  campaignDiscountValue?: number | null;
+  campaignBadgeText?: string | null;
   unitPrice: number;
   stockQuantity: number;
   reservedQuantity: number;

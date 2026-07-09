@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Brain,
+  BarChart3,
   Grid2x2,
   LayoutDashboard,
-  Library,
   LogOut,
+  Megaphone,
   Package,
   Settings,
   ShoppingCart,
@@ -31,11 +31,15 @@ const adminLinks: AdminLink[] = [
   { href: '/admin/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Sản phẩm', icon: Package },
   { href: '/admin/categories', label: 'Danh mục', icon: Grid2x2 },
-  { href: '/admin/collections', label: 'Bộ sưu tập', icon: Library },
+  { href: '/admin/campaigns', label: 'Chiến dịch', icon: Megaphone },
   { href: '/admin/orders', label: 'Đơn hàng', icon: ShoppingCart },
   { href: '/admin/vouchers', label: 'Voucher', icon: Ticket },
   { href: '/admin/users', label: 'Khách hàng', icon: Users },
-  { href: '/admin/ai-agent', label: 'AI Agent', icon: Brain },
+  {
+    href: '/admin/market-analysis',
+    label: 'Phân tích thị trường',
+    icon: BarChart3,
+  },
   {
     href: '/admin/settings',
     label: 'Cài đặt hệ thống',

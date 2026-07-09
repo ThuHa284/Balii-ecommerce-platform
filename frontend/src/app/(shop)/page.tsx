@@ -13,10 +13,16 @@ import {
 } from 'lucide-react';
 import ComboBanner from '@/components/product/combo-banner';
 import ProductGrid from '@/components/product/product-grid';
+import { getActiveCampaigns } from '@/lib/api/campaigns.api';
 import { getCollections } from '@/lib/api/collections.api';
 import { getCategories } from '@/lib/api/categories.api';
-import { getFeaturedProducts, getNewProducts } from '@/lib/api/products.api';
-import { Category, Collection, Product } from '@/types/product.types';
+import {
+  getFeaturedProducts,
+  getNewProducts,
+  getProducts,
+} from '@/lib/api/products.api';
+import { formatCurrency } from '@/lib/utils';
+import { Campaign, Category, Collection, Product } from '@/types/product.types';
 
 const HERO_VIDEO_URL =
   'https://res.cloudinary.com/ddbnubhxr/video/upload/f_auto,q_auto,ac_none/v1777210564/video_background_ijdowe.mp4';
@@ -26,7 +32,9 @@ export default function HomePage() {
   const [videoError, setVideoError] = useState(false);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [newProducts, setNewProducts] = useState<Product[]>([]);
+  const [campaignProducts, setCampaignProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
 
   useEffect(() => {
@@ -41,22 +49,53 @@ export default function HomePage() {
 
   useEffect(() => {
     async function loadData() {
-      const [featured, newest, categoryList, collectionList] =
-        await Promise.all([
-          getFeaturedProducts(),
-          getNewProducts(),
-          getCategories(),
-          getCollections(),
-        ]);
+      const [
+        featured,
+        newest,
+        productResult,
+        categoryList,
+        campaignList,
+        collectionList,
+      ] = await Promise.all([
+        getFeaturedProducts(),
+        getNewProducts(),
+        getProducts({ page: 1, limit: 50 }),
+        getCategories(),
+        getActiveCampaigns(),
+        getCollections(),
+      ]);
 
       setFeaturedProducts(featured);
       setNewProducts(newest);
+      setCampaignProducts(productResult.products);
       setCategories(categoryList);
+      setCampaigns(campaignList);
       setCollections(collectionList);
     }
 
     void loadData();
   }, []);
+
+  const primaryCampaign = campaigns[0] ?? null;
+  const primaryCampaignProducts = primaryCampaign
+    ? campaignProducts
+        .filter((product) => primaryCampaign.productIds.includes(product.id))
+        .slice(0, 4)
+    : [];
+
+  function getCampaignOfferLabel(campaign: Campaign) {
+    if (campaign.discountType === 'PERCENT') {
+      return `Giảm thêm ${campaign.discountValue ?? 0}%`;
+    }
+
+    if (campaign.discountType === 'AMOUNT') {
+      return `Giảm thêm ${formatCurrency(campaign.discountValue ?? 0)}`;
+    }
+
+    return campaign.giftName
+      ? `Tặng kèm ${campaign.giftName}`
+      : 'Tặng quà/phụ kiện';
+  }
 
   return (
     <div>
@@ -94,8 +133,8 @@ export default function HomePage() {
           </h1>
 
           <p className="fade-in-up fade-in-up-delay-2 mx-auto mb-8 max-w-xl text-lg leading-relaxed text-foreground/80 md:text-xl">
-            Khám phá bộ sưu tập đồ ngủ  - thiết kế xinh xắn, chất
-            liệu tự nhiên, giá cả hợp lý
+            Khám phá bộ sưu tập đồ ngủ - thiết kế xinh xắn, chất liệu tự nhiên,
+            giá cả hợp lý
           </p>
 
           <div className="fade-in-up fade-in-up-delay-3 flex flex-col justify-center gap-4 sm:flex-row">
@@ -173,6 +212,111 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {primaryCampaign ? (
+        <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-[32px] border border-rose-200/60 bg-gradient-to-br from-rose-50 via-orange-50 to-amber-50 shadow-sm">
+            <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="p-8 md:p-10">
+                <span className="inline-flex items-center rounded-full border border-rose-300/50 bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">
+                  {primaryCampaign.badgeText || 'Chiến dịch nổi bật'}
+                </span>
+                <h2 className="mt-4 font-heading text-3xl font-bold text-slate-900 md:text-4xl">
+                  {primaryCampaign.name}
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
+                  {primaryCampaign.shortDescription ||
+                    primaryCampaign.description}
+                </p>
+
+                <div className="mt-6 flex flex-wrap gap-3 text-sm">
+                  <span className="rounded-full bg-rose-600 px-4 py-2 font-semibold text-white">
+                    {getCampaignOfferLabel(primaryCampaign)}
+                  </span>
+                  <span className="rounded-full border border-slate-300 bg-white/80 px-4 py-2 text-slate-700">
+                    Kết thúc lúc{' '}
+                    {new Date(primaryCampaign.endAt).toLocaleDateString(
+                      'vi-VN',
+                    )}
+                  </span>
+                </div>
+
+                <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                  {primaryCampaignProducts.map((product) => {
+                    const campaignPrice =
+                      product.salePrice ?? product.basePrice;
+                    const regularPrice = product.basePrice;
+
+                    return (
+                      <Link
+                        key={product.id}
+                        href={`/products/${product.slug}`}
+                        className="group flex gap-4 rounded-2xl border border-white/70 bg-white/75 p-3 transition hover:-translate-y-0.5 hover:shadow-lg"
+                      >
+                        <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+                          <Image
+                            src={product.thumbnail}
+                            alt={product.name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="line-clamp-2 text-sm font-semibold text-slate-900">
+                            {product.name}
+                          </p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-base font-bold text-rose-600">
+                              {formatCurrency(campaignPrice)}
+                            </span>
+                            {campaignPrice < regularPrice ? (
+                              <span className="text-xs text-slate-400 line-through">
+                                {formatCurrency(regularPrice)}
+                              </span>
+                            ) : null}
+                          </div>
+                          {primaryCampaign.discountType === 'GIFT' ? (
+                            <p className="mt-2 text-xs text-slate-500">
+                              {primaryCampaign.giftDescription ||
+                                'Áp dụng quà tặng trong thời gian chiến dịch.'}
+                            </p>
+                          ) : (
+                            <p className="mt-2 text-xs font-medium text-rose-700">
+                              Ưu đãi chiến dịch áp dụng khi mua trong thời gian
+                              diễn ra.
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="relative min-h-[320px] bg-slate-900">
+                {primaryCampaign.bannerImage ? (
+                  <Image
+                    src={primaryCampaign.bannerImage}
+                    alt={primaryCampaign.name}
+                    fill
+                    className="object-cover"
+                  />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-900/30 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-8 text-white">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/70">
+                    Ưu tiên hiển thị dưới danh mục nổi bật
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-white/85">
+                    {primaryCampaign.description ||
+                      'Sản phẩm trong chiến dịch sẽ được áp dụng mức ưu đãi riêng trong khoảng thời gian đã cấu hình.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
         <ComboBanner />
@@ -258,14 +402,13 @@ export default function HomePage() {
               Câu Chuyện <span className="text-gradient">Balii</span>
             </h2>
             <p className="mb-4 leading-relaxed text-muted-foreground">
-              Balii Sleepwear ra đời từ niềm đam mê tạo nên những bộ đồ ngủ
-              xin xắn với giá cả hợp lý. Chúng tôi tin rằng mỗi người đều xứng
-              đáng được tận hưởng sự mềm mại và dễ chịu của mỗi đêm.
+              Balii Sleepwear ra đời từ niềm đam mê tạo nên những bộ đồ ngủ xin
+              xắn với giá cả hợp lý. Chúng tôi tin rằng mỗi người đều xứng đáng
+              được tận hưởng sự mềm mại và dễ chịu của mỗi đêm.
             </p>
             <p className="mb-6 leading-relaxed text-muted-foreground">
-              Với chất liệu tự nhiên 100%, thiết kế thanh lịch và sự chú
-              trọng đến từng chi tiết, Balii mang đến cho bạn giấc ngủ ngọt ngào
-              nhất.
+              Với chất liệu tự nhiên 100%, thiết kế thanh lịch và sự chú trọng
+              đến từng chi tiết, Balii mang đến cho bạn giấc ngủ ngọt ngào nhất.
             </p>
             <div className="flex gap-8">
               {[
@@ -284,7 +427,7 @@ export default function HomePage() {
           </div>
           <div className="relative aspect-square overflow-hidden rounded-2xl">
             <Image
-              src="https://images.unsplash.com/photo-1631048835765-13e56e5f5ee4?w=600"
+              src="/images/placeholder.svg"
               alt="Balii Sleepwear"
               fill
               className="object-cover"

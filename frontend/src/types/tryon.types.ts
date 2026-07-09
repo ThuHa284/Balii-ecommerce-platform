@@ -21,6 +21,13 @@ export interface TryOnRequest {
   garmentPhotoType?: 'auto' | 'model' | 'flat-lay';
 }
 
+export interface TryOnProductDesignRequest {
+  baseGarmentImage: string;
+  colorReferenceImage: string;
+  patternReferenceImage: string;
+  productId?: string;
+}
+
 export interface TryOnResult {
   id: string;
   resultImageUrl: string;

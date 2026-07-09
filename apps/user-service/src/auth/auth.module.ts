@@ -15,7 +15,6 @@ import { EmailVerification } from '../entities/email-verification.entity';
 import { UsersModule } from '../users/users.module';
 import { PasswordReset } from '../entities/password-reset.entity';
 
-
 @Module({
   imports: [
     UsersModule,
@@ -33,11 +32,7 @@ import { PasswordReset } from '../entities/password-reset.entity';
 
   controllers: [AuthController],
 
-  providers: [
-    AuthService,
-    LocalStrategy,
-    JwtStrategy,
-  ],
+  providers: [AuthService, LocalStrategy, JwtStrategy],
 
   exports: [AuthService],
 })

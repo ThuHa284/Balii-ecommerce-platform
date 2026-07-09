@@ -10,6 +10,11 @@ type CheckoutCartItem = {
   sku: string;
   thumbnailUrl?: string;
   variantLabel: string;
+  campaignId?: string | null;
+  campaignName?: string | null;
+  campaignDiscountType?: 'PERCENT' | 'AMOUNT' | 'GIFT' | null;
+  campaignDiscountValue?: number | null;
+  campaignBadgeText?: string | null;
   unitPrice: number;
   quantity: number;
   subtotal: number;
@@ -32,7 +37,10 @@ export class CartClientService {
 
   constructor(private readonly httpService: HttpService) {}
 
-  async getCheckoutCart(userId: string, sessionId?: string): Promise<CheckoutCart> {
+  async getCheckoutCart(
+    userId: string,
+    sessionId?: string,
+  ): Promise<CheckoutCart> {
     try {
       const response = await firstValueFrom(
         this.httpService.get<CheckoutCart>(
@@ -63,7 +71,9 @@ export class CartClientService {
         }),
       );
     } catch {
-      throw new BadGatewayException('Unable to clear cart after order creation');
+      throw new BadGatewayException(
+        'Unable to clear cart after order creation',
+      );
     }
   }
 }

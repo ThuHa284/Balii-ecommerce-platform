@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import {
   Ticket,
   Tag,
@@ -33,11 +34,7 @@ export default function VouchersPage() {
   const [savingCode, setSavingCode] = useState<string | null>(null);
   const [savedCodes, setSavedCodes] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useEffectEvent(async () => {
     setLoading(true);
     try {
       const [availableResult, savedResult] = await Promise.allSettled([
@@ -55,7 +52,11 @@ export default function VouchersPage() {
     } finally {
       setLoading(false);
     }
-  }
+  });
+
+  useEffect(() => {
+    void loadData();
+  }, []);
 
   async function handleSave(code: string) {
     setSavingCode(code);
@@ -66,13 +67,6 @@ export default function VouchersPage() {
     } finally {
       setSavingCode(null);
     }
-  }
-
-  function getDiscountLabel(voucher: Voucher) {
-    if (voucher.discountType === VoucherDiscountType.PERCENT) {
-      return `${voucher.discountValue}%`;
-    }
-    return formatCurrency(voucher.discountValue);
   }
 
   function getRemainingPercent(voucher: Voucher) {

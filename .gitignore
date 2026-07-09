@@ -39,6 +39,7 @@ libs/**/dist
 # Env files
 .env
 .env.*
+.envdev.txt
 !.env.example
 !.env*.example
 

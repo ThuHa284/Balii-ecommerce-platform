@@ -15,6 +15,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { NAV_LINKS } from "@/lib/constants";
+import { useHasMounted } from "@/hooks/use-has-mounted";
 import { useCartStore } from "@/store/cart.store";
 import { useUIStore } from "@/store/ui.store";
 import { useAuthStore } from "@/store/auth.store";
@@ -179,11 +180,7 @@ function AuthSection() {
  * This prevents Next.js SSR hydration mismatches.
  */
 function AuthSectionHydrated() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHasMounted();
 
   if (!mounted) {
     // Skeleton placeholder — same size as the avatar button so layout doesn't shift

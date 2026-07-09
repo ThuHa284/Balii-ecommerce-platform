@@ -7,8 +7,21 @@ export type ProductContext = {
   salePrice: number | null;
   material: string;
   targetGender: string;
+  recommendedAgeGroups: string[];
   thumbnail: string;
   updatedAt?: string;
+  variants: ProductVariantContext[];
+};
+
+export type ProductVariantContext = {
+  id: string;
+  sku: string;
+  size: string;
+  color: string;
+  itemType: string;
+  price: number | null;
+  stock: number;
+  attributeSummary: string;
 };
 
 export type KnowledgeDocument = {
@@ -16,7 +29,7 @@ export type KnowledgeDocument = {
   type: 'faq' | 'policy' | 'product';
   title: string;
   content: string;
-  metadata?: Record<string, string | number | null>;
+  metadata?: Record<string, unknown>;
 };
 
 export type RetrievedDocument = KnowledgeDocument & {

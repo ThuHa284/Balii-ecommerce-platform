@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   BarChart3,
-  Brain,
   LayoutDashboard,
-  Library,
+  Megaphone,
   Package,
   Search,
   Settings,
@@ -44,11 +43,11 @@ const NAV_OPTIONS: NavOption[] = [
     keywords: 'san pham products hang hoa kho',
   },
   {
-    label: 'Quản lý Bộ sưu tập',
-    href: '/admin/collections',
-    category: 'Bán hàng',
-    icon: Library,
-    keywords: 'bo suu tap collections album mua',
+    label: 'Quản lý Chiến dịch',
+    href: '/admin/campaigns',
+    category: 'Khuyến mãi',
+    icon: Megaphone,
+    keywords: 'chien dich campaign sale promotion marketing bo suu tap mua',
   },
   {
     label: 'Quản lý Đơn hàng',
@@ -79,11 +78,12 @@ const NAV_OPTIONS: NavOption[] = [
     keywords: 'phan tich analytics bao cao doanh thu bieu do',
   },
   {
-    label: 'AI Agent',
-    href: '/admin/ai-agent',
+    label: 'Phân tích thị trường',
+    href: '/admin/market-analysis',
     category: 'AI',
-    icon: Brain,
-    keywords: 'ai agent tro ly ao tu van',
+    icon: BarChart3,
+    keywords:
+      'phan tich thi truong market analysis tim bang anh google lens san pham tuong tu doi thu',
   },
   {
     label: 'Cài đặt hệ thống',
@@ -103,11 +103,24 @@ export default function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const openPalette = () => {
+    setIsOpen(true);
+    setSearch('');
+    setSelectedIndex(0);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        setIsOpen((prev) => !prev);
+        if (isOpen) {
+          setIsOpen(false);
+        } else {
+          openPalette();
+        }
       } else if (e.key === 'Escape') {
         setIsOpen(false);
       }
@@ -115,26 +128,16 @@ export default function CommandPalette() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isOpen]);
 
   useEffect(() => {
     const handleOpen = () => {
-      setIsOpen(true);
+      openPalette();
     };
 
     window.addEventListener('open-command-palette', handleOpen);
     return () => window.removeEventListener('open-command-palette', handleOpen);
   }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 50);
-    setSearch('');
-    setSelectedIndex(0);
-  }, [isOpen]);
 
   const filtered = NAV_OPTIONS.filter((option) => {
     if (!hasRoleAccess(userRole, option.roles)) {

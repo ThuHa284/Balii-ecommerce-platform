@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2, MapPin, Phone, User, X } from 'lucide-react';
@@ -70,9 +70,9 @@ export default function AddressFormModal({
 
   const {
     register,
-    watch,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
@@ -84,7 +84,7 @@ export default function AddressFormModal({
     },
   });
 
-  const provinceId = watch('provinceId');
+  const provinceId = useWatch({ control, name: 'provinceId' });
 
   const selectedProvince = useMemo(
     () => provinces.find((item) => String(item.id) === provinceId) ?? null,

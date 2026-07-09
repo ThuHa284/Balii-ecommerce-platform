@@ -25,8 +25,6 @@ describe('PaymentServiceController (e2e)', () => {
   });
 
   it('/payments (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/payments')
-      .expect(200, []);
+    return request(app.getHttpServer()).get('/payments').expect(200, []);
   });
 });

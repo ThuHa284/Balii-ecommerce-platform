@@ -22,31 +22,31 @@ export class AddressesService {
   }
 
   async create(userId: string, dto: CreateAddressDto) {
-  console.log('========== CREATE ADDRESS ==========');
-  console.log('USER ID:', userId);
-  console.log('DTO:', dto);
+    console.log('========== CREATE ADDRESS ==========');
+    console.log('USER ID:', userId);
+    console.log('DTO:', dto);
 
-  const count = await this.addressRepo.count({
-    where: { userId },
-  });
+    const count = await this.addressRepo.count({
+      where: { userId },
+    });
 
-  console.log('ADDRESS COUNT:', count);
+    console.log('ADDRESS COUNT:', count);
 
-  const address = this.addressRepo.create({
-    userId,
-    ...dto,
-    isDefault: count === 0,
-  });
+    const address = this.addressRepo.create({
+      userId,
+      ...dto,
+      isDefault: count === 0,
+    });
 
-  console.log('ADDRESS ENTITY:', address);
+    console.log('ADDRESS ENTITY:', address);
 
-  const savedAddress = await this.addressRepo.save(address);
+    const savedAddress = await this.addressRepo.save(address);
 
-  console.log('SAVED ADDRESS:', savedAddress);
-  console.log('===================================');
+    console.log('SAVED ADDRESS:', savedAddress);
+    console.log('===================================');
 
-  return savedAddress;
-}
+    return savedAddress;
+  }
 
   async update(userId: string, id: string, dto: UpdateAddressDto) {
     const address = await this.addressRepo.findOne({
@@ -89,11 +89,7 @@ export class AddressesService {
 
       await manager.update(UserAddress, { userId }, { isDefault: false });
 
-      await manager.update(
-        UserAddress,
-        { id, userId },
-        { isDefault: true },
-      );
+      await manager.update(UserAddress, { id, userId }, { isDefault: true });
 
       return manager.findOne(UserAddress, {
         where: { id, userId },

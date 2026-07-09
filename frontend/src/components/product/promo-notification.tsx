@@ -17,14 +17,11 @@ import { cn } from "@/lib/utils";
 // ─── Floating Promo Bar ──────────────────────────────────────────────────────
 
 export function FloatingPromoBar() {
-  const [isVisible, setIsVisible] = useState(true);
-  const [isDismissed, setIsDismissed] = useState(false);
-
-  useEffect(() => {
-    // Check if dismissed in this session
-    const dismissed = sessionStorage.getItem("promo-bar-dismissed");
-    if (dismissed) setIsDismissed(true);
-  }, []);
+  const [isDismissed, setIsDismissed] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("promo-bar-dismissed") != null
+  );
 
   const handleDismiss = () => {
     setIsDismissed(true);
@@ -37,7 +34,7 @@ export function FloatingPromoBar() {
     <div
       className={cn(
         "promo-float-bar py-3 transition-all duration-500",
-        isVisible ? "translate-y-0" : "translate-y-full"
+        "translate-y-0"
       )}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

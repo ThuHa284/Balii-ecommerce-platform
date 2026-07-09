@@ -1,13 +1,16 @@
 'use client';
 
 import { type RefObject, useCallback, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { Camera, CameraOff, RotateCcw, Upload, User, X } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { cn } from '@/lib/utils';
 import { useTryOnStore } from '@/store/tryon.store';
-import { toast } from 'sonner';
 
 interface TryOnUploadProps {
   className?: string;
+  compact?: boolean;
 }
 
 function validateImage(file: File) {
@@ -20,7 +23,31 @@ function validateImage(file: File) {
   }
 }
 
-export default function TryOnUpload({ className }: TryOnUploadProps) {
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error('Không thể đọc ảnh đã chọn.'));
+    };
+
+    reader.onerror = () => {
+      reject(new Error('Không thể đọc ảnh đã chọn.'));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+export default function TryOnUpload({
+  className,
+  compact = false,
+}: TryOnUploadProps) {
   const { userImage, setUserImage, showCamera, setShowCamera } =
     useTryOnStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,11 +66,11 @@ export default function TryOnUpload({ className }: TryOnUploadProps) {
   useEffect(() => stopCameraStream, [stopCameraStream]);
 
   const handleUseImageFile = useCallback(
-    (file: File) => {
+    async (file: File) => {
       try {
         validateImage(file);
-        const url = URL.createObjectURL(file);
-        setUserImage(url);
+        const imageDataUrl = await readFileAsDataUrl(file);
+        setUserImage(imageDataUrl);
       } catch (error) {
         toast.error(
           error instanceof Error
@@ -60,7 +87,7 @@ export default function TryOnUpload({ className }: TryOnUploadProps) {
       const file = event.target.files?.[0];
 
       if (!file) return;
-      handleUseImageFile(file);
+      void handleUseImageFile(file);
     },
     [handleUseImageFile],
   );
@@ -74,7 +101,7 @@ export default function TryOnUpload({ className }: TryOnUploadProps) {
       const file = (event.target as HTMLInputElement).files?.[0];
 
       if (file) {
-        handleUseImageFile(file);
+        void handleUseImageFile(file);
       }
     };
     input.click();
@@ -110,11 +137,9 @@ export default function TryOnUpload({ className }: TryOnUploadProps) {
           });
         }
       }, 0);
-    } catch (error) {
+    } catch {
       toast.error(
-        error instanceof Error
-          ? 'Không thể mở camera. Hãy kiểm tra quyền truy cập camera của trình duyệt.'
-          : 'Không thể mở camera. Vui lòng thử lại.',
+        'Không thể mở camera. Hãy kiểm tra quyền truy cập camera của trình duyệt.',
       );
       stopCameraStream();
       setShowCamera(false);
@@ -175,12 +200,23 @@ export default function TryOnUpload({ className }: TryOnUploadProps) {
   if (userImage) {
     return (
       <>
-        <div className={cn('relative group', className)}>
-          <div className="relative aspect-[3/4] rounded-2xl overflow-hidden glass-card">
-            <img
+        <div className={cn('group relative', className)}>
+          <div
+            className={cn(
+              'relative overflow-hidden rounded-2xl glass-card',
+              compact ? 'aspect-[3/4]' : 'aspect-square max-h-[360px]',
+            )}
+          >
+            <Image
               src={userImage}
               alt="Ảnh của bạn"
-              className="h-full w-full object-cover"
+              fill
+              className="object-cover"
+              sizes={
+                compact
+                  ? '(max-width: 468px) 100vw, 280px'
+                  : '(max-width: 468px) 100vw, 400px'
+              }
             />
             <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
               <button
@@ -226,13 +262,31 @@ export default function TryOnUpload({ className }: TryOnUploadProps) {
 
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="group flex aspect-[3/4] cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-violet-300/50 glass-card transition-all hover:border-violet-400 hover:bg-white/50"
+          className={cn(
+            'group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-300/50 glass-card transition-all hover:border-violet-400 hover:bg-white/50',
+            compact ? 'aspect-[3/4] gap-2' : 'aspect-square max-h-[360px] gap-4',
+          )}
         >
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-violet-100 transition-transform group-hover:scale-110">
-            <User className="h-10 w-10 text-violet-400" />
+          <div
+            className={cn(
+              'flex items-center justify-center rounded-full bg-violet-100 transition-transform group-hover:scale-110',
+              compact ? 'h-14 w-14' : 'h-20 w-20',
+            )}
+          >
+            <User
+              className={cn(
+                'text-violet-400',
+                compact ? 'h-7 w-7' : 'h-10 w-10',
+              )}
+            />
           </div>
           <div className="px-4 text-center">
-            <p className="mb-1 text-sm font-medium text-foreground">
+            <p
+              className={cn(
+                'mb-1 font-medium text-foreground',
+                compact ? 'text-xs' : 'text-sm',
+              )}
+            >
               Tải ảnh của bạn
             </p>
             <p className="text-xs text-muted-foreground">
@@ -241,17 +295,25 @@ export default function TryOnUpload({ className }: TryOnUploadProps) {
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div
+          className={cn('mt-3 grid grid-cols-2', compact ? 'gap-2' : 'gap-3')}
+        >
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 rounded-xl border border-white/50 bg-white/60 px-4 py-3 text-sm font-medium text-foreground transition-all hover:bg-white/80 active:scale-95"
+            className={cn(
+              'flex items-center justify-center gap-2 rounded-xl border border-white/50 bg-white/60 px-4 font-medium text-foreground transition-all hover:bg-white/80 active:scale-95',
+              compact ? 'py-2 text-xs' : 'py-3 text-sm',
+            )}
           >
             <Upload className="h-4 w-4 text-violet-500" />
             Thư viện
           </button>
           <button
             onClick={handleCameraClick}
-            className="flex items-center justify-center gap-2 rounded-xl bg-violet-500 px-4 py-3 text-sm font-medium text-white shadow-lg shadow-violet-300/25 transition-all hover:bg-violet-600 active:scale-95"
+            className={cn(
+              'flex items-center justify-center gap-2 rounded-xl bg-violet-500 px-4 font-medium text-white shadow-lg shadow-violet-300/25 transition-all hover:bg-violet-600 active:scale-95',
+              compact ? 'py-2 text-xs' : 'py-3 text-sm',
+            )}
           >
             <Camera className="h-4 w-4" />
             Chụp ảnh

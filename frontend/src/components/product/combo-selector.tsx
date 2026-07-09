@@ -7,11 +7,12 @@ import { COMBO_TIERS, MOCK_COMBO_SHORTS } from "@/lib/api/mock-data";
 import { formatCurrency } from "@/lib/utils";
 
 interface ComboSelectorProps {
-  productPrice: number;
+  productPrice?: number;
   onSelectCombo?: (tier: typeof COMBO_TIERS[number], shortsSize: string, shortsColor: string) => void;
 }
 
-export default function ComboSelector({ productPrice, onSelectCombo }: ComboSelectorProps) {
+export default function ComboSelector({ productPrice: _productPrice, onSelectCombo }: ComboSelectorProps) {
+  void _productPrice;
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState(MOCK_COMBO_SHORTS.sizes[1]); // Default M
   const [selectedColor, setSelectedColor] = useState(MOCK_COMBO_SHORTS.colors[0]);

@@ -2,6 +2,6 @@ import { IsEmail, IsNotEmpty } from 'class-validator';
 
 export class ForgotPasswordDto {
   @IsEmail()
-   @IsNotEmpty()
+  @IsNotEmpty()
   email!: string;
 }

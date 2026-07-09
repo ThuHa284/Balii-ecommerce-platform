@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -29,6 +28,20 @@ const STATUS_ACTIONS = [
   'delivered',
 ] as const;
 
+function getOrderItemCampaignLabel(item: AdminOrder['items'][number]) {
+  if (item.campaignBadgeText) return item.campaignBadgeText;
+  if (item.campaignDiscountType === 'PERCENT') {
+    return `Giảm thêm ${item.campaignDiscountValue ?? 0}%`;
+  }
+  if (item.campaignDiscountType === 'AMOUNT') {
+    return `Giảm thêm ${formatCurrency(item.campaignDiscountValue ?? 0)}`;
+  }
+  if (item.campaignDiscountType === 'GIFT') {
+    return item.campaignName || 'Tặng quà chiến dịch';
+  }
+  return item.campaignName || '';
+}
+
 function OrderDetailModal({
   order,
   onClose,
@@ -42,14 +55,35 @@ function OrderDetailModal({
   const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
 
   useEffect(() => {
+    let isActive = true;
+
     if (!order) {
-      setReturnRequests([]);
-      return;
+      queueMicrotask(() => {
+        if (isActive) {
+          setReturnRequests([]);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
     }
 
     void getAdminOrderReturnRequests(order.id)
-      .then(setReturnRequests)
-      .catch(() => setReturnRequests([]));
+      .then((requests) => {
+        if (isActive) {
+          setReturnRequests(requests);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setReturnRequests([]);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, [order]);
 
   if (!order) return null;
@@ -212,13 +246,18 @@ function OrderDetailModal({
                     <p className="text-xs text-muted-foreground">
                       SKU: {item.sku}
                     </p>
+                    {item.campaignName ? (
+                      <p className="mt-1 inline-flex rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">
+                        {getOrderItemCampaignLabel(item)}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-right">
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(item.price)} x {item.quantity}
+                    </p>
                     <p className="text-sm font-semibold text-primary">
                       {formatCurrency(item.totalPrice)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      x{item.quantity}
                     </p>
                   </div>
                 </div>

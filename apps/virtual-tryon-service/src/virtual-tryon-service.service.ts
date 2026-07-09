@@ -3,17 +3,21 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PersonAnalysisService } from './analysis/person-analysis.service';
 import { CloudinaryService } from './cloudinary.service';
-import { CreateTryOnDto } from './dto/create-tryon.dto';
+import { CreateProductDesignDto, CreateTryOnDto } from './dto/create-tryon.dto';
 import { TryonHistory } from './entities/tryon-history.entity';
 
 type UploadedImageFile = Express.Multer.File;
@@ -21,6 +25,12 @@ type UploadedImageFile = Express.Multer.File;
 type TryOnFiles = {
   modelImage?: UploadedImageFile[];
   garmentImage?: UploadedImageFile[];
+};
+
+type ProductDesignFiles = {
+  baseGarmentImage?: UploadedImageFile[];
+  colorReferenceImage?: UploadedImageFile[];
+  patternReferenceImage?: UploadedImageFile[];
 };
 
 type TryOnWarnings = {
@@ -35,6 +45,8 @@ type TryOnWarnings = {
 
 @Injectable()
 export class VirtualTryonServiceService {
+  private readonly logger = new Logger(VirtualTryonServiceService.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly cloudinaryService: CloudinaryService,
@@ -71,6 +83,94 @@ export class VirtualTryonServiceService {
     }
 
     return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+  }
+
+  private getImageLabel(fieldName: string): string {
+    switch (fieldName) {
+      case 'modelImage':
+        return 'Ảnh người mẫu';
+      case 'garmentImage':
+        return 'Ảnh sản phẩm';
+      case 'baseGarmentImage':
+        return 'Ảnh form gốc sản phẩm';
+      case 'colorReferenceImage':
+        return 'Ảnh màu tham chiếu';
+      case 'patternReferenceImage':
+        return 'Ảnh hoạ tiết tham chiếu';
+      default:
+        return fieldName;
+    }
+  }
+
+  private fileToInlineData(
+    file: UploadedImageFile | undefined,
+    fieldName: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException(
+        `${this.getImageLabel(fieldName)} là bắt buộc.`,
+      );
+    }
+
+    if (!file.mimetype.startsWith('image/')) {
+      throw new BadRequestException(
+        `${this.getImageLabel(fieldName)} phải là tệp hình ảnh.`,
+      );
+    }
+
+    return {
+      inlineData: {
+        mimeType: file.mimetype,
+        data: file.buffer.toString('base64'),
+      },
+    };
+  }
+
+  private extractInlineImageData(response: {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{
+          inlineData?: {
+            data?: string;
+            mimeType?: string;
+          };
+          text?: string;
+        }>;
+      };
+    }>;
+    text?: () => string;
+  }) {
+    const parts = response.candidates?.[0]?.content?.parts ?? [];
+
+    for (const part of parts) {
+      if (part.inlineData?.data && part.inlineData?.mimeType) {
+        return part.inlineData;
+      }
+    }
+
+    return null;
+  }
+
+  private buildProductDesignPrompt(): string {
+    return [
+      "Create a clean front-facing product image of a women's sleepwear top.",
+      '',
+      'Use the garment shape and silhouette from the source/base garment image.',
+      'Use the main color, color tone, and fabric color style from the COLOR REFERENCE image.',
+      'Use the pattern, print, or motif from the PATTERN REFERENCE image.',
+      '',
+      'Combine the color and the pattern into one coherent final garment design.',
+      'Do not create a split half-and-half garment.',
+      'Do not place two garments side by side.',
+      'Do not copy the entire color reference garment.',
+      'Do not copy the entire pattern reference garment.',
+      'Only use the color from the color reference and only use the pattern from the pattern reference.',
+      '',
+      'Keep the garment realistic, centered, front-facing, and suitable for virtual try-on.',
+      'Keep the fabric texture natural and soft like sleepwear.',
+      'Use a clean white background.',
+      'Do not add a person, mannequin, hanger, text, logo, watermark, or extra accessories.',
+    ].join('\n');
   }
 
   private parseRecommendedAgeGroups(dto: CreateTryOnDto): string[] {
@@ -124,6 +224,38 @@ export class VirtualTryonServiceService {
       success: false,
       message: 'Không thể tạo ảnh thử đồ lúc này.',
     });
+  }
+
+  private extractProviderErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    return String(error);
+  }
+
+  private isGeminiQuotaError(error: unknown): boolean {
+    const errorText = this.extractProviderErrorMessage(error).toLowerCase();
+
+    return (
+      errorText.includes('429') ||
+      errorText.includes('quota exceeded') ||
+      errorText.includes('too many requests') ||
+      errorText.includes('rate limit') ||
+      errorText.includes('generate_content_free_tier')
+    );
+  }
+
+  private buildGeminiQuotaException(): HttpException {
+    return new HttpException(
+      {
+        success: false,
+        code: 'GEMINI_QUOTA_EXCEEDED',
+        message:
+          'Bản demo try-on mới đang tạm hết quota Gemini để tạo ảnh. Vui lòng thử lại sau hoặc cấu hình API key Gemini có billing/quota khả dụng.',
+      },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
   }
 
   private buildTryOnWarnings(
@@ -205,7 +337,6 @@ export class VirtualTryonServiceService {
     dto: CreateTryOnDto,
     userId?: string,
   ) {
-    const resolvedUserId = this.requireUserId(userId);
     const apiKey = this.configService.get<string>('FASHN_API_KEY');
     const apiUrl =
       this.configService.get<string>('FASHN_API_URL') ||
@@ -229,12 +360,7 @@ export class VirtualTryonServiceService {
       await this.tryonHistoryRepository.save({
         status: 'need_confirmation',
         needConfirmation: true,
-        ...this.buildHistoryPayload(
-          dto,
-          resolvedUserId,
-          analysis,
-          warningResult,
-        ),
+        ...this.buildHistoryPayload(dto, userId, analysis, warningResult),
         userConfirmed: false,
       });
 
@@ -358,7 +484,6 @@ export class VirtualTryonServiceService {
     dto: CreateTryOnDto,
     userId?: string,
   ) {
-    const resolvedUserId = this.requireUserId(userId);
     const created = await this.createTryOn(files, dto, userId);
 
     if (!created.success && created.needConfirmation) {
@@ -392,7 +517,7 @@ export class VirtualTryonServiceService {
           completedAt: new Date(),
           ...this.buildHistoryPayload(
             dto,
-            resolvedUserId,
+            userId,
             personAnalysis,
             warningResult,
           ),
@@ -419,7 +544,7 @@ export class VirtualTryonServiceService {
             rawProviderResponse: result.data,
             ...this.buildHistoryPayload(
               dto,
-              resolvedUserId,
+              userId,
               personAnalysis,
               warningResult,
             ),
@@ -435,7 +560,7 @@ export class VirtualTryonServiceService {
           errorMessage: result.data.error || 'FASHN try-on failed',
           ...this.buildHistoryPayload(
             dto,
-            resolvedUserId,
+            userId,
             personAnalysis,
             warningResult,
           ),
@@ -457,6 +582,89 @@ export class VirtualTryonServiceService {
         personAnalysis,
       },
     };
+  }
+
+  async createProductDesignSync(
+    files: ProductDesignFiles,
+    dto: CreateProductDesignDto,
+    userId?: string,
+  ) {
+    const apiKey =
+      this.configService.get<string>('TRYON_GEMINI_API_KEY') ||
+      this.configService.get<string>('GEMINI_API_KEY');
+    const modelName =
+      this.configService.get<string>('TRYON_GEMINI_IMAGE_MODEL') ||
+      this.configService.get<string>('GEMINI_IMAGE_MODEL') ||
+      'gemini-2.5-flash-image';
+
+    if (!apiKey) {
+      throw new InternalServerErrorException(
+        'Thiếu cấu hình TRYON_GEMINI_API_KEY hoặc GEMINI_API_KEY.',
+      );
+    }
+
+    const baseGarmentFile = files.baseGarmentImage?.[0];
+    const colorReferenceFile = files.colorReferenceImage?.[0];
+    const patternReferenceFile = files.patternReferenceImage?.[0];
+
+    const client = new GoogleGenerativeAI(apiKey);
+    const model = client.getGenerativeModel({ model: modelName });
+
+    try {
+      const result = await model.generateContent([
+        this.fileToInlineData(baseGarmentFile, 'baseGarmentImage'),
+        this.fileToInlineData(colorReferenceFile, 'colorReferenceImage'),
+        this.fileToInlineData(patternReferenceFile, 'patternReferenceImage'),
+        this.buildProductDesignPrompt(),
+      ]);
+
+      const generatedImage = this.extractInlineImageData(result.response);
+
+      if (!generatedImage?.data || !generatedImage.mimeType) {
+        const fallbackText =
+          typeof result.response.text === 'function'
+            ? result.response.text().trim()
+            : '';
+
+        throw new BadRequestException(
+          fallbackText ||
+            'Gemini không trả về ảnh. Kiểm tra model trong biến TRYON_GEMINI_IMAGE_MODEL hoặc GEMINI_IMAGE_MODEL.',
+        );
+      }
+
+      const buffer = Buffer.from(generatedImage.data, 'base64');
+      const uploaded = await this.cloudinaryService.uploadBuffer(
+        buffer,
+        `tryon/product-designs/${userId || 'anonymous'}`,
+      );
+
+      return {
+        success: true,
+        data: {
+          id: dto.productId || `product_design_${Date.now()}`,
+          status: 'completed',
+          resultUrl: uploaded.url,
+          cloudinaryPublicId: uploaded.publicId,
+        },
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Product design generation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      if (this.isGeminiQuotaError(error)) {
+        throw this.buildGeminiQuotaException();
+      }
+
+      throw new BadRequestException({
+        success: false,
+        message: 'Không thể tạo ảnh sản phẩm từ các ảnh tham chiếu lúc này.',
+      });
+    }
   }
 
   async getHistory(userId?: string) {

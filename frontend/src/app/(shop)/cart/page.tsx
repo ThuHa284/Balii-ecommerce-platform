@@ -9,6 +9,25 @@ import { isEligibleForFreeShipping } from '@/lib/combo-utils';
 import { formatCurrency } from '@/lib/utils';
 import { useCartStore } from '@/store/cart.store';
 
+function getCampaignLabel(item: {
+  campaign: {
+    name: string | null;
+    discountType: 'PERCENT' | 'AMOUNT' | 'GIFT' | null;
+    discountValue: number | null;
+    badgeText: string | null;
+  } | null;
+}) {
+  if (!item.campaign) return '';
+  if (item.campaign.badgeText) return item.campaign.badgeText;
+  if (item.campaign.discountType === 'PERCENT') {
+    return `Giảm thêm ${item.campaign.discountValue ?? 0}%`;
+  }
+  if (item.campaign.discountType === 'AMOUNT') {
+    return `Giảm thêm ${formatCurrency(item.campaign.discountValue ?? 0)}`;
+  }
+  return item.campaign.name || 'Quà tặng chiến dịch';
+}
+
 export default function CartPage() {
   const { items, removeItem, updateQuantity, hydrateCart } = useCartStore();
 
@@ -77,6 +96,11 @@ export default function CartPage() {
                       <p className="mt-0.5 text-sm text-muted-foreground">
                         {item.variant.size} / {item.variant.color}
                       </p>
+                      {item.campaign ? (
+                        <p className="mt-1 inline-flex rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">
+                          {getCampaignLabel(item)}
+                        </p>
+                      ) : null}
                     </div>
                     <button
                       onClick={() => {
@@ -109,9 +133,14 @@ export default function CartPage() {
                         <Plus className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <p className="font-bold text-primary">
-                      {formatCurrency(item.totalPrice)}
-                    </p>
+                    <div className="text-right">
+                      <p className="font-bold text-primary">
+                        {formatCurrency(item.totalPrice)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(item.price)} / sản phẩm
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

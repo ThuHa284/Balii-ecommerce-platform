@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import { UserRole } from '@/types/user.types';
@@ -28,8 +28,19 @@ export default function AuthGuard({
 }: AuthGuardProps) {
   const router = useRouter();
   const { isAuthenticated, user, isLoading } = useAuthStore();
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setIsMounted(true);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+
     // Don't redirect while the store is hydrating
     if (isLoading) return;
 
@@ -56,14 +67,15 @@ export default function AuthGuard({
     allowedRoles,
     isAuthenticated,
     isLoading,
+    isMounted,
     requiredRole,
     redirectTo,
     router,
     user?.role,
   ]);
 
-  // Show a minimal loading state while Zustand rehydrates from localStorage
-  if (isLoading) {
+  // Render a stable fallback until the client has mounted to avoid SSR/client mismatch.
+  if (!isMounted || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-3">

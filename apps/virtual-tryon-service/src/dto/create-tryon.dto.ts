@@ -30,3 +30,9 @@ export class CreateTryOnDto {
   @IsBooleanString()
   confirmWarnings?: string;
 }
+
+export class CreateProductDesignDto {
+  @IsOptional()
+  @IsString()
+  productId?: string;
+}

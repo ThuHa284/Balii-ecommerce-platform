@@ -156,7 +156,7 @@ export default function TryOnWarningModal({
                 >
                   <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-xl bg-white/40">
                     <Image
-                      src={product.thumbnail || '/images/placeholder.jpg'}
+                      src={product.thumbnail || '/images/placeholder.svg'}
                       alt={product.name}
                       fill
                       className="object-cover"

@@ -116,7 +116,11 @@ CREATE TABLE product_service.products (
     base_price NUMERIC(12,2) NOT NULL,
     original_price NUMERIC(12,2),
     sale_price NUMERIC(12,2),
+    sale_start_at TIMESTAMPTZ,
+    sale_end_at TIMESTAMPTZ,
     material VARCHAR(100),
+    target_gender VARCHAR(20) DEFAULT 'unisex',
+    recommended_age_groups TEXT[],
     is_active BOOLEAN DEFAULT TRUE,
     es_sync_status BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -226,6 +230,28 @@ CREATE TABLE product_service.collections (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE product_service.campaigns (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(280) NOT NULL UNIQUE,
+    description TEXT,
+    short_description TEXT,
+    image_url TEXT,
+    banner_image_url TEXT,
+    product_ids UUID[] NOT NULL DEFAULT '{}',
+    discount_type VARCHAR(20) NOT NULL DEFAULT 'PERCENT',
+    discount_value NUMERIC(12,2),
+    gift_name VARCHAR(255),
+    gift_description TEXT,
+    badge_text VARCHAR(120),
+    priority_order INT NOT NULL DEFAULT 0,
+    start_at TIMESTAMPTZ NOT NULL,
+    end_at TIMESTAMPTZ NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ============================================================
 -- 3. order_service
 -- ============================================================
@@ -280,6 +306,11 @@ CREATE TABLE order_service.order_items (
     product_name VARCHAR(255) NOT NULL,
     sku VARCHAR(100) NOT NULL,
     variant_label VARCHAR(200),
+    campaign_id UUID,
+    campaign_name VARCHAR(255),
+    campaign_discount_type VARCHAR(20),
+    campaign_discount_value NUMERIC(12,2),
+    campaign_badge_text VARCHAR(120),
     unit_price NUMERIC(12,2) NOT NULL,
     quantity INT NOT NULL CHECK (quantity > 0),
     subtotal NUMERIC(12,2) NOT NULL,

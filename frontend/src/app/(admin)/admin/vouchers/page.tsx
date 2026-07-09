@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import {
   Plus,
   Search,
@@ -15,11 +16,10 @@ import {
   ToggleLeft,
   ToggleRight,
 } from 'lucide-react';
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   VOUCHER_STATUS_LABELS,
   VOUCHER_STATUS_COLORS,
-  VOUCHER_DISCOUNT_TYPE_LABELS,
 } from '@/lib/constants';
 import {
   getAdminVouchers,
@@ -72,11 +72,7 @@ export default function AdminVouchersPage() {
   const [form, setForm] = useState<CreateVoucherData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadVouchers();
-  }, []);
-
-  async function loadVouchers() {
+  const loadVouchers = useEffectEvent(async () => {
     setLoading(true);
     try {
       const data = await getAdminVouchers();
@@ -84,7 +80,11 @@ export default function AdminVouchersPage() {
     } finally {
       setLoading(false);
     }
-  }
+  });
+
+  useEffect(() => {
+    void loadVouchers();
+  }, []);
 
   function openCreate() {
     setEditingVoucher(null);

@@ -31,7 +31,12 @@ export class Payment {
   })
   providerTransactionId?: string | null;
 
-  @Column({ name: 'provider_ref', type: 'varchar', length: 200, nullable: true })
+  @Column({
+    name: 'provider_ref',
+    type: 'varchar',
+    length: 200,
+    nullable: true,
+  })
   providerRef?: string | null;
 
   @Column({ name: 'payment_url', type: 'text', nullable: true })
@@ -45,4 +50,10 @@ export class Payment {
 
   @Column({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
+
+  /**
+   * Entity này chỉ map các cột mà luồng save đồng bộ đang dùng trực tiếp.
+   * Các cột workflow như metadata, idempotency_key, merchant_txn_id, updated_at
+   * hiện được PaymentService thao tác bằng raw SQL để tránh phải map toàn bộ schema lớn.
+   */
 }

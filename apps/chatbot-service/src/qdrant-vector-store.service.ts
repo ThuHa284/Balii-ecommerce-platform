@@ -296,10 +296,12 @@ export class QdrantVectorStoreService {
             : null,
         material: '',
         targetGender: '',
+        recommendedAgeGroups: [],
         thumbnail:
           typeof document.metadata?.thumbnail === 'string'
             ? document.metadata.thumbnail
             : '',
+        variants: [],
       });
       seen.add(productId);
     }

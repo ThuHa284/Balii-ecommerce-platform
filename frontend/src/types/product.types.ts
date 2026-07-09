@@ -6,6 +6,10 @@ export interface Product {
   shortDescription: string;
   basePrice: number;
   salePrice: number | null;
+  scheduledSalePrice?: number | null;
+  saleStartAt?: string | null;
+  saleEndAt?: string | null;
+  isSaleActive?: boolean;
   targetGender?: 'male' | 'female' | 'unisex';
   recommendedAgeGroups?: string[];
   categoryId: string;
@@ -19,8 +23,20 @@ export interface Product {
   isFeatured: boolean;
   isNew: boolean;
   tags: string[];
+  activeCampaign?: ActiveCampaignSummary | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ActiveCampaignSummary {
+  id: string;
+  name: string;
+  slug: string;
+  discountType: CampaignDiscountType;
+  discountValue: number | null;
+  giftName: string;
+  giftDescription: string;
+  badgeText: string;
 }
 
 export interface ProductVariant {
@@ -82,6 +98,31 @@ export interface Collection {
   productIds: string[];
   season: string;
   isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type CampaignDiscountType = 'PERCENT' | 'AMOUNT' | 'GIFT';
+
+export interface Campaign {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  shortDescription: string;
+  image: string;
+  bannerImage: string;
+  productIds: string[];
+  discountType: CampaignDiscountType;
+  discountValue: number | null;
+  giftName: string;
+  giftDescription: string;
+  badgeText: string;
+  priorityOrder: number;
+  startAt: string;
+  endAt: string;
+  isActive: boolean;
+  isLive: boolean;
   createdAt: string;
   updatedAt?: string;
 }

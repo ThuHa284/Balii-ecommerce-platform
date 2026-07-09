@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { toast } from 'sonner';
 import { Product } from '@/types/product.types';
 import {
@@ -45,6 +45,7 @@ interface TryOnState {
   setConfidence: (value: number | null) => void;
   setShowGuide: (value: boolean) => void;
   setShowCamera: (value: boolean) => void;
+  clearResult: () => void;
   saveToHistory: () => void;
   removeFromHistory: (id: string) => void;
   clearHistory: () => void;
@@ -105,6 +106,17 @@ export const useTryOnStore = create<TryOnState>()(
       setConfidence: (value) => set({ confidence: value }),
       setShowGuide: (value) => set({ showGuide: value }),
       setShowCamera: (value) => set({ showCamera: value }),
+      clearResult: () =>
+        set({
+          resultImage: null,
+          resultUrl: null,
+          personAnalysis: null,
+          confidence: null,
+          isGenerating: false,
+          generationProgress: 0,
+          generatingPhase: 'analyzing',
+          currentStep: 'garment',
+        }),
 
       saveToHistory: () => {
         const { resultImage, selectedProduct } = get();
@@ -119,7 +131,7 @@ export const useTryOnStore = create<TryOnState>()(
           resultImage,
           garmentName: selectedProduct?.name || 'Sản phẩm thử đồ',
           garmentThumbnail:
-            selectedProduct?.thumbnail || '/images/placeholder.jpg',
+            selectedProduct?.thumbnail || '/images/placeholder.svg',
           createdAt: new Date().toLocaleDateString('vi-VN', {
             hour: '2-digit',
             minute: '2-digit',
@@ -146,7 +158,11 @@ export const useTryOnStore = create<TryOnState>()(
     }),
     {
       name: 'balii-tryon-storage',
-      partialize: (state) => ({ history: state.history }),
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (state) => ({
+        userImage: state.userImage,
+        history: state.history,
+      }),
     },
   ),
 );

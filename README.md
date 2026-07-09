@@ -126,27 +126,21 @@ npm install
 
 ### Root `.env`
 
-Repo hiện có:
+Repo hiện đang dùng cách tách môi trường như sau:
 
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=balii_admin
-DB_PASSWORD=123456
-DB_DATABASE=balii_sleepwear
+- `.env`: local runtime trên máy dev.
+- `.env.example`: mẫu an toàn để tạo `.env`.
+- `.env.production`: cấu hình cho `docker-compose.prod.yml`.
+- `.env.production.example`: mẫu an toàn để tạo `.env.production`.
 
-PORT=4000
-```
+Lưu ý:
 
-Ngoài ra còn có:
-
-- `env/development.env`
-- `env/staging.env`
-- `env/production.env`
+- Thư mục `env/` hiện có các file `development.env`, `staging.env`, `production.env` nhưng đang rỗng và chưa phải nguồn env thực sự được dùng.
+- Không commit các file secret thật như `.env`, `.env.production`, `frontend/.env.local`.
 
 ### Frontend `.env.local`
 
-Tạo file `frontend/.env.local` nếu cần:
+Tạo file `frontend/.env.local` từ `frontend/.env.local.example` nếu cần override riêng cho frontend local:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:4000
@@ -159,6 +153,8 @@ Trong code frontend:
 - `NEXT_PUBLIC_SOCKET_URL` mặc định là `http://localhost:4006`
 
 ## Hạ tầng local với Docker
+
+`docker-compose.yml` là hạ tầng local/dev. Production baseline dùng file `docker-compose.prod.yml`.
 
 `docker-compose.yml` hiện đang khai báo các dịch vụ sau:
 
@@ -194,6 +190,11 @@ Tắt và xóa volume:
 ```bash
 docker compose down -v
 ```
+
+## Tài liệu môi trường
+
+- [Environment Separation](E:/HocODayNe/DoAnTotNghiep/LVTN/Balii-ecommerce-platform/docs/environment-separation.md)
+- [Production Setup](E:/HocODayNe/DoAnTotNghiep/LVTN/Balii-ecommerce-platform/docs/production-setup.md)
 
 ## Chạy dự án local
 

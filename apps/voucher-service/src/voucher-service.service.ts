@@ -1,7 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   BadRequestException,
   Injectable,
@@ -51,7 +49,7 @@ type VoucherUsageRow = {
 };
 
 type UserVoucherRow = {
-  id: string;
+  userVoucherId: string;
   voucherId: string;
   userId: string;
   savedAt: Date;
@@ -363,13 +361,13 @@ export class VoucherServiceService {
 
   async findMySavedVouchers(userId: string | undefined) {
     if (!userId) {
-      throw new BadRequestException('Missing x-user-id');
+      return [];
     }
 
     const rows = await this.dataSource.query(
       `
       SELECT
-        uv.id,
+        uv.id AS "userVoucherId",
         uv.voucher_id AS "voucherId",
         uv.user_id AS "userId",
         uv.saved_at AS "savedAt",
@@ -409,7 +407,7 @@ export class VoucherServiceService {
     );
 
     return (rows as UserVoucherRow[]).map((row) => ({
-      id: row.id,
+      id: row.userVoucherId,
       voucher: this.toVoucherResponse(row),
       savedAt: row.savedAt,
       isUsed: row.isUsed,
@@ -459,7 +457,7 @@ export class VoucherServiceService {
 
   async findMyUsages(userId: string | undefined) {
     if (!userId) {
-      throw new BadRequestException('Missing x-user-id');
+      return [];
     }
 
     const rows = await this.dataSource.query(
@@ -560,7 +558,7 @@ export class VoucherServiceService {
   ) {
     const normalizedType = typeCode.trim().toLowerCase();
     let discountAmount =
-      normalizedType === VoucherDiscountType.PERCENT
+      normalizedType === String(VoucherDiscountType.PERCENT)
         ? (orderAmount * discountValue) / 100
         : discountValue;
 
@@ -725,7 +723,7 @@ export class VoucherServiceService {
     maxDiscount: number | null,
   ) {
     const value =
-      typeCode === VoucherDiscountType.PERCENT
+      typeCode === String(VoucherDiscountType.PERCENT)
         ? `${discountValue}%`
         : `${discountValue.toLocaleString('vi-VN')} VND`;
     const minOrder =
@@ -784,7 +782,7 @@ export class VoucherServiceService {
     maxDiscount: number | null | undefined,
   ) {
     if (
-      discountType === VoucherDiscountType.PERCENT &&
+      discountType === String(VoucherDiscountType.PERCENT) &&
       (discountValue <= 0 || discountValue > 100)
     ) {
       throw new BadRequestException(

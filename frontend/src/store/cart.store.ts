@@ -32,6 +32,9 @@ export const useCartStore = create<CartState>((set, get) => ({
     try {
       const cart = await getCart();
       set({ items: cart.items });
+    } catch {
+      // Background cart hydration should not surface as an unhandled promise when the service is unavailable.
+      set({ items: [] });
     } finally {
       set({ isLoading: false });
     }

@@ -13,6 +13,7 @@ import { Product } from '@/types/product.types';
 
 interface TryOnGarmentPickerProps {
   className?: string;
+  compact?: boolean;
 }
 
 function getProductImageOptions(product: Product) {
@@ -23,6 +24,7 @@ function getProductImageOptions(product: Product) {
 
 export default function TryOnGarmentPicker({
   className,
+  compact = false,
 }: TryOnGarmentPickerProps) {
   const {
     garmentImage,
@@ -30,6 +32,7 @@ export default function TryOnGarmentPicker({
     garmentTargetGender,
     garmentRecommendedAgeGroups,
     setGarmentImage,
+    clearResult,
   } = useTryOnStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
@@ -40,42 +43,157 @@ export default function TryOnGarmentPicker({
         const response = await getProducts({ limit: 100 });
         setProducts(response.products);
       } catch {
-        toast.error(
-          'Không tải được danh sách sản phẩm. Vui lòng thử lại.',
-        );
+        toast.error('Không tải được danh sách sản phẩm. Vui lòng thử lại.');
       }
     }
 
     void loadProducts();
   }, []);
 
-  const filteredProducts = useMemo(
-    () =>
-      products.filter((product) =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
-    [products, searchQuery],
-  );
+  const filteredProducts = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return products;
+    }
+
+    return products.filter((product) =>
+      product.name.toLowerCase().includes(normalizedQuery),
+    );
+  }, [products, searchQuery]);
+
+  const suggestedProducts = useMemo(() => {
+    if (!selectedProduct) {
+      return filteredProducts;
+    }
+
+    return filteredProducts.filter(
+      (product) => product.id !== selectedProduct.id,
+    );
+  }, [filteredProducts, selectedProduct]);
 
   const handleSelectProduct = useCallback(
     (product: Product) => {
+      clearResult();
       const [defaultImage] = getProductImageOptions(product);
       setGarmentImage(defaultImage ?? product.thumbnail, product);
     },
-    [setGarmentImage],
+    [clearResult, setGarmentImage],
   );
 
   const handleSelectProductImage = useCallback(
     (image: string) => {
       if (!selectedProduct) return;
+
+      clearResult();
       setGarmentImage(image, selectedProduct);
     },
-    [selectedProduct, setGarmentImage],
+    [clearResult, selectedProduct, setGarmentImage],
   );
 
   const handleClearGarment = useCallback(() => {
+    clearResult();
     setGarmentImage(null, null);
-  }, [setGarmentImage]);
+  }, [clearResult, setGarmentImage]);
+
+  const renderProductGrid = useCallback(
+    (items: Product[]) => {
+      if (items.length === 0) {
+        return (
+          <div className="py-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Không tìm thấy sản phẩm phù hợp
+            </p>
+          </div>
+        );
+      }
+
+      return (
+        <div
+          className={cn(
+            'grid overflow-y-auto pr-1',
+            compact
+              ? 'max-h-[260px] grid-cols-2 gap-2 sm:grid-cols-3'
+              : 'max-h-[400px] grid-cols-2 gap-3',
+          )}
+        >
+          {items.map((product) => {
+            const isActive = product.id === selectedProduct?.id;
+
+            return (
+              <button
+                key={product.id}
+                onClick={() => handleSelectProduct(product)}
+                className={cn(
+                  'group overflow-hidden rounded-xl text-left glass-card-hover',
+                  isActive && 'ring-2 ring-violet-300',
+                )}
+              >
+                <div
+                  className={cn(
+                    'relative overflow-hidden rounded-t-xl',
+                    compact ? 'aspect-[3/4]' : 'aspect-square',
+                  )}
+                >
+                  <Image
+                    src={product.thumbnail}
+                    alt={product.name}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    sizes={
+                      compact
+                        ? '(max-width: 768px) 40vw, 140px'
+                        : '(max-width: 768px) 40vw, 200px'
+                    }
+                  />
+                  {getProductImageOptions(product).length > 1 && (
+                    <div className="absolute bottom-2 right-2 rounded-full bg-black/65 px-2 py-1 text-[10px] font-semibold text-white">
+                      +{getProductImageOptions(product).length - 1} ảnh
+                    </div>
+                  )}
+                  {isActive && (
+                    <div className="absolute left-2 top-2 rounded-full bg-violet-500 px-2 py-1 text-[10px] font-semibold text-white">
+                      Đang chọn
+                    </div>
+                  )}
+                </div>
+                <div className={cn('space-y-1', compact ? 'p-2' : 'p-2.5')}>
+                  <p
+                    className={cn(
+                      'font-medium text-foreground',
+                      compact ? 'line-clamp-2 text-[11px]' : 'truncate text-xs',
+                    )}
+                  >
+                    {product.name}
+                  </p>
+                  <p
+                    className={cn(
+                      'font-semibold text-primary',
+                      compact ? 'text-[11px]' : 'text-xs',
+                    )}
+                  >
+                    {formatCurrency(product.salePrice || product.basePrice)}
+                  </p>
+                  <p
+                    className={cn(
+                      'text-muted-foreground',
+                      compact ? 'line-clamp-2 text-[10px]' : 'text-[11px]',
+                    )}
+                  >
+                    {formatGenderLabel(product.targetGender)} ·{' '}
+                    {(product.recommendedAgeGroups ?? [])
+                      .map(formatAgeGroupLabel)
+                      .join(', ')}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      );
+    },
+    [compact, handleSelectProduct, selectedProduct?.id],
+  );
 
   if (garmentImage) {
     const productImageOptions = selectedProduct
@@ -83,13 +201,24 @@ export default function TryOnGarmentPicker({
       : [];
 
     return (
-      <div className={cn('', className)}>
+      <div className={cn('space-y-4', className)}>
         <div className="group relative overflow-hidden rounded-2xl glass-card">
-          <div className="relative aspect-[3/4]">
-            <img
+          <div
+            className={cn(
+              'relative',
+              compact ? 'aspect-[3/4]' : 'aspect-square max-h-[360px]',
+            )}
+          >
+            <Image
               src={garmentImage}
               alt={selectedProduct?.name || 'Sản phẩm đã chọn'}
-              className="h-full w-full object-cover"
+              fill
+              className="object-cover"
+              sizes={
+                compact
+                  ? '(max-width: 768px) 100vw, 280px'
+                  : '(max-width: 768px) 100vw, 400px'
+              }
             />
           </div>
 
@@ -123,12 +252,12 @@ export default function TryOnGarmentPicker({
 
         <button
           onClick={handleClearGarment}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-white/80 active:scale-95 md:hidden"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-white/80 active:scale-95 md:hidden"
         >
           Đổi sản phẩm khác
         </button>
 
-        <div className="mt-4 rounded-2xl bg-white/50 p-4">
+        <div className={cn('rounded-2xl bg-white/50', compact ? 'p-3' : 'p-4')}>
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
             <Tag className="h-4 w-4 text-violet-500" />
             Metadata đang áp dụng
@@ -154,11 +283,16 @@ export default function TryOnGarmentPicker({
         </div>
 
         {selectedProduct && productImageOptions.length > 1 && (
-          <div className="mt-4">
+          <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Chọn ảnh sản phẩm
             </p>
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+            <div
+              className={cn(
+                'grid gap-2',
+                compact ? 'grid-cols-4' : 'grid-cols-4 sm:grid-cols-5',
+              )}
+            >
               {productImageOptions.map((image, index) => {
                 const isActive = image === garmentImage;
 
@@ -187,6 +321,34 @@ export default function TryOnGarmentPicker({
             </div>
           </div>
         )}
+
+        <div className={cn('rounded-2xl bg-white/40', compact ? 'p-3' : 'p-4')}>
+          <div className="mb-3 flex items-center gap-2">
+            <ShoppingBag className="h-4 w-4 text-violet-500" />
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Thử tiếp với sản phẩm khác
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Ảnh người dùng vẫn được giữ trong tab này cho đến khi bạn đóng
+                trình duyệt hoặc đổi lại ảnh người mẫu.
+              </p>
+            </div>
+          </div>
+
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Tìm sản phẩm khác..."
+              className="w-full rounded-xl border border-white/50 bg-white/60 py-2.5 pl-10 pr-4 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-violet-300"
+            />
+          </div>
+
+          {renderProductGrid(suggestedProducts)}
+        </div>
       </div>
     );
   }
@@ -217,52 +379,7 @@ export default function TryOnGarmentPicker({
         />
       </div>
 
-      <div className="grid max-h-[400px] grid-cols-2 gap-3 overflow-y-auto pr-1">
-        {filteredProducts.map((product) => (
-          <button
-            key={product.id}
-            onClick={() => handleSelectProduct(product)}
-            className="group overflow-hidden rounded-xl text-left glass-card-hover"
-          >
-            <div className="relative aspect-square overflow-hidden rounded-t-xl">
-              <Image
-                src={product.thumbnail}
-                alt={product.name}
-                fill
-                className="object-cover transition-transform duration-500 group-hover:scale-110"
-                sizes="(max-width: 768px) 40vw, 200px"
-              />
-              {getProductImageOptions(product).length > 1 && (
-                <div className="absolute bottom-2 right-2 rounded-full bg-black/65 px-2 py-1 text-[10px] font-semibold text-white">
-                  +{getProductImageOptions(product).length - 1} ảnh
-                </div>
-              )}
-            </div>
-            <div className="space-y-1 p-2.5">
-              <p className="truncate text-xs font-medium text-foreground">
-                {product.name}
-              </p>
-              <p className="text-xs font-semibold text-primary">
-                {formatCurrency(product.salePrice || product.basePrice)}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {formatGenderLabel(product.targetGender)} •{' '}
-                {(product.recommendedAgeGroups ?? [])
-                  .map(formatAgeGroupLabel)
-                  .join(', ')}
-              </p>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {filteredProducts.length === 0 && (
-        <div className="py-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Không tìm thấy sản phẩm
-          </p>
-        </div>
-      )}
+      {renderProductGrid(filteredProducts)}
     </div>
   );
 }

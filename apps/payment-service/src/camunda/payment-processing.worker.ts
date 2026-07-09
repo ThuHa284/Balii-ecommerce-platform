@@ -19,6 +19,8 @@ export class PaymentProcessingWorker implements OnModuleInit {
       return;
     }
 
+    // Worker này là lớp map giữa BPMN topic và application service.
+    // Mỗi topic nên chỉ làm một việc nhỏ để workflow dễ retry/rẽ nhánh.
     const client = this.camundaClient.getClient();
 
     client.subscribe(
@@ -411,17 +413,13 @@ export class PaymentProcessingWorker implements OnModuleInit {
       async ({ task, taskService }) => {
         try {
           const paymentId = task.variables.get('paymentId');
-          const result = await this.paymentService.increaseReconciliationAttempt(
-            {
+          const result =
+            await this.paymentService.increaseReconciliationAttempt({
               paymentId,
-            },
-          );
+            });
 
           const variables = new Variables();
-          variables.set(
-            'reconciliationAttempt',
-            result.reconciliationAttempt,
-          );
+          variables.set('reconciliationAttempt', result.reconciliationAttempt);
           variables.set('tooManyAttempts', result.tooManyAttempts);
 
           await taskService.complete(task, variables);
@@ -557,8 +555,9 @@ export class PaymentProcessingWorker implements OnModuleInit {
       async ({ task, taskService }) => {
         try {
           const paymentId = task.variables.get('paymentId');
-          const approvedRefundAmount =
-            task.variables.get('approvedRefundAmount');
+          const approvedRefundAmount = task.variables.get(
+            'approvedRefundAmount',
+          );
           const amount =
             approvedRefundAmount != null
               ? approvedRefundAmount
@@ -584,39 +583,35 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
-      'refund.create-record',
-      async ({ task, taskService }) => {
-        try {
-          const paymentId = task.variables.get('paymentId');
-          const approvedRefundAmount =
-            task.variables.get('approvedRefundAmount');
-          const amount =
-            approvedRefundAmount != null
-              ? approvedRefundAmount
-              : task.variables.get('effectiveRefundAmount') ??
-                task.variables.get('amount');
-          const reason = task.variables.get('reason');
-          const idempotencyKey = task.variables.get('idempotencyKey');
+    client.subscribe('refund.create-record', async ({ task, taskService }) => {
+      try {
+        const paymentId = task.variables.get('paymentId');
+        const approvedRefundAmount = task.variables.get('approvedRefundAmount');
+        const amount =
+          approvedRefundAmount != null
+            ? approvedRefundAmount
+            : (task.variables.get('effectiveRefundAmount') ??
+              task.variables.get('amount'));
+        const reason = task.variables.get('reason');
+        const idempotencyKey = task.variables.get('idempotencyKey');
 
-          const result = await this.paymentService.createRefundRecord({
-            paymentId,
-            amount: Number(amount),
-            reason,
-            idempotencyKey,
-          });
+        const result = await this.paymentService.createRefundRecord({
+          paymentId,
+          amount: Number(amount),
+          reason,
+          idempotencyKey,
+        });
 
-          const variables = new Variables();
-          variables.set('refundId', result.refundId);
-          variables.set('providerRefundId', result.providerRefundId || null);
-          variables.set('effectiveRefundAmount', Number(amount));
+        const variables = new Variables();
+        variables.set('refundId', result.refundId);
+        variables.set('providerRefundId', result.providerRefundId || null);
+        variables.set('effectiveRefundAmount', Number(amount));
 
-          await taskService.complete(task, variables);
-        } catch (error) {
-          await this.handleFailure(task, taskService, error);
-        }
-      },
-    );
+        await taskService.complete(task, variables);
+      } catch (error) {
+        await this.handleFailure(task, taskService, error);
+      }
+    });
 
     client.subscribe(
       'refund.call-gateway-api',
@@ -654,18 +649,16 @@ export class PaymentProcessingWorker implements OnModuleInit {
           const paymentId = task.variables.get('paymentId');
           const rawPayload = task.variables.get('rawPayload');
           const providerRefundId = task.variables.get('providerRefundId');
-          const refundResult =
-            task.variables.get('refundResult') || 'FAILED';
+          const refundResult = task.variables.get('refundResult') || 'FAILED';
 
-          const result = await this.paymentService.persistRefundResultTransaction(
-            {
+          const result =
+            await this.paymentService.persistRefundResultTransaction({
               refundId,
               paymentId,
               rawPayload,
               providerRefundId,
               refundResult,
-            },
-          );
+            });
 
           const variables = new Variables();
           variables.set('refundStatus', result.refundStatus);
@@ -747,8 +740,9 @@ export class PaymentProcessingWorker implements OnModuleInit {
           const userId = task.variables.get('userId');
           const amount = task.variables.get('amount');
           const reason = task.variables.get('reason');
-          const approvedRefundAmount =
-            task.variables.get('approvedRefundAmount');
+          const approvedRefundAmount = task.variables.get(
+            'approvedRefundAmount',
+          );
           const adminNote = task.variables.get('adminNote');
 
           const result = await this.paymentService.createExchangeRequest({
@@ -868,6 +862,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
   private async handleFailure(task: any, taskService: any, error: any) {
     console.error('[Camunda Worker Error]', error);
 
+    // Retry mặc định ở mức worker để che các lỗi tạm thời; lỗi nghiệp vụ sẽ được service throw rõ ràng cho BPMN xử lý.
     await taskService.handleFailure(task, {
       errorMessage: error.message || 'Worker error',
       errorDetails: error.stack || String(error),

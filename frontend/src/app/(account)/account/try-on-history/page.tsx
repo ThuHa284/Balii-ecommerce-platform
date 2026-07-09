@@ -79,9 +79,7 @@ export default function TryOnHistoryPage() {
         setStats(statsData);
       } catch (err) {
         setError(
-          err instanceof Error
-            ? err.message
-            : 'Không thể tải lịch sử thử đồ.',
+          err instanceof Error ? err.message : 'Không thể tải lịch sử thử đồ.',
         );
       } finally {
         setLoading(false);
@@ -171,7 +169,7 @@ export default function TryOnHistoryPage() {
               <div className="flex flex-col gap-5 md:flex-row">
                 <div className="relative h-36 w-full overflow-hidden rounded-2xl bg-white/40 md:h-40 md:w-32">
                   <Image
-                    src={item.resultUrl || '/images/placeholder.jpg'}
+                    src={item.resultUrl || '/images/placeholder.svg'}
                     alt="Kết quả thử đồ"
                     fill
                     className="object-cover"

@@ -1,15 +1,14 @@
 import axios from 'axios';
 import apiClient from './client';
-import { SOCKET_URL } from '@/lib/constants';
 import {
+  PersonAnalysis,
   TryOnHistoryRecord,
+  TryOnProductDesignRequest,
   TryOnRequest,
   TryOnResult,
   TryOnStats,
   TryOnSyncResponse,
 } from '@/types/tryon.types';
-
-const TRYON_API_BASE_URL = `${SOCKET_URL.replace(/\/$/, '')}/try-on`;
 
 function getCurrentUserHeaders() {
   if (typeof window === 'undefined' || !window.__BALII_USER_ID__) {
@@ -125,10 +124,54 @@ export async function buildTryOnFormData(
   return formData;
 }
 
+export async function analyzeTryOnPersonImage(
+  userImage: string,
+): Promise<PersonAnalysis> {
+  const imageFile = await imageUrlToFile(userImage, 'person-analysis');
+  const formData = new FormData();
+  formData.append('personImage', imageFile);
+
+  const { data } = await apiClient.post<{
+    success: true;
+    data: PersonAnalysis;
+  }>('/try-on/analyze-person', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return data.data;
+}
+
+export async function buildProductDesignFormData(
+  request: TryOnProductDesignRequest,
+) {
+  const [
+    baseGarmentImageFile,
+    colorReferenceImageFile,
+    patternReferenceImageFile,
+  ] = await Promise.all([
+    imageUrlToFile(request.baseGarmentImage, 'base-garment-image'),
+    imageUrlToFile(request.colorReferenceImage, 'color-reference-image'),
+    imageUrlToFile(request.patternReferenceImage, 'pattern-reference-image'),
+  ]);
+
+  const formData = new FormData();
+  formData.append('baseGarmentImage', baseGarmentImageFile);
+  formData.append('colorReferenceImage', colorReferenceImageFile);
+  formData.append('patternReferenceImage', patternReferenceImageFile);
+
+  if (request.productId) {
+    formData.append('productId', request.productId);
+  }
+
+  return formData;
+}
+
 export async function createTryOnSync(
   formData: FormData,
 ): Promise<TryOnSyncResponse> {
-  const response = await axios.post(`${TRYON_API_BASE_URL}/sync`, formData, {
+  const response = await apiClient.post('/try-on/sync', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
       ...getCurrentUserHeaders(),
@@ -146,6 +189,29 @@ export async function submitTryOnRequest(
   try {
     const formData = await buildTryOnFormData(request, confirmWarnings);
     return await createTryOnSync(formData);
+  } catch (error) {
+    throw normalizeTryOnError(error);
+  }
+}
+
+export async function submitProductDesignRequest(
+  request: TryOnProductDesignRequest,
+): Promise<TryOnSyncResponse> {
+  try {
+    const formData = await buildProductDesignFormData(request);
+    const response = await apiClient.post(
+      '/try-on/product-design/sync',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...getCurrentUserHeaders(),
+        },
+        timeout: 180000,
+      },
+    );
+
+    return normalizeTryOnResponse(response.data);
   } catch (error) {
     throw normalizeTryOnError(error);
   }

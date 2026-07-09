@@ -1,5 +1,7 @@
-import 'dotenv/config';
+import { loadEnv } from '@app/common';
 import { DataSource } from 'typeorm';
+
+loadEnv();
 
 const AppDataSource = new DataSource({
   type: 'postgres',

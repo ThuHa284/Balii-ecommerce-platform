@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" fill="none">
+  <rect width="1200" height="900" fill="#F8FAFC" />
+  <rect x="96" y="96" width="1008" height="708" rx="48" fill="url(#panel)" />
+  <circle cx="350" cy="320" r="84" fill="#E9D5FF" />
+  <path d="M252 630L430 430L564 548L726 358L948 630H252Z" fill="#C4B5FD" />
+  <path d="M252 630L394 468L520 574L706 414L884 630H252Z" fill="#A78BFA" />
+  <text
+    x="600"
+    y="748"
+    text-anchor="middle"
+    fill="#6D28D9"
+    font-family="Arial, sans-serif"
+    font-size="56"
+    font-weight="700"
+  >
+    Balii Placeholder
+  </text>
+  <defs>
+    <linearGradient
+      id="panel"
+      x1="96"
+      y1="96"
+      x2="1104"
+      y2="804"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#F1F5F9" />
+    </linearGradient>
+  </defs>
+</svg>

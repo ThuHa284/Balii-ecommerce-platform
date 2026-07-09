@@ -24,7 +24,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { toggleCompare, isInCompare } = useCompareStore();
   const inCompare = isInCompare(product.id);
 
-  const price = product.salePrice || product.basePrice;
+  const price = product.salePrice ?? product.basePrice;
   const hasDiscount =
     product.salePrice !== null && product.salePrice < product.basePrice;
   const discountPercent = hasDiscount
@@ -57,7 +57,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     }
 
     const priceToAdd =
-      defaultVariant.salePrice || defaultVariant.price || price;
+      defaultVariant.salePrice ?? defaultVariant.price ?? price;
 
     await addItem({
       id: `cart_${Date.now()}`,
@@ -66,6 +66,15 @@ export default function ProductCard({ product }: ProductCardProps) {
       productSlug: product.slug,
       thumbnail: product.thumbnail,
       variant: defaultVariant,
+      campaign: product.activeCampaign
+        ? {
+            id: product.activeCampaign.id,
+            name: product.activeCampaign.name,
+            discountType: product.activeCampaign.discountType,
+            discountValue: product.activeCampaign.discountValue,
+            badgeText: product.activeCampaign.badgeText,
+          }
+        : null,
       quantity: 1,
       price: priceToAdd,
       totalPrice: priceToAdd,
@@ -113,6 +122,11 @@ export default function ProductCard({ product }: ProductCardProps) {
               -{discountPercent}%
             </span>
           )}
+          {product.activeCampaign?.badgeText ? (
+            <span className="px-2 py-0.5 text-[11px] font-bold bg-rose-600 text-white rounded-full">
+              {product.activeCampaign.badgeText}
+            </span>
+          ) : null}
           {product.isNew && (
             <span className="px-2 py-0.5 text-[11px] font-bold bg-emerald-500 text-white rounded-full">
               Mới
@@ -156,7 +170,9 @@ export default function ProductCard({ product }: ProductCardProps) {
           <button
             onClick={handleToggleCompare}
             className={`p-1.5 rounded-lg backdrop-blur-sm shadow-sm transition-all hover:scale-105 active:scale-95 ${
-              inCompare ? 'bg-violet-500 text-white' : 'bg-white/90 text-slate-700'
+              inCompare
+                ? 'bg-violet-500 text-white'
+                : 'bg-white/90 text-slate-700'
             }`}
             aria-label="So sánh"
           >

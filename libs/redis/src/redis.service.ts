@@ -27,4 +27,12 @@ export class RedisService {
   del(key: string) {
     return this.client.del(key);
   }
+
+  incr(key: string) {
+    return this.client.incr(key);
+  }
+
+  expire(key: string, ttl: number) {
+    return this.client.expire(key, ttl);
+  }
 }

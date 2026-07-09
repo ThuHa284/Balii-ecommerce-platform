@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class UpgradeRefundWorkflow20260624193000
-  implements MigrationInterface
-{
+export class UpgradeRefundWorkflow20260624193000 implements MigrationInterface {
   name = 'UpgradeRefundWorkflow20260624193000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

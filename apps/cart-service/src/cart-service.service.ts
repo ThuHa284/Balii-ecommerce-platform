@@ -113,6 +113,11 @@ export class CartService {
       existedItem.variantLabel = variant.variantLabel;
       existedItem.variantSize = variant.variantSize;
       existedItem.variantColor = variant.variantColor;
+      existedItem.campaignId = variant.campaignId ?? null;
+      existedItem.campaignName = variant.campaignName ?? null;
+      existedItem.campaignDiscountType = variant.campaignDiscountType ?? null;
+      existedItem.campaignDiscountValue = variant.campaignDiscountValue ?? null;
+      existedItem.campaignBadgeText = variant.campaignBadgeText ?? null;
     } else {
       cart.items.push({
         variantId: variant.variantId,
@@ -124,6 +129,11 @@ export class CartService {
         variantLabel: variant.variantLabel,
         variantSize: variant.variantSize,
         variantColor: variant.variantColor,
+        campaignId: variant.campaignId ?? null,
+        campaignName: variant.campaignName ?? null,
+        campaignDiscountType: variant.campaignDiscountType ?? null,
+        campaignDiscountValue: variant.campaignDiscountValue ?? null,
+        campaignBadgeText: variant.campaignBadgeText ?? null,
         unitPrice: variant.unitPrice,
         quantity: dto.quantity,
         subtotal: variant.unitPrice * dto.quantity,
@@ -162,6 +172,11 @@ export class CartService {
     item.variantLabel = variant.variantLabel;
     item.variantSize = variant.variantSize;
     item.variantColor = variant.variantColor;
+    item.campaignId = variant.campaignId ?? null;
+    item.campaignName = variant.campaignName ?? null;
+    item.campaignDiscountType = variant.campaignDiscountType ?? null;
+    item.campaignDiscountValue = variant.campaignDiscountValue ?? null;
+    item.campaignBadgeText = variant.campaignBadgeText ?? null;
 
     return this.saveCart(key, cart);
   }
@@ -253,6 +268,11 @@ export class CartService {
       item.variantLabel = variant.variantLabel;
       item.variantSize = variant.variantSize;
       item.variantColor = variant.variantColor;
+      item.campaignId = variant.campaignId ?? null;
+      item.campaignName = variant.campaignName ?? null;
+      item.campaignDiscountType = variant.campaignDiscountType ?? null;
+      item.campaignDiscountValue = variant.campaignDiscountValue ?? null;
+      item.campaignBadgeText = variant.campaignBadgeText ?? null;
     }
 
     return this.saveCart(key, cart);

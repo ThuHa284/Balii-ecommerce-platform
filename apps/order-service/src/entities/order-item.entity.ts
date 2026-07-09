@@ -28,11 +28,52 @@ export class OrderItem {
   @Column({ name: 'sku', type: 'varchar', length: 100 })
   sku!: string;
 
-  @Column({ name: 'variant_label', type: 'varchar', length: 200, nullable: true })
+  @Column({
+    name: 'variant_label',
+    type: 'varchar',
+    length: 200,
+    nullable: true,
+  })
   variantLabel?: string | null;
 
   @Column({ name: 'thumbnail_url', type: 'text', nullable: true })
   thumbnailUrl?: string | null;
+
+  @Column({ name: 'campaign_id', type: 'uuid', nullable: true })
+  campaignId?: string | null;
+
+  @Column({
+    name: 'campaign_name',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  campaignName?: string | null;
+
+  @Column({
+    name: 'campaign_discount_type',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  campaignDiscountType?: 'PERCENT' | 'AMOUNT' | 'GIFT' | null;
+
+  @Column({
+    name: 'campaign_discount_value',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    nullable: true,
+  })
+  campaignDiscountValue?: number | null;
+
+  @Column({
+    name: 'campaign_badge_text',
+    type: 'varchar',
+    length: 120,
+    nullable: true,
+  })
+  campaignBadgeText?: string | null;
 
   @Column({ name: 'unit_price', type: 'numeric', precision: 12, scale: 2 })
   unitPrice!: number;

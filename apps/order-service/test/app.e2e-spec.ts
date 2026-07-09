@@ -25,8 +25,6 @@ describe('OrderServiceController (e2e)', () => {
   });
 
   it('/orders (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/orders')
-      .expect(200, []);
+    return request(app.getHttpServer()).get('/orders').expect(200, []);
   });
 });

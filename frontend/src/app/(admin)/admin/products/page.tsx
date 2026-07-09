@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { FileSpreadsheet, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import {
+  FileSpreadsheet,
+  Megaphone,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import ExcelImportModal from '@/components/admin/excel-import-modal';
 import {
@@ -153,6 +160,13 @@ export default function AdminProductsPage() {
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin/campaigns"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/15"
+            >
+              <Megaphone className="h-4 w-4" />
+              Tạo chiến dịch
+            </Link>
             <button
               onClick={() => setShowExcelImport(true)}
               className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/15"

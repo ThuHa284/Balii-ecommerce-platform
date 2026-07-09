@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -157,18 +156,16 @@ export default function ProductDetailPage() {
   }, [product, productImages, selectedColor, selectedVariant, variantPool]);
 
   useEffect(() => {
-    if (!selectedVariant) return;
-
-    if (selectedSize !== selectedVariant.size) {
-      setSelectedSize(selectedVariant.size);
+    const nextVariantId = selectedVariant?.id;
+    if (!nextVariantId) {
+      return;
     }
-    if (selectedColor !== selectedVariant.color) {
-      setSelectedColor(selectedVariant.color);
-    }
-  }, [selectedColor, selectedSize, selectedVariant]);
 
-  useEffect(() => {
-    setMainImage(0);
+    const frame = window.requestAnimationFrame(() => {
+      setMainImage(0);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [selectedVariant?.id]);
 
   if (!product) {
@@ -176,11 +173,11 @@ export default function ProductDetailPage() {
   }
 
   const price =
-    selectedVariant?.salePrice ||
-    selectedVariant?.price ||
-    product.salePrice ||
+    selectedVariant?.salePrice ??
+    selectedVariant?.price ??
+    product.salePrice ??
     product.basePrice;
-  const hasDiscount = product.salePrice !== null;
+  const hasDiscount = price < product.basePrice;
 
   const handleSelectSize = (size: string) => {
     setSelectedSize(size);
@@ -233,6 +230,15 @@ export default function ProductDetailPage() {
         galleryItems[0]?.image ||
         product.thumbnail,
       variant: selectedVariant,
+      campaign: product.activeCampaign
+        ? {
+            id: product.activeCampaign.id,
+            name: product.activeCampaign.name,
+            discountType: product.activeCampaign.discountType,
+            discountValue: product.activeCampaign.discountValue,
+            badgeText: product.activeCampaign.badgeText,
+          }
+        : null,
       quantity,
       price,
       totalPrice: price * quantity,
@@ -257,6 +263,15 @@ export default function ProductDetailPage() {
         galleryItems[0]?.image ||
         product.thumbnail,
       variant: selectedVariant,
+      campaign: product.activeCampaign
+        ? {
+            id: product.activeCampaign.id,
+            name: product.activeCampaign.name,
+            discountType: product.activeCampaign.discountType,
+            discountValue: product.activeCampaign.discountValue,
+            badgeText: product.activeCampaign.badgeText,
+          }
+        : null,
       quantity,
       price,
       totalPrice: price * quantity,
@@ -289,6 +304,7 @@ export default function ProductDetailPage() {
       productSlug: MOCK_COMBO_SHORTS.slug,
       thumbnail: MOCK_COMBO_SHORTS.image,
       variant: shortsVariant,
+      campaign: null,
       quantity: shortsQuantity,
       price: shortsPrice,
       totalPrice: shortsPrice * shortsQuantity,
@@ -302,11 +318,20 @@ export default function ProductDetailPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <nav className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Link href="/" className="hover:text-primary transition-colors">Trang chủ</Link>
+          <Link href="/" className="hover:text-primary transition-colors">
+            Trang chủ
+          </Link>
           <ChevronRight className="h-3.5 w-3.5" />
-          <Link href="/products" className="hover:text-primary transition-colors">Sản phẩm</Link>
+          <Link
+            href="/products"
+            className="hover:text-primary transition-colors"
+          >
+            Sản phẩm
+          </Link>
           <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-foreground font-medium truncate max-w-[200px]">{product.name}</span>
+          <span className="text-foreground font-medium truncate max-w-[200px]">
+            {product.name}
+          </span>
         </nav>
 
         {/* Main Product Section */}
@@ -390,6 +415,21 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
+              {product.activeCampaign ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                  <p className="font-semibold">
+                    {product.activeCampaign.badgeText ||
+                      product.activeCampaign.name}
+                  </p>
+                  <p className="mt-1 text-xs">
+                    {product.activeCampaign.discountType === 'GIFT'
+                      ? product.activeCampaign.giftDescription ||
+                        `Tặng kèm ${product.activeCampaign.giftName || 'quà tặng'} khi mua trong thời gian chiến dịch.`
+                      : 'Giá hiện tại đã bao gồm ưu đãi chiến dịch đang diễn ra.'}
+                  </p>
+                </div>
+              ) : null}
+
               {/* Description */}
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {product.description}
@@ -420,7 +460,9 @@ export default function ProductDetailPage() {
                             ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200 ring-offset-1'
                             : 'border-slate-200 bg-white hover:border-slate-300'
                         } ${
-                          isAvailableForSize ? 'hover:scale-[1.02]' : 'opacity-50'
+                          isAvailableForSize
+                            ? 'hover:scale-[1.02]'
+                            : 'opacity-50'
                         }`}
                         title={variant.color}
                       >
@@ -440,7 +482,8 @@ export default function ProductDetailPage() {
               {/* Size Selector */}
               <div>
                 <p className="text-sm font-medium text-foreground mb-2.5">
-                  Kích thước: <span className="text-primary">{selectedSize}</span>
+                  Kích thước:{' '}
+                  <span className="text-primary">{selectedSize}</span>
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {sizeOptions.map((size) => (
@@ -521,7 +564,10 @@ export default function ProductDetailPage() {
                   { icon: RotateCcw, text: 'Đổi trả 30 ngày' },
                   { icon: ShieldCheck, text: 'Hàng chính hãng' },
                 ].map((feature) => (
-                  <div key={feature.text} className="flex flex-col items-center gap-1.5 rounded-xl bg-slate-50/80 p-3">
+                  <div
+                    key={feature.text}
+                    className="flex flex-col items-center gap-1.5 rounded-xl bg-slate-50/80 p-3"
+                  >
                     <feature.icon className="w-4.5 h-4.5 text-violet-500" />
                     <p className="text-[11px] text-center font-medium text-muted-foreground leading-tight">
                       {feature.text}

@@ -1,0 +1,336 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: ${DB_DATABASE:?DB_DATABASE is required}
+      TZ: Asia/Ho_Chi_Minh
+      PGTZ: Asia/Ho_Chi_Minh
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:?DB_USERNAME is required} -d ${DB_DATABASE:?DB_DATABASE is required}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  camunda:
+    image: camunda/camunda-bpm-platform:run-latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_DRIVER: org.postgresql.Driver
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_DATABASE:?DB_DATABASE is required}
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+
+  qdrant:
+    image: qdrant/qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_NAME: user-service
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      USER_SERVICE_PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379
+
+  product-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_NAME: product-service
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      PRODUCT_SERVICE_PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+
+  cart-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_NAME: cart-service
+    restart: unless-stopped
+    init: true
+    depends_on:
+      redis:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      CART_SERVICE_PORT: 3003
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PRODUCT_SERVICE_URL: http://product-service:3002
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_NAME: order-service
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      payment-service:
+        condition: service_started
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      ORDER_SERVICE_PORT: 3004
+      DB_HOST: postgres
+      DB_PORT: 5432
+      CART_SERVICE_URL: http://cart-service:3003
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_NAME: payment-service
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      camunda:
+        condition: service_started
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      PAYMENT_SERVICE_PORT: 3005
+      DB_HOST: postgres
+      DB_PORT: 5432
+      ORDER_SERVICE_URL: http://order-service:3004
+      KAFKA_BROKERS: kafka:29092
+      CAMUNDA_BASE_URL: http://camunda:8080/engine-rest
+
+  voucher-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_NAME: voucher-service
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      VOUCHER_SERVICE_PORT: 3008
+      DB_HOST: postgres
+      DB_PORT: 5432
+
+  virtual-tryon-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_NAME: virtual-tryon-service
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      TRYON_SERVICE_PORT: 3010
+      DB_HOST: postgres
+      DB_PORT: 5432
+
+  market-analysis-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_NAME: market-analysis-service
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      MARKET_ANALYSIS_SERVICE_PORT: 3011
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+  chatbot-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_NAME: chatbot-service
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      CHATBOT_SERVICE_PORT: 3012
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_NAME: api-gateway
+    restart: unless-stopped
+    init: true
+    depends_on:
+      - user-service
+      - product-service
+      - cart-service
+      - order-service
+      - payment-service
+      - voucher-service
+      - virtual-tryon-service
+      - market-analysis-service
+      - chatbot-service
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      API_GATEWAY_PORT: 4000
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
+      USER_SERVICE_URL: http://user-service:3001
+      PRODUCT_SERVICE_URL: http://product-service:3002
+      CART_SERVICE_URL: http://cart-service:3003
+      ORDER_SERVICE_URL: http://order-service:3004
+      PAYMENT_SERVICE_URL: http://payment-service:3005
+      VOUCHER_SERVICE_URL: http://voucher-service:3008
+      TRYON_SERVICE_URL: http://virtual-tryon-service:3010
+      MARKET_ANALYSIS_SERVICE_URL: http://market-analysis-service:3011
+      CHATBOT_SERVICE_URL: http://chatbot-service:3012
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/health/ready >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:?NEXT_PUBLIC_SOCKET_URL is required}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:?NEXT_PUBLIC_SOCKET_URL is required}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:

@@ -1,22 +1,44 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductServiceController } from './product-service.controller';
-import { ProductServiceService } from './product-service.service';
+import { ProductService } from './product-service.service';
 
 describe('ProductServiceController', () => {
   let productServiceController: ProductServiceController;
+  const productService = {
+    getVariantSnapshot: jest.fn(),
+  };
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [ProductServiceController],
-      providers: [ProductServiceService],
+      providers: [
+        {
+          provide: ProductService,
+          useValue: productService,
+        },
+      ],
     }).compile();
 
-    productServiceController = app.get<ProductServiceController>(ProductServiceController);
+    productServiceController = app.get<ProductServiceController>(
+      ProductServiceController,
+    );
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(productServiceController.getHello()).toBe('Hello World!');
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('getVariantSnapshot', () => {
+    it('should delegate to product service', async () => {
+      const snapshot = { variantId: 'variant-1' };
+      productService.getVariantSnapshot.mockResolvedValue(snapshot);
+
+      await expect(
+        productServiceController.getVariantSnapshot('variant-1'),
+      ).resolves.toBe(snapshot);
+      expect(productService.getVariantSnapshot).toHaveBeenCalledWith(
+        'variant-1',
+      );
     });
   });
 });

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ProductGrid from "@/components/product/product-grid";
+import { useHasMounted } from "@/hooks/use-has-mounted";
 import { useWishlistStore } from "@/store/wishlist.store";
 import { Heart } from "lucide-react";
 import Link from "next/link";
@@ -10,12 +11,8 @@ import { getProducts } from "@/lib/api/products.api";
 
 export default function WishlistPage() {
   const { items } = useWishlistStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasMounted();
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     async function loadWishlistProducts() {

@@ -10,6 +10,8 @@ export interface ProductPayload {
   basePrice: number;
   originalPrice?: number;
   salePrice?: number | null;
+  saleStartAt?: string | null;
+  saleEndAt?: string | null;
   material?: string;
   targetGender?: 'male' | 'female' | 'unisex';
   recommendedAgeGroups?: string[];

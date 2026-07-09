@@ -24,6 +24,9 @@ export interface AdminTopProduct {
   thumbnail: string;
   quantitySold: number;
   revenue: number;
+  campaignQuantitySold: number;
+  campaignRevenue: number;
+  campaignOrderCount: number;
 }
 
 export interface AdminOrderStatusPoint {
@@ -61,6 +64,55 @@ export interface AdminRefund {
   retryCount: number;
 }
 
+export interface AdminMarketImageSearchItem {
+  title: string;
+  price: number | null;
+  currency: string | null;
+  shopName: string | null;
+  source: string | null;
+  imageUrl: string | null;
+  productUrl: string | null;
+  confidenceScore: number | null;
+  rawData: Record<string, unknown>;
+  isSaved: boolean;
+  savedProductId?: string;
+  unsavedReason?: string;
+}
+
+export interface AdminMarketImageSearchResponse {
+  items: AdminMarketImageSearchItem[];
+  savedCount: number;
+  skippedCount: number;
+}
+
+type BackendMarketSearchItem = {
+  title: string;
+  source?: string | null;
+  link: string | null;
+  imageUrl?: string | null;
+  price?: string | null;
+  extractedPrice?: number | null;
+  currency?: string | null;
+  rating?: number | null;
+  reviews?: number | null;
+  snippet?: string | null;
+  engine: 'google_lens' | 'google_shopping' | 'google_images';
+  confidenceScore: number;
+  isSaved?: boolean;
+  rawData?: Record<string, unknown>;
+};
+
+type BackendMarketSearchResponse = {
+  success: boolean;
+  keyword: string;
+  imageUrl?: string;
+  total: number;
+  results?: BackendMarketSearchItem[];
+  items?: BackendMarketSearchItem[];
+  savedCount?: number;
+  skippedCount?: number;
+};
+
 export interface AdminDashboardStats {
   totalRevenue: number;
   totalOrders: number;
@@ -89,14 +141,40 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
   const { data } = await apiClient.get<AdminDashboardStats>(
     '/orders/admin/dashboard',
   );
-  return data;
+  return {
+    totalRevenue: data?.totalRevenue ?? 0,
+    totalOrders: data?.totalOrders ?? 0,
+    totalCustomers: data?.totalCustomers ?? 0,
+    totalProducts: data?.totalProducts ?? 0,
+    revenueGrowth: data?.revenueGrowth ?? 0,
+    orderGrowth: data?.orderGrowth ?? 0,
+    revenueByMonth: Array.isArray(data?.revenueByMonth)
+      ? data.revenueByMonth
+      : [],
+    recentOrders: Array.isArray(data?.recentOrders) ? data.recentOrders : [],
+  };
 }
 
 export async function getAdminAnalyticsStats(): Promise<AdminAnalyticsStats> {
   const { data } = await apiClient.get<AdminAnalyticsStats>(
     '/orders/admin/analytics',
   );
-  return data;
+  return {
+    totalRevenue: data?.totalRevenue ?? 0,
+    totalOrders: data?.totalOrders ?? 0,
+    totalCustomers: data?.totalCustomers ?? 0,
+    totalProducts: data?.totalProducts ?? 0,
+    averageOrderValue: data?.averageOrderValue ?? 0,
+    revenueGrowth: data?.revenueGrowth ?? 0,
+    orderGrowth: data?.orderGrowth ?? 0,
+    monthlyRevenue: Array.isArray(data?.monthlyRevenue)
+      ? data.monthlyRevenue
+      : [],
+    topProducts: Array.isArray(data?.topProducts) ? data.topProducts : [],
+    orderStatusBreakdown: Array.isArray(data?.orderStatusBreakdown)
+      ? data.orderStatusBreakdown
+      : [],
+  };
 }
 
 type BackendAdminOrder = Parameters<typeof mapOrder>[0] & {
@@ -193,4 +271,68 @@ export async function getAdminRefunds(): Promise<AdminRefund[]> {
     '/payments/admin/refunds',
   );
   return data;
+}
+
+export async function searchAdminMarketByImage(payload: {
+  image?: File | null;
+  imageUrl?: string;
+  keyword?: string;
+  limit?: number;
+}): Promise<AdminMarketImageSearchResponse> {
+  const formData = new FormData();
+
+  if (payload.image) {
+    formData.append('image', payload.image);
+  }
+
+  if (payload.imageUrl) {
+    formData.append('imageUrl', payload.imageUrl);
+  }
+
+  if (payload.keyword) {
+    formData.append('keyword', payload.keyword);
+  }
+
+  formData.append('limit', String(payload.limit ?? 10));
+
+  const { data } = await apiClient.post<BackendMarketSearchResponse>(
+    '/admin/market-analysis/search-by-image',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    },
+  );
+
+  const rawItems = Array.isArray(data.results)
+    ? data.results
+    : Array.isArray(data.items)
+      ? data.items
+      : [];
+
+  const items = rawItems.map<AdminMarketImageSearchItem>((item) => ({
+    title: item.title,
+    price: item.extractedPrice ?? null,
+    currency: item.currency ?? null,
+    shopName: item.source ?? null,
+    source: item.source ?? null,
+    imageUrl: item.imageUrl ?? null,
+    productUrl: item.link ?? null,
+    confidenceScore: item.confidenceScore ?? null,
+    rawData: item.rawData ?? {},
+    isSaved: item.isSaved ?? false,
+  }));
+
+  return {
+    items,
+    savedCount:
+      typeof data.savedCount === 'number'
+        ? data.savedCount
+        : items.filter((item) => item.isSaved).length,
+    skippedCount:
+      typeof data.skippedCount === 'number'
+        ? data.skippedCount
+        : items.filter((item) => !item.isSaved).length,
+  };
 }

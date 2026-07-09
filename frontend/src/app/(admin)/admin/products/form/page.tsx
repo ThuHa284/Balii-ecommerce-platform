@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability */
 'use client';
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -110,6 +111,20 @@ function normalizeSkuPart(value: string) {
     .replace(/^-+|-+$/g, '');
 }
 
+function toDateTimeLocalValue(value?: string | null) {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const timezoneOffset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+}
+
 function buildSizeRows(groupClientId: string, sizes = WEIGHT_SIZE_PRESETS) {
   return sizes.map((size, index) => ({
     clientId: `${groupClientId}-size-${index}`,
@@ -143,6 +158,8 @@ function ProductFormContent() {
   const [newCategorySlug, setNewCategorySlug] = useState('');
   const [basePrice, setBasePrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
+  const [saleStartAt, setSaleStartAt] = useState('');
+  const [saleEndAt, setSaleEndAt] = useState('');
   const [material, setMaterial] = useState('');
   const [targetGender, setTargetGender] = useState<
     'male' | 'female' | 'unisex'
@@ -194,7 +211,7 @@ function ProductFormContent() {
     void loadData();
   }, [legacyEditSlug, productId]);
 
-  const hydrateForm = (product: Product, imageData: ProductImageRecord[]) => {
+  function hydrateForm(product: Product, imageData: ProductImageRecord[]) {
     setExistingProduct(product);
     setName(product.name);
     setSlug(product.slug);
@@ -202,7 +219,15 @@ function ProductFormContent() {
     setShortDescription(product.shortDescription || '');
     setCategoryId(product.categoryId || '');
     setBasePrice(product.basePrice ? String(product.basePrice) : '');
-    setSalePrice(product.salePrice != null ? String(product.salePrice) : '');
+    setSalePrice(
+      product.scheduledSalePrice != null
+        ? String(product.scheduledSalePrice)
+        : product.salePrice != null
+          ? String(product.salePrice)
+          : '',
+    );
+    setSaleStartAt(toDateTimeLocalValue(product.saleStartAt));
+    setSaleEndAt(toDateTimeLocalValue(product.saleEndAt));
     setMaterial('');
     setTargetGender(product.targetGender ?? 'female');
     setRecommendedAgeGroups(
@@ -266,7 +291,7 @@ function ProductFormContent() {
 
     setImages(imagesState);
     setVariantGroups(Array.from(groupMap.values()));
-  };
+  }
 
   const handleNameChange = (value: string) => {
     setName(value);
@@ -717,6 +742,26 @@ function ProductFormContent() {
 
   const handleSave = async () => {
     if (!validateForm()) return;
+    if (salePrice && Number(salePrice) >= Number(basePrice)) {
+      toast.error('Giá sale phải nhỏ hơn giá gốc.');
+      return;
+    }
+    if ((saleStartAt && !saleEndAt) || (!saleStartAt && saleEndAt)) {
+      toast.error('Vui lòng nhập đầy đủ thời gian bắt đầu và kết thúc sale.');
+      return;
+    }
+    if ((saleStartAt || saleEndAt) && !salePrice) {
+      toast.error('Vui lòng nhập giá sale trước khi đặt lịch giảm giá.');
+      return;
+    }
+    if (
+      saleStartAt &&
+      saleEndAt &&
+      new Date(saleStartAt).getTime() >= new Date(saleEndAt).getTime()
+    ) {
+      toast.error('Thời gian kết thúc phải sau thời gian bắt đầu.');
+      return;
+    }
 
     try {
       setIsSaving(true);
@@ -729,6 +774,8 @@ function ProductFormContent() {
         basePrice: Number(basePrice),
         originalPrice: Number(basePrice),
         salePrice: salePrice ? Number(salePrice) : null,
+        saleStartAt: saleStartAt ? new Date(saleStartAt).toISOString() : null,
+        saleEndAt: saleEndAt ? new Date(saleEndAt).toISOString() : null,
         material: material.trim() || undefined,
         targetGender,
         recommendedAgeGroups,
@@ -762,6 +809,30 @@ function ProductFormContent() {
     () => formatCurrency(Number(salePrice) || Number(basePrice) || 0),
     [basePrice, salePrice],
   );
+
+  const saleStatusText = useMemo(() => {
+    if (!salePrice) {
+      return 'Chưa cấu hình chương trình giảm giá.';
+    }
+
+    if (!saleStartAt || !saleEndAt) {
+      return 'Giá sale sẽ áp dụng ngay khi lưu.';
+    }
+
+    const start = new Date(saleStartAt);
+    const end = new Date(saleEndAt);
+    const now = new Date();
+
+    if (now < start) {
+      return 'Chương trình giảm giá đang chờ đến giờ bắt đầu.';
+    }
+
+    if (now > end) {
+      return 'Khung giờ sale đã kết thúc.';
+    }
+
+    return 'Chương trình giảm giá đang trong thời gian hiệu lực.';
+  }, [saleEndAt, salePrice, saleStartAt]);
 
   if (loading) {
     return (
@@ -1276,6 +1347,30 @@ function ProductFormContent() {
                   className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                 />
               </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">
+                    Th?i gian b?t d?u sale
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={saleStartAt}
+                    onChange={(e) => setSaleStartAt(e.target.value)}
+                    className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">
+                    Th?i gian k?t th�c sale
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={saleEndAt}
+                    onChange={(e) => setSaleEndAt(e.target.value)}
+                    className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                  />
+                </div>
+              </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">
                   Chất liệu
@@ -1337,6 +1432,9 @@ function ProductFormContent() {
                   </p>
                   <p className="text-lg font-bold text-primary">
                     {previewPrice}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {saleStatusText}
                   </p>
                   {salePrice ? (
                     <p className="text-xs text-muted-foreground line-through">

@@ -1,7 +1,9 @@
-import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { CartServiceModule } from './cart-service.module';
 import { ValidationPipe } from '@nestjs/common';
+import { loadEnv } from '@app/common';
+
+loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(CartServiceModule);
@@ -22,4 +24,4 @@ async function bootstrap() {
   );
 }
 
-bootstrap();
+void bootstrap();

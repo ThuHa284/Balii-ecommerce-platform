@@ -80,7 +80,7 @@ export default function ComboBanner({ variant = "full" }: ComboBannerProps) {
       {/* Tiers Grid */}
       <div className="px-6 md:px-8 pb-6 md:pb-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {COMBO_TIERS.map((tier, index) => {
+          {COMBO_TIERS.map((tier) => {
             const isHot = tier.id === "combo_2";
             const isVIP = tier.id === "combo_3";
 

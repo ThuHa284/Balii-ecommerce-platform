@@ -4,12 +4,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import {
-  Kafka,
-  logLevel,
-  type Producer,
-  type SASLOptions,
-} from 'kafkajs';
+import { Kafka, logLevel, type Producer, type SASLOptions } from 'kafkajs';
 import { DataSource } from 'typeorm';
 
 type OutboxEventRow = {
@@ -39,9 +34,7 @@ type PreparedKafkaEvent = {
 };
 
 @Injectable()
-export class PaymentOutboxPublisher
-  implements OnModuleInit, OnModuleDestroy
-{
+export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PaymentOutboxPublisher.name);
   private readonly maxBatchSize = Number(
     process.env.PAYMENT_OUTBOX_BATCH_SIZE || 20,
@@ -201,8 +194,7 @@ export class PaymentOutboxPublisher
       });
 
       this.producer = kafka.producer({
-        allowAutoTopicCreation:
-          process.env.KAFKA_AUTO_CREATE_TOPICS === 'true',
+        allowAutoTopicCreation: process.env.KAFKA_AUTO_CREATE_TOPICS === 'true',
       });
       await this.producer.connect();
       this.logger.log(`Kafka producer đã kết nối tới ${brokers.join(', ')}`);
@@ -258,9 +250,7 @@ export class PaymentOutboxPublisher
 
       const rows = this.unwrapQueryRows(rawResult);
 
-      return rows.map((row) =>
-        this.normalizeClaimedRow(row),
-      );
+      return rows.map((row) => this.normalizeClaimedRow(row));
     });
   }
 
@@ -324,7 +314,10 @@ export class PaymentOutboxPublisher
       key: this.requireString(message.aggregateId, 'key'),
       value: JSON.stringify(message),
       headers: {
-        aggregateId: this.requireString(message.aggregateId, 'header.aggregateId'),
+        aggregateId: this.requireString(
+          message.aggregateId,
+          'header.aggregateId',
+        ),
         aggregateType: this.requireString(
           message.aggregateType,
           'header.aggregateType',
@@ -403,11 +396,7 @@ export class PaymentOutboxPublisher
     return {
       id: this.readRowString(row, 'id'),
       eventId: this.readRowOptionalString(row, 'eventId', 'eventid'),
-      aggregateType: this.readRowString(
-        row,
-        'aggregateType',
-        'aggregatetype',
-      ),
+      aggregateType: this.readRowString(row, 'aggregateType', 'aggregatetype'),
       aggregateId: this.readRowString(row, 'aggregateId', 'aggregateid'),
       type: this.readRowString(row, 'type'),
       payload: this.readRowPayload(row, 'payload'),
@@ -423,7 +412,9 @@ export class PaymentOutboxPublisher
       }
     }
 
-    throw new Error(`Unable to read raw row string for keys: ${keys.join(', ')}`);
+    throw new Error(
+      `Unable to read raw row string for keys: ${keys.join(', ')}`,
+    );
   }
 
   private readRowOptionalString(
@@ -461,7 +452,7 @@ export class PaymentOutboxPublisher
         typeof value === 'string' ||
         value == null
       ) {
-        return value as number | string | null | undefined;
+        return value;
       }
     }
 
@@ -492,9 +483,7 @@ export class PaymentOutboxPublisher
       Array.isArray(value) &&
       value.every(
         (item) =>
-          item != null &&
-          typeof item === 'object' &&
-          !Array.isArray(item),
+          item != null && typeof item === 'object' && !Array.isArray(item),
       )
     );
   }

@@ -1,7 +1,9 @@
-import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { loadEnv } from '@app/common';
 import { ApiGatewayModule } from './api-gateway.module';
+
+loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(ApiGatewayModule);
@@ -18,4 +20,4 @@ async function bootstrap() {
   );
   await app.listen(process.env.API_GATEWAY_PORT ?? 3000);
 }
-bootstrap();
+void bootstrap();

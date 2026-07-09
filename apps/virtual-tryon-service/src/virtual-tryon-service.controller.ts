@@ -7,13 +7,19 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { CreateTryOnDto } from './dto/create-tryon.dto';
+import { CreateProductDesignDto, CreateTryOnDto } from './dto/create-tryon.dto';
 import { VirtualTryonServiceService } from './virtual-tryon-service.service';
 import { Param, Get } from '@nestjs/common';
 
 type TryOnUploadFiles = {
   modelImage?: Express.Multer.File[];
   garmentImage?: Express.Multer.File[];
+};
+
+type ProductDesignUploadFiles = {
+  baseGarmentImage?: Express.Multer.File[];
+  colorReferenceImage?: Express.Multer.File[];
+  patternReferenceImage?: Express.Multer.File[];
 };
 
 @Controller('try-on')
@@ -87,5 +93,28 @@ export class VirtualTryonServiceController {
     @Headers('x-user-id') userId?: string,
   ) {
     return this.virtualTryonService.createTryOnSync(files, dto, userId);
+  }
+
+  @Post('product-design/sync')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'baseGarmentImage', maxCount: 1 },
+        { name: 'colorReferenceImage', maxCount: 1 },
+        { name: 'patternReferenceImage', maxCount: 1 },
+      ],
+      {
+        limits: {
+          fileSize: 8 * 1024 * 1024,
+        },
+      },
+    ),
+  )
+  createProductDesignSync(
+    @UploadedFiles() files: ProductDesignUploadFiles,
+    @Body() dto: CreateProductDesignDto,
+    @Headers('x-user-id') userId?: string,
+  ) {
+    return this.virtualTryonService.createProductDesignSync(files, dto, userId);
   }
 }

@@ -10,6 +10,11 @@ export interface CartItem {
   variantLabel?: string;
   variantSize?: string;
   variantColor?: string;
+  campaignId?: string | null;
+  campaignName?: string | null;
+  campaignDiscountType?: 'PERCENT' | 'AMOUNT' | 'GIFT' | null;
+  campaignDiscountValue?: number | null;
+  campaignBadgeText?: string | null;
   unitPrice: number;
   quantity: number;
   subtotal: number;

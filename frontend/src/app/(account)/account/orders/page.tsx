@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Eye, Package } from 'lucide-react';
@@ -48,11 +49,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
 
-  useEffect(() => {
-    void loadOrders();
-  }, []);
-
-  async function loadOrders() {
+  const loadOrders = useEffectEvent(async () => {
     setLoading(true);
     try {
       const { orders: data } = await getOrders(1, 20);
@@ -60,7 +57,11 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }
+  });
+
+  useEffect(() => {
+    void loadOrders();
+  }, []);
 
   const filteredOrders =
     activeTab === 'all'

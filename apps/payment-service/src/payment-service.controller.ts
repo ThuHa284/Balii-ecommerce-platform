@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -15,12 +16,14 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import type { Response } from 'express';
 import { CamundaClientService } from './camunda/camunda-client.service';
 import { StartRefundWorkflowDto } from './dto/start-refund-workflow.dto';
+import { PaymentWebhookSecurityService } from './payment-webhook-security.service';
 
 @Controller('payments')
 export class PaymentServiceController {
   constructor(
     private readonly paymentServiceService: PaymentServiceService,
     private readonly camundaClientService: CamundaClientService,
+    private readonly paymentWebhookSecurityService: PaymentWebhookSecurityService,
   ) {}
 
   @Post()
@@ -94,6 +97,7 @@ export class PaymentServiceController {
       idempotencyKey?: string;
     },
   ) {
+    // Endpoint này khởi động Camunda workflow thay vì xử lý thanh toán ngay trong request đồng bộ.
     const result = await this.camundaClientService.startPaymentProcessing({
       orderId: body.orderId,
       userId: body.userId,
@@ -115,7 +119,15 @@ export class PaymentServiceController {
     @Body() body: any,
     @Headers('x-payment-signature') signature?: string,
   ) {
+    // Callback được correlate vào workflow để toàn bộ kiểm tra idempotency/transaction đi chung một luồng.
     const orderId = body.orderId;
+    this.paymentWebhookSecurityService.validateGenericWebhookRequest({
+      provider,
+      flow: 'payment',
+      businessKey: orderId,
+      rawPayload: body,
+      signature,
+    });
 
     const result = await this.camundaClientService.correlatePaymentCallback({
       orderId,
@@ -170,6 +182,19 @@ export class PaymentServiceController {
     },
     @Headers('x-payment-signature') signature?: string,
   ) {
+    // Refund webhook cũng đi qua Camunda để dùng lại logic retry, manual review và outbox.
+    if (!body.paymentId) {
+      throw new BadRequestException('Missing paymentId');
+    }
+
+    this.paymentWebhookSecurityService.validateGenericWebhookRequest({
+      provider,
+      flow: 'refund',
+      businessKey: body.paymentId,
+      rawPayload: body.rawPayload ?? body,
+      signature,
+    });
+
     const result = await this.camundaClientService.correlateRefundResult({
       paymentId: body.paymentId,
       provider,

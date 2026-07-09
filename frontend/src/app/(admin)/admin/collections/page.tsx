@@ -64,7 +64,7 @@ export default function AdminCollectionsPage() {
         toast.error(
           error instanceof Error
             ? error.message
-            : 'Không tải được bộ sưu tập.',
+            : 'Không tải được chiến dịch.',
         );
       } finally {
         setLoading(false);
@@ -205,17 +205,17 @@ export default function AdminCollectionsPage() {
             collection.id === editId ? updated : collection,
           ),
         );
-        toast.success('Đã cập nhật bộ sưu tập.');
+        toast.success('Đã cập nhật chiến dịch.');
       } else {
         const created = await createCollection(payload);
         setCollections((current) => [created, ...current]);
-        toast.success('Đã thêm bộ sưu tập.');
+        toast.success('Đã thêm chiến dịch.');
       }
 
       setShowModal(false);
       resetForm();
     } catch (error) {
-      toast.error(getUserErrorMessage(error, 'Lưu bộ sưu tập thất bại.'));
+      toast.error(getUserErrorMessage(error, 'Lưu chiến dịch thất bại.'));
     } finally {
       setSaving(false);
     }
@@ -224,7 +224,7 @@ export default function AdminCollectionsPage() {
   async function handleDelete() {
     if (!deleteId) return;
     if (!canDelete) {
-      toast.error('Chỉ super admin mới có quyền xóa bộ sưu tập.');
+      toast.error('Chỉ super admin mới có quyền xóa chiến dịch.');
       return;
     }
 
@@ -235,9 +235,9 @@ export default function AdminCollectionsPage() {
         current.filter((collection) => collection.id !== deleteId),
       );
       setDeleteId(null);
-      toast.success('Đã xóa bộ sưu tập.');
+      toast.success('Đã xóa chiến dịch.');
     } catch (error) {
-      toast.error(getUserErrorMessage(error, 'Xóa bộ sưu tập thất bại.'));
+      toast.error(getUserErrorMessage(error, 'Xóa chiến dịch thất bại.'));
     } finally {
       setDeleting(false);
     }
@@ -249,21 +249,22 @@ export default function AdminCollectionsPage() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-2 text-xs uppercase tracking-[0.24em] text-amber-700/70">
-              Trưng bày và chiến dịch
+              Quản lý chiến dịch
             </p>
             <span className="inline-flex rounded-full border border-amber-900/10 bg-white/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-900/70">
               {roleLabel}
             </span>
             <h1 className="font-heading text-3xl font-bold text-slate-900">
-              Quản lý bộ sưu tập
+              Quản lý chiến dịch
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600">
-              Gom nhóm sản phẩm theo mùa vụ, concept hoặc chiến dịch bán hàng để
-              đội nội dung và vận hành phối hợp nhanh hơn.
+              Tạo chiến dịch riêng trong trang admin, gắn sản phẩm theo mùa vụ,
+              concept hoặc đợt bán hàng để đội nội dung và vận hành phối hợp rõ
+              ràng hơn.
             </p>
             {!canDelete ? (
               <p className="mt-3 max-w-2xl rounded-2xl border border-amber-200 bg-white/70 px-4 py-3 text-sm text-slate-600">
-                Admin có thể tạo và cập nhật bộ sưu tập. Xóa bộ sưu tập được giữ
+                Admin có thể tạo và cập nhật chiến dịch. Xóa chiến dịch được giữ
                 riêng cho super admin.
               </p>
             ) : null}
@@ -273,7 +274,7 @@ export default function AdminCollectionsPage() {
             className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             <Plus className="h-4 w-4" />
-            Thêm bộ sưu tập
+            Thêm chiến dịch
           </button>
         </div>
       </section>
@@ -286,7 +287,7 @@ export default function AdminCollectionsPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm theo tên bộ sưu tập..."
+              placeholder="Tìm theo tên chiến dịch..."
               className="w-full rounded-xl border border-white/50 bg-white/60 py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
             />
           </div>
@@ -322,7 +323,7 @@ export default function AdminCollectionsPage() {
             <thead>
               <tr className="border-b border-white/30 bg-slate-50/50">
                 <th className="px-6 py-4 text-left text-sm font-medium text-muted-foreground">
-                  Bộ sưu tập
+                  Chiến dịch
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-medium text-muted-foreground">
                   Mùa vụ
@@ -345,7 +346,7 @@ export default function AdminCollectionsPage() {
                     colSpan={5}
                     className="px-6 py-12 text-center text-sm text-muted-foreground"
                   >
-                    Đang tải bộ sưu tập...
+                    Đang tải chiến dịch...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
@@ -354,7 +355,7 @@ export default function AdminCollectionsPage() {
                     colSpan={5}
                     className="px-6 py-12 text-center text-sm text-muted-foreground"
                   >
-                    Chưa có bộ sưu tập phù hợp.
+                    Chưa có chiến dịch phù hợp.
                   </td>
                 </tr>
               ) : (
@@ -407,7 +408,7 @@ export default function AdminCollectionsPage() {
                         <button
                           onClick={() => handleOpenEditModal(collection)}
                           className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50"
-                          title="Chỉnh sửa bộ sưu tập"
+                          title="Chỉnh sửa chiến dịch"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
@@ -415,7 +416,7 @@ export default function AdminCollectionsPage() {
                           onClick={() => {
                             if (!canDelete) {
                               toast.error(
-                                'Chỉ super admin mới có quyền xóa bộ sưu tập.',
+                                'Chỉ super admin mới có quyền xóa chiến dịch.',
                               );
                               return;
                             }
@@ -425,7 +426,7 @@ export default function AdminCollectionsPage() {
                           className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                           title={
                             canDelete
-                              ? 'Xóa bộ sưu tập'
+                              ? 'Xóa chiến dịch'
                               : 'Chỉ super admin mới được xóa'
                           }
                         >
@@ -455,10 +456,10 @@ export default function AdminCollectionsPage() {
                 <Trash2 className="h-8 w-8 text-red-500" />
               </div>
               <h3 className="mb-2 font-heading text-xl font-bold text-foreground">
-                Xác nhận xóa bộ sưu tập
+                Xác nhận xóa chiến dịch
               </h3>
               <p className="mb-6 text-sm text-muted-foreground">
-                Bộ sưu tập sẽ bị xóa khỏi hệ thống và không thể khôi phục lại
+                Chiến dịch sẽ bị xóa khỏi hệ thống và không thể khôi phục lại
                 sau khi xác nhận.
               </p>
               <div className="flex gap-3">
@@ -473,7 +474,7 @@ export default function AdminCollectionsPage() {
                   disabled={deleting}
                   className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 font-medium text-white transition-all hover:bg-red-600 disabled:opacity-60"
                 >
-                  {deleting ? 'Đang xóa...' : 'Xóa bộ sưu tập'}
+                  {deleting ? 'Đang xóa...' : 'Xóa chiến dịch'}
                 </button>
               </div>
             </div>
@@ -490,7 +491,7 @@ export default function AdminCollectionsPage() {
             <div className="mb-6 flex items-center justify-between border-b border-white/30 pb-4">
               <h3 className="flex items-center gap-2 font-heading text-xl font-bold text-foreground">
                 <Library className="h-5 w-5 text-violet-500" />
-                {editId ? 'Cập nhật bộ sưu tập' : 'Thêm bộ sưu tập mới'}
+                {editId ? 'Cập nhật chiến dịch' : 'Thêm chiến dịch mới'}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
@@ -504,7 +505,7 @@ export default function AdminCollectionsPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">
-                    Tên bộ sưu tập <span className="text-red-500">*</span>
+                    Tên chiến dịch <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -524,7 +525,7 @@ export default function AdminCollectionsPage() {
                         );
                       }
                     }}
-                    placeholder="Ví dụ: Summer Silk 2026"
+                    placeholder="Ví dụ: Summer Sale 2026"
                     className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                   />
                 </div>
@@ -565,7 +566,7 @@ export default function AdminCollectionsPage() {
                   type="text"
                   value={shortDescription}
                   onChange={(e) => setShortDescription(e.target.value)}
-                  placeholder="Thông điệp ngắn cho bộ sưu tập"
+                  placeholder="Thông điệp ngắn cho chiến dịch"
                   className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                 />
               </div>
@@ -578,7 +579,7 @@ export default function AdminCollectionsPage() {
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Mô tả đầy đủ về bộ sưu tập..."
+                  placeholder="Mô tả đầy đủ về chiến dịch..."
                   className="w-full resize-none rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                 />
               </div>
@@ -652,7 +653,7 @@ export default function AdminCollectionsPage() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium">
-                  Chọn sản phẩm thuộc bộ sưu tập
+                  Chọn sản phẩm thuộc chiến dịch
                 </label>
                 <div className="grid max-h-48 grid-cols-1 gap-2 overflow-y-auto rounded-xl border border-white/20 bg-white/30 p-3 sm:grid-cols-2">
                   {products.map((product) => {

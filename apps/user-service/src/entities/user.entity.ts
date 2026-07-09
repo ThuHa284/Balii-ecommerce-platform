@@ -1,5 +1,5 @@
 import {
-  Entity,              
+  Entity,
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
@@ -10,18 +10,18 @@ import {
 
 import { Role } from './role.entity';
 
-@Entity({ schema: 'user_service', name: 'users' }) 
+@Entity({ schema: 'user_service', name: 'users' })
 export class User {
-  @PrimaryGeneratedColumn('uuid') 
+  @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ unique: true }) 
+  @Column({ unique: true })
   email!: string;
 
-  @Column({ name: 'password_hash', nullable: true }) 
+  @Column({ name: 'password_hash', nullable: true })
   passwordHash!: string;
 
-  @Column({ name: 'full_name' }) 
+  @Column({ name: 'full_name' })
   fullName!: string;
 
   @Column({ nullable: true })
@@ -33,7 +33,7 @@ export class User {
   @Column({ name: 'role_id' })
   roleId!: number;
 
-  @ManyToOne(() => Role) 
+  @ManyToOne(() => Role)
   @JoinColumn({ name: 'role_id' })
   role!: Role;
 

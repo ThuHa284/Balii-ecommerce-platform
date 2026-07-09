@@ -1,7 +1,9 @@
-import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { loadEnv } from '@app/common';
 import { ChatbotServiceModule } from './chatbot-service.module';
+
+loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(ChatbotServiceModule);

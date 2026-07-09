@@ -41,6 +41,11 @@ export interface OrderItem {
   variantSize: string;
   variantColor: string;
   sku: string;
+  campaignId?: string | null;
+  campaignName?: string | null;
+  campaignDiscountType?: 'PERCENT' | 'AMOUNT' | 'GIFT' | null;
+  campaignDiscountValue?: number | null;
+  campaignBadgeText?: string | null;
   price: number;
   quantity: number;
   totalPrice: number;
