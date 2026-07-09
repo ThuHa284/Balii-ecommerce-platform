@@ -44,9 +44,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     environment: Production
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
