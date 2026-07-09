@@ -43,6 +43,7 @@ jobs:
     needs: frontend-ci
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
+    environment: Production
     defaults:
       run:
         working-directory: frontend
