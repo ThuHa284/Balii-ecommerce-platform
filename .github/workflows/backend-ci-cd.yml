@@ -43,23 +43,23 @@ jobs:
       - name: Copy backend source to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VPS_HOST || '163.61.110.43' }}
-          username: ${{ secrets.VPS_USERNAME || 'root' }}
+          host: 163.61.110.43
+          username: root
           password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           source: 'apps,libs,database,frontend,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,docker-compose.prod.yml,.dockerignore'
-          target: ${{ secrets.VPS_DEPLOY_PATH || '/opt/balii-backend' }}
+          target: /opt/balii-backend
       - name: Rebuild backend services
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VPS_HOST || '163.61.110.43' }}
-          username: ${{ secrets.VPS_USERNAME || 'root' }}
+          host: 163.61.110.43
+          username: root
           password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           script: |
-            cd '${{ secrets.VPS_DEPLOY_PATH || '/opt/balii-backend' }}'
+            cd /opt/balii-backend
             rm -f 'frontend/src/app/(admin)/admin/settings/page.tsx'
             APP_ENV_FILE=.env.production.vps docker compose --env-file .env.production.vps -f docker-compose.prod.yml up --build -d
             curl --fail --retry 12 --retry-delay 5 http://127.0.0.1:4000/health/ready
