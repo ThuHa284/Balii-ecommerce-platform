@@ -83,12 +83,16 @@ export async function createOrderReturnRequest(
   orderId: string,
   payload: {
     reason: string;
-    imageUrls: string[];
+    images: File[];
   },
 ): Promise<ReturnRequest> {
+  const formData = new FormData();
+  formData.append('reason', payload.reason);
+  payload.images.forEach((image) => formData.append('images', image));
+
   const { data } = await apiClient.post<ReturnRequest>(
     `/orders/${orderId}/return-requests`,
-    payload,
+    formData,
   );
   return data;
 }

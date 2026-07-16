@@ -15,156 +15,156 @@
 
   <bpmn:message id="Message_PaymentCallbackReceived" name="payment.callback.received" camunda:historyTimeToLive="180"/>
 
-  <bpmn:process id="Process_Payment_Processing" name="Balii Payment Processing Workflow" isExecutable="true" camunda:historyTimeToLive="180">
-    <bpmn:startEvent id="StartEvent_PaymentRequested" name="Payment Requested">
+  <bpmn:process id="Process_Payment_Processing" name="Quy trình xử lý thanh toán Balii" isExecutable="true" camunda:historyTimeToLive="180">
+    <bpmn:startEvent id="StartEvent_PaymentRequested" name="Yêu cầu thanh toán">
       <bpmn:outgoing>Flow_Start_Validate</bpmn:outgoing>
     </bpmn:startEvent>
 
-    <bpmn:serviceTask id="Task_ValidatePaymentRequest" name="Validate Payment Request" camunda:type="external" camunda:topic="payment.validate-request">
+    <bpmn:serviceTask id="Task_ValidatePaymentRequest" name="Kiểm tra yêu cầu thanh toán" camunda:type="external" camunda:topic="payment.validate-request">
       <bpmn:incoming>Flow_Start_Validate</bpmn:incoming>
       <bpmn:outgoing>Flow_Validate_CheckIdempotency</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_CheckPaymentIdempotency" name="Check Payment Idempotency" camunda:type="external" camunda:topic="payment.check-idempotency">
+    <bpmn:serviceTask id="Task_CheckPaymentIdempotency" name="Kiểm tra giao dịch trùng lặp" camunda:type="external" camunda:topic="payment.check-idempotency">
       <bpmn:incoming>Flow_Validate_CheckIdempotency</bpmn:incoming>
       <bpmn:outgoing>Flow_CheckIdempotency_CreateOrReuse</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_CreateOrReusePayment" name="Create or Reuse Payment" camunda:type="external" camunda:topic="payment.create-or-reuse">
+    <bpmn:serviceTask id="Task_CreateOrReusePayment" name="Tạo hoặc sử dụng lại thanh toán" camunda:type="external" camunda:topic="payment.create-or-reuse">
       <bpmn:incoming>Flow_CheckIdempotency_CreateOrReuse</bpmn:incoming>
       <bpmn:outgoing>Flow_CreateOrReuse_GenerateUrl</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_GenerateProviderPaymentUrl" name="Generate Provider Payment URL" camunda:type="external" camunda:topic="payment.generate-provider-url">
+    <bpmn:serviceTask id="Task_GenerateProviderPaymentUrl" name="Tạo liên kết thanh toán" camunda:type="external" camunda:topic="payment.generate-provider-url">
       <bpmn:incoming>Flow_CreateOrReuse_GenerateUrl</bpmn:incoming>
       <bpmn:outgoing>Flow_GenerateUrl_WaitCallback</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:intermediateCatchEvent id="Event_WaitGatewayCallback" name="Wait Gateway Callback">
+    <bpmn:intermediateCatchEvent id="Event_WaitGatewayCallback" name="Chờ kết quả từ cổng thanh toán">
       <bpmn:incoming>Flow_GenerateUrl_WaitCallback</bpmn:incoming>
       <bpmn:outgoing>Flow_Callback_VerifySignature</bpmn:outgoing>
       <bpmn:messageEventDefinition id="MessageEventDefinition_Callback" messageRef="Message_PaymentCallbackReceived" />
     </bpmn:intermediateCatchEvent>
 
-    <bpmn:boundaryEvent id="BoundaryEvent_PaymentTimeout" name="Payment Timeout 15 Minutes" attachedToRef="Event_WaitGatewayCallback" cancelActivity="true">
+    <bpmn:boundaryEvent id="BoundaryEvent_PaymentTimeout" name="Hết hạn thanh toán sau 15 phút" attachedToRef="Event_WaitGatewayCallback" cancelActivity="true">
       <bpmn:outgoing>Flow_Timeout_ExpireTransaction</bpmn:outgoing>
       <bpmn:timerEventDefinition id="TimerEventDefinition_PaymentTimeout">
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT15M</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
 
-    <bpmn:serviceTask id="Task_VerifyHmacSignature" name="Verify HMAC Signature" camunda:type="external" camunda:topic="payment.verify-signature">
+    <bpmn:serviceTask id="Task_VerifyHmacSignature" name="Xác thực chữ ký HMAC" camunda:type="external" camunda:topic="payment.verify-signature">
       <bpmn:incoming>Flow_Callback_VerifySignature</bpmn:incoming>
       <bpmn:outgoing>Flow_VerifySignature_IsValid</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:exclusiveGateway id="Gateway_IsSignatureValid" name="Is Signature Valid?">
+    <bpmn:exclusiveGateway id="Gateway_IsSignatureValid" name="Chữ ký hợp lệ?">
       <bpmn:incoming>Flow_VerifySignature_IsValid</bpmn:incoming>
       <bpmn:outgoing>Flow_SignatureValid_CheckDuplicate</bpmn:outgoing>
       <bpmn:outgoing>Flow_SignatureInvalid_SaveInvalidWebhook</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
-    <bpmn:serviceTask id="Task_SaveInvalidWebhook" name="Save Invalid Webhook Audit" camunda:type="external" camunda:topic="payment.save-invalid-webhook">
+    <bpmn:serviceTask id="Task_SaveInvalidWebhook" name="Lưu nhật ký webhook không hợp lệ" camunda:type="external" camunda:topic="payment.save-invalid-webhook">
       <bpmn:incoming>Flow_SignatureInvalid_SaveInvalidWebhook</bpmn:incoming>
       <bpmn:outgoing>Flow_SaveInvalidWebhook_MarkReview</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_MarkReviewRequired_Invalid" name="Mark Review Required" camunda:type="external" camunda:topic="payment.mark-review-required">
+    <bpmn:serviceTask id="Task_MarkReviewRequired_Invalid" name="Đánh dấu cần kiểm tra" camunda:type="external" camunda:topic="payment.mark-review-required">
       <bpmn:incoming>Flow_SaveInvalidWebhook_MarkReview</bpmn:incoming>
       <bpmn:outgoing>Flow_MarkReview_EndInvalid</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:endEvent id="EndEvent_InvalidCallback" name="Invalid Callback - Review Required">
+    <bpmn:endEvent id="EndEvent_InvalidCallback" name="Callback không hợp lệ - Cần kiểm tra">
       <bpmn:incoming>Flow_MarkReview_EndInvalid</bpmn:incoming>
     </bpmn:endEvent>
 
-    <bpmn:serviceTask id="Task_CheckDuplicateCallback" name="Check Duplicate Callback" camunda:type="external" camunda:topic="payment.check-duplicate-callback">
+    <bpmn:serviceTask id="Task_CheckDuplicateCallback" name="Kiểm tra callback trùng lặp" camunda:type="external" camunda:topic="payment.check-duplicate-callback">
       <bpmn:incoming>Flow_SignatureValid_CheckDuplicate</bpmn:incoming>
       <bpmn:outgoing>Flow_CheckDuplicate_PersistResult</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_PersistPaymentResultTransaction" name="Persist Payment Result Transaction" camunda:type="external" camunda:topic="payment.persist-result-transaction">
+    <bpmn:serviceTask id="Task_PersistPaymentResultTransaction" name="Lưu kết quả giao dịch thanh toán" camunda:type="external" camunda:topic="payment.persist-result-transaction">
       <bpmn:incoming>Flow_CheckDuplicate_PersistResult</bpmn:incoming>
       <bpmn:outgoing>Flow_PersistResult_StatusGateway</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:exclusiveGateway id="Gateway_PaymentResult" name="Payment Result?">
+    <bpmn:exclusiveGateway id="Gateway_PaymentResult" name="Kết quả thanh toán?">
       <bpmn:incoming>Flow_PersistResult_StatusGateway</bpmn:incoming>
       <bpmn:outgoing>Flow_ResultSuccess_SignalOutbox</bpmn:outgoing>
       <bpmn:outgoing>Flow_ResultFailed_CancelOrder</bpmn:outgoing>
       <bpmn:outgoing>Flow_ResultReview_ManualReview</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
-    <bpmn:serviceTask id="Task_SignalOutboxPublisherSuccess" name="Signal Outbox Publisher" camunda:type="external" camunda:topic="outbox.signal-publisher">
+    <bpmn:serviceTask id="Task_SignalOutboxPublisherSuccess" name="Phát sự kiện qua Outbox" camunda:type="external" camunda:topic="outbox.signal-publisher">
       <bpmn:incoming>Flow_ResultSuccess_SignalOutbox</bpmn:incoming>
       <bpmn:outgoing>Flow_SignalOutbox_CorrelateOrder</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_CorrelateOrderWorkflowSuccess" name="Correlate Order Workflow: payment.success" camunda:type="external" camunda:topic="workflow.correlate-payment-success">
+    <bpmn:serviceTask id="Task_CorrelateOrderWorkflowSuccess" name="Thông báo đơn hàng: thanh toán thành công" camunda:type="external" camunda:topic="workflow.correlate-payment-success">
       <bpmn:incoming>Flow_SignalOutbox_CorrelateOrder</bpmn:incoming>
       <bpmn:outgoing>Flow_CorrelateOrder_EndCompleted</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:endEvent id="EndEvent_PaymentCompleted" name="Payment Completed">
+    <bpmn:endEvent id="EndEvent_PaymentCompleted" name="Thanh toán hoàn tất">
       <bpmn:incoming>Flow_CorrelateOrder_EndCompleted</bpmn:incoming>
     </bpmn:endEvent>
 
-    <bpmn:serviceTask id="Task_CancelReleaseOrderFailed" name="Cancel / Release Order" camunda:type="external" camunda:topic="order.cancel-release">
+    <bpmn:serviceTask id="Task_CancelReleaseOrderFailed" name="Hủy đơn và hoàn tồn kho" camunda:type="external" camunda:topic="order.cancel-release">
       <bpmn:incoming>Flow_ResultFailed_CancelOrder</bpmn:incoming>
       <bpmn:outgoing>Flow_CancelFailed_SignalOutbox</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_SignalOutboxPublisherFailed" name="Signal Outbox Publisher" camunda:type="external" camunda:topic="outbox.signal-publisher">
+    <bpmn:serviceTask id="Task_SignalOutboxPublisherFailed" name="Phát sự kiện qua Outbox" camunda:type="external" camunda:topic="outbox.signal-publisher">
       <bpmn:incoming>Flow_CancelFailed_SignalOutbox</bpmn:incoming>
       <bpmn:outgoing>Flow_SignalOutboxFailed_EndFailed</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:endEvent id="EndEvent_PaymentFailed" name="Payment Failed / Cancelled">
+    <bpmn:endEvent id="EndEvent_PaymentFailed" name="Thanh toán thất bại hoặc bị hủy">
       <bpmn:incoming>Flow_SignalOutboxFailed_EndFailed</bpmn:incoming>
     </bpmn:endEvent>
 
-    <bpmn:userTask id="UserTask_ManualPaymentReview" name="Manual Payment Review" camunda:assignee="payment-admin">
+    <bpmn:userTask id="UserTask_ManualPaymentReview" name="Admin kiểm tra thanh toán" camunda:assignee="payment-admin">
       <bpmn:incoming>Flow_ResultReview_ManualReview</bpmn:incoming>
       <bpmn:outgoing>Flow_ManualReview_Decision</bpmn:outgoing>
     </bpmn:userTask>
 
-    <bpmn:exclusiveGateway id="Gateway_ManualReviewDecision" name="Review Decision?">
+    <bpmn:exclusiveGateway id="Gateway_ManualReviewDecision" name="Quyết định kiểm tra?">
       <bpmn:incoming>Flow_ManualReview_Decision</bpmn:incoming>
       <bpmn:outgoing>Flow_ReviewApprove_CorrelateSuccess</bpmn:outgoing>
       <bpmn:outgoing>Flow_ReviewReject_CancelOrder</bpmn:outgoing>
       <bpmn:outgoing>Flow_ReviewRefund_EndRefundRequired</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
-    <bpmn:serviceTask id="Task_CorrelateOrderWorkflowReviewSuccess" name="Correlate Order Workflow: approved" camunda:type="external" camunda:topic="workflow.correlate-payment-success">
+    <bpmn:serviceTask id="Task_CorrelateOrderWorkflowReviewSuccess" name="Thông báo đơn hàng: đã duyệt" camunda:type="external" camunda:topic="workflow.correlate-payment-success">
       <bpmn:incoming>Flow_ReviewApprove_CorrelateSuccess</bpmn:incoming>
       <bpmn:outgoing>Flow_ReviewSuccess_EndCompleted</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_CancelReleaseOrderReviewReject" name="Cancel / Release Order" camunda:type="external" camunda:topic="order.cancel-release">
+    <bpmn:serviceTask id="Task_CancelReleaseOrderReviewReject" name="Hủy đơn và hoàn tồn kho" camunda:type="external" camunda:topic="order.cancel-release">
       <bpmn:incoming>Flow_ReviewReject_CancelOrder</bpmn:incoming>
       <bpmn:outgoing>Flow_ReviewReject_EndFailed</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:endEvent id="EndEvent_RefundRequired" name="Refund Required">
+    <bpmn:endEvent id="EndEvent_RefundRequired" name="Cần hoàn tiền">
       <bpmn:incoming>Flow_ReviewRefund_EndRefundRequired</bpmn:incoming>
     </bpmn:endEvent>
 
-    <bpmn:serviceTask id="Task_MarkPaymentExpiredTransaction" name="Mark Payment EXPIRED Transaction" camunda:type="external" camunda:topic="payment.mark-expired-transaction">
+    <bpmn:serviceTask id="Task_MarkPaymentExpiredTransaction" name="Đánh dấu giao dịch hết hạn" camunda:type="external" camunda:topic="payment.mark-expired-transaction">
       <bpmn:incoming>Flow_Timeout_ExpireTransaction</bpmn:incoming>
       <bpmn:outgoing>Flow_Expired_CancelOrder</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_CancelReleaseOrderExpired" name="Cancel / Release Order" camunda:type="external" camunda:topic="order.cancel-release">
+    <bpmn:serviceTask id="Task_CancelReleaseOrderExpired" name="Hủy đơn và hoàn tồn kho" camunda:type="external" camunda:topic="order.cancel-release">
       <bpmn:incoming>Flow_Expired_CancelOrder</bpmn:incoming>
       <bpmn:outgoing>Flow_CancelExpired_SignalOutbox</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_SignalOutboxPublisherExpired" name="Signal Outbox Publisher" camunda:type="external" camunda:topic="outbox.signal-publisher">
+    <bpmn:serviceTask id="Task_SignalOutboxPublisherExpired" name="Phát sự kiện qua Outbox" camunda:type="external" camunda:topic="outbox.signal-publisher">
       <bpmn:incoming>Flow_CancelExpired_SignalOutbox</bpmn:incoming>
       <bpmn:outgoing>Flow_SignalExpired_EndTimeout</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:endEvent id="EndEvent_PaymentTimeout" name="Payment Timeout">
+    <bpmn:endEvent id="EndEvent_PaymentTimeout" name="Thanh toán hết hạn">
       <bpmn:incoming>Flow_SignalExpired_EndTimeout</bpmn:incoming>
     </bpmn:endEvent>
 
@@ -175,23 +175,23 @@
     <bpmn:sequenceFlow id="Flow_GenerateUrl_WaitCallback" sourceRef="Task_GenerateProviderPaymentUrl" targetRef="Event_WaitGatewayCallback" />
     <bpmn:sequenceFlow id="Flow_Callback_VerifySignature" sourceRef="Event_WaitGatewayCallback" targetRef="Task_VerifyHmacSignature" />
     <bpmn:sequenceFlow id="Flow_VerifySignature_IsValid" sourceRef="Task_VerifyHmacSignature" targetRef="Gateway_IsSignatureValid" />
-    <bpmn:sequenceFlow id="Flow_SignatureValid_CheckDuplicate" name="Yes" sourceRef="Gateway_IsSignatureValid" targetRef="Task_CheckDuplicateCallback">
+    <bpmn:sequenceFlow id="Flow_SignatureValid_CheckDuplicate" name="Có" sourceRef="Gateway_IsSignatureValid" targetRef="Task_CheckDuplicateCallback">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${signatureValid == true}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_SignatureInvalid_SaveInvalidWebhook" name="No" sourceRef="Gateway_IsSignatureValid" targetRef="Task_SaveInvalidWebhook">
+    <bpmn:sequenceFlow id="Flow_SignatureInvalid_SaveInvalidWebhook" name="Không" sourceRef="Gateway_IsSignatureValid" targetRef="Task_SaveInvalidWebhook">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${signatureValid == false}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_SaveInvalidWebhook_MarkReview" sourceRef="Task_SaveInvalidWebhook" targetRef="Task_MarkReviewRequired_Invalid" />
     <bpmn:sequenceFlow id="Flow_MarkReview_EndInvalid" sourceRef="Task_MarkReviewRequired_Invalid" targetRef="EndEvent_InvalidCallback" />
     <bpmn:sequenceFlow id="Flow_CheckDuplicate_PersistResult" sourceRef="Task_CheckDuplicateCallback" targetRef="Task_PersistPaymentResultTransaction" />
     <bpmn:sequenceFlow id="Flow_PersistResult_StatusGateway" sourceRef="Task_PersistPaymentResultTransaction" targetRef="Gateway_PaymentResult" />
-    <bpmn:sequenceFlow id="Flow_ResultSuccess_SignalOutbox" name="SUCCESS" sourceRef="Gateway_PaymentResult" targetRef="Task_SignalOutboxPublisherSuccess">
+    <bpmn:sequenceFlow id="Flow_ResultSuccess_SignalOutbox" name="Thành công" sourceRef="Gateway_PaymentResult" targetRef="Task_SignalOutboxPublisherSuccess">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${paymentResult == "SUCCESS"}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_ResultFailed_CancelOrder" name="FAILED / CANCELLED" sourceRef="Gateway_PaymentResult" targetRef="Task_CancelReleaseOrderFailed">
+    <bpmn:sequenceFlow id="Flow_ResultFailed_CancelOrder" name="Thất bại / Đã hủy" sourceRef="Gateway_PaymentResult" targetRef="Task_CancelReleaseOrderFailed">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${paymentResult == "FAILED" || paymentResult == "CANCELLED"}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_ResultReview_ManualReview" name="UNKNOWN / MISMATCH" sourceRef="Gateway_PaymentResult" targetRef="UserTask_ManualPaymentReview">
+    <bpmn:sequenceFlow id="Flow_ResultReview_ManualReview" name="Không rõ / Không khớp" sourceRef="Gateway_PaymentResult" targetRef="UserTask_ManualPaymentReview">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${paymentResult == "UNKNOWN" || paymentResult == "AMOUNT_MISMATCH" || paymentResult == "REVIEW_REQUIRED"}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_SignalOutbox_CorrelateOrder" sourceRef="Task_SignalOutboxPublisherSuccess" targetRef="Task_CorrelateOrderWorkflowSuccess" />
@@ -199,13 +199,13 @@
     <bpmn:sequenceFlow id="Flow_CancelFailed_SignalOutbox" sourceRef="Task_CancelReleaseOrderFailed" targetRef="Task_SignalOutboxPublisherFailed" />
     <bpmn:sequenceFlow id="Flow_SignalOutboxFailed_EndFailed" sourceRef="Task_SignalOutboxPublisherFailed" targetRef="EndEvent_PaymentFailed" />
     <bpmn:sequenceFlow id="Flow_ManualReview_Decision" sourceRef="UserTask_ManualPaymentReview" targetRef="Gateway_ManualReviewDecision" />
-    <bpmn:sequenceFlow id="Flow_ReviewApprove_CorrelateSuccess" name="Approve" sourceRef="Gateway_ManualReviewDecision" targetRef="Task_CorrelateOrderWorkflowReviewSuccess">
+    <bpmn:sequenceFlow id="Flow_ReviewApprove_CorrelateSuccess" name="Duyệt" sourceRef="Gateway_ManualReviewDecision" targetRef="Task_CorrelateOrderWorkflowReviewSuccess">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${reviewDecision == "APPROVE"}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_ReviewReject_CancelOrder" name="Reject" sourceRef="Gateway_ManualReviewDecision" targetRef="Task_CancelReleaseOrderReviewReject">
+    <bpmn:sequenceFlow id="Flow_ReviewReject_CancelOrder" name="Từ chối" sourceRef="Gateway_ManualReviewDecision" targetRef="Task_CancelReleaseOrderReviewReject">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${reviewDecision == "REJECT"}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_ReviewRefund_EndRefundRequired" name="Refund" sourceRef="Gateway_ManualReviewDecision" targetRef="EndEvent_RefundRequired">
+    <bpmn:sequenceFlow id="Flow_ReviewRefund_EndRefundRequired" name="Hoàn tiền" sourceRef="Gateway_ManualReviewDecision" targetRef="EndEvent_RefundRequired">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${reviewDecision == "REFUND"}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_ReviewSuccess_EndCompleted" sourceRef="Task_CorrelateOrderWorkflowReviewSuccess" targetRef="EndEvent_PaymentCompleted" />

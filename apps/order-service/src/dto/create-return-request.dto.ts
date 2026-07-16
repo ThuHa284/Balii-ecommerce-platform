@@ -1,19 +1,8 @@
-import {
-  ArrayMaxSize,
-  IsArray,
-  IsOptional,
-  IsString,
-  MaxLength,
-} from 'class-validator';
+import { IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateReturnRequestDto {
   @IsString()
+  @MinLength(10)
   @MaxLength(2000)
   reason!: string;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(5)
-  @IsString({ each: true })
-  imageUrls?: string[];
 }

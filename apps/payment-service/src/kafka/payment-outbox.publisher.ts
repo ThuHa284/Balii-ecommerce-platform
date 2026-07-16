@@ -1,10 +1,17 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { Kafka, logLevel, type Producer, type SASLOptions } from 'kafkajs';
+import {
+  Kafka,
+  logLevel,
+  type Admin,
+  type Producer,
+  type SASLOptions,
+} from 'kafkajs';
 import { DataSource } from 'typeorm';
 
 type OutboxEventRow = {
@@ -33,6 +40,47 @@ type PreparedKafkaEvent = {
   headers: Record<string, string>;
 };
 
+const KAFKA_EVENT_CATALOG = [
+  {
+    topic: 'payment.success',
+    label: 'Thanh toán thành công',
+    description:
+      'Phát khi giao dịch đã được xác nhận thành công và có thể tiếp tục xử lý đơn hàng.',
+    producer: 'Payment Service · Outbox Publisher',
+    intendedConsumers: ['Order Service', 'Notification Service'],
+  },
+  {
+    topic: 'payment.failed',
+    label: 'Thanh toán thất bại',
+    description:
+      'Phát khi giao dịch thất bại hoặc bị hủy để các hệ thống liên quan giải phóng tài nguyên.',
+    producer: 'Payment Service · Outbox Publisher',
+    intendedConsumers: ['Order Service', 'Notification Service'],
+  },
+  {
+    topic: 'payment.expired',
+    label: 'Thanh toán hết hạn',
+    description:
+      'Phát khi quá thời gian thanh toán để đơn hàng được hủy và hoàn tồn kho.',
+    producer: 'Payment Service · Outbox Publisher',
+    intendedConsumers: ['Order Service', 'Notification Service'],
+  },
+  {
+    topic: 'payment.refund.completed',
+    label: 'Hoàn tiền hoàn tất',
+    description: 'Event nghiệp vụ xác nhận quá trình hoàn tiền đã hoàn thành.',
+    producer: 'Payment Service · Outbox Publisher',
+    intendedConsumers: ['Order Service', 'Analytics Service'],
+  },
+  {
+    topic: 'notification.refund.completed',
+    label: 'Thông báo hoàn tiền',
+    description: 'Event dành cho kênh thông báo sau khi hoàn tiền thành công.',
+    producer: 'Payment Service · Outbox Publisher',
+    intendedConsumers: ['Notification Service'],
+  },
+] as const;
+
 @Injectable()
 export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PaymentOutboxPublisher.name);
@@ -49,6 +97,7 @@ export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
     process.env.PAYMENT_OUTBOX_MAX_RETRY || 10,
   );
   private producer: Producer | null = null;
+  private kafka: Kafka | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
   private isPublishing = false;
 
@@ -79,6 +128,7 @@ export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
       await this.producer.disconnect();
       this.producer = null;
     }
+    this.kafka = null;
   }
 
   async publishPendingEvents(limit = this.maxBatchSize) {
@@ -193,6 +243,7 @@ export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
         logLevel: this.readKafkaLogLevel(),
       });
 
+      this.kafka = kafka;
       this.producer = kafka.producer({
         allowAutoTopicCreation: process.env.KAFKA_AUTO_CREATE_TOPICS === 'true',
       });
@@ -200,10 +251,152 @@ export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Kafka producer đã kết nối tới ${brokers.join(', ')}`);
     } catch (error) {
       this.producer = null;
+      this.kafka = null;
       this.logger.warn(
         `Không khởi tạo được Kafka producer. Event sẽ tiếp tục nằm trong outbox. ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  async getAdminKafkaOverview() {
+    if (!this.kafka) {
+      return {
+        connected: false,
+        brokers: this.readBrokers(),
+        kafkaUiUrl: process.env.KAFKA_UI_PUBLIC_URL || 'http://localhost:8081',
+        topics: [],
+        consumerGroups: [],
+        outbox: await this.getOutboxSummary(),
+        eventCatalog: KAFKA_EVENT_CATALOG,
+        error: 'Kafka producer chưa kết nối.',
+      };
+    }
+
+    let admin: Admin | null = null;
+
+    try {
+      admin = this.kafka.admin();
+      await admin.connect();
+
+      const topicNames = await admin.listTopics();
+      const businessTopics = topicNames.filter(
+        (topic) => !topic.startsWith('__'),
+      );
+      const metadata =
+        businessTopics.length > 0
+          ? await admin.fetchTopicMetadata({ topics: businessTopics })
+          : { topics: [] };
+      const groupResult = await admin.listGroups();
+
+      const topics = await Promise.all(
+        metadata.topics.map(async (topic) => {
+          const offsets = await admin!.fetchTopicOffsets(topic.name);
+          const messageCount = offsets.reduce((sum, partition) => {
+            const high = Number(partition.high ?? 0);
+            const low = Number(partition.low ?? 0);
+            return sum + Math.max(0, high - low);
+          }, 0);
+
+          return {
+            name: topic.name,
+            partitions: topic.partitions.length,
+            replicationFactor: Math.max(
+              0,
+              ...topic.partitions.map(
+                (partition) => partition.replicas?.length ?? 0,
+              ),
+            ),
+            messageCount,
+          };
+        }),
+      );
+
+      return {
+        connected: true,
+        brokers: this.readBrokers(),
+        kafkaUiUrl: process.env.KAFKA_UI_PUBLIC_URL || 'http://localhost:8081',
+        topics: topics.sort((a, b) => a.name.localeCompare(b.name)),
+        consumerGroups: groupResult.groups.map((group) => ({
+          groupId: group.groupId,
+          protocolType: group.protocolType,
+        })),
+        outbox: await this.getOutboxSummary(),
+        eventCatalog: KAFKA_EVENT_CATALOG,
+        error: null,
+      };
+    } catch (error) {
+      return {
+        connected: false,
+        brokers: this.readBrokers(),
+        kafkaUiUrl: process.env.KAFKA_UI_PUBLIC_URL || 'http://localhost:8081',
+        topics: [],
+        consumerGroups: [],
+        outbox: await this.getOutboxSummary(),
+        eventCatalog: KAFKA_EVENT_CATALOG,
+        error:
+          error instanceof Error ? error.message : 'Không thể truy vấn Kafka.',
+      };
+    } finally {
+      if (admin) {
+        await admin.disconnect().catch(() => undefined);
+      }
+    }
+  }
+
+  private readBrokers() {
+    return (process.env.KAFKA_BROKERS || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+
+  private async getOutboxSummary() {
+    const statusRows: Array<{ status: string; count: string | number }> =
+      await this.dataSource.query(
+        `
+        SELECT status, COUNT(*) AS count
+        FROM payment_service.outbox_events
+        GROUP BY status
+        ORDER BY status
+        `,
+      );
+    const recentEvents: Array<{
+      id: string;
+      type: string;
+      aggregateType: string;
+      aggregateId: string;
+      status: string;
+      retryCount: number | string;
+      createdAt: string;
+      publishedAt: string | null;
+      lastError: string | null;
+    }> = await this.dataSource.query(
+      `
+      SELECT
+        id,
+        type,
+        aggregate_type AS "aggregateType",
+        aggregate_id AS "aggregateId",
+        status,
+        retry_count AS "retryCount",
+        created_at AS "createdAt",
+        published_at AS "publishedAt",
+        last_error AS "lastError"
+      FROM payment_service.outbox_events
+      ORDER BY created_at DESC
+      LIMIT 20
+      `,
+    );
+
+    return {
+      counts: Object.fromEntries(
+        statusRows.map((row) => [row.status, Number(row.count)]),
+      ),
+      recentEvents: recentEvents.map((event) => ({
+        ...event,
+        retryCount: Number(event.retryCount),
+      })),
+    };
   }
 
   private async claimPendingEvents(limit: number): Promise<OutboxEventRow[]> {

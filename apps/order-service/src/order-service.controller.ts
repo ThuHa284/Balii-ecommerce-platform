@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -6,8 +7,12 @@ import {
   Param,
   Patch,
   Post,
+  Query,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { OrderServiceService } from './order-service.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { HeaderRolesGuard } from './auth/header-roles.guard';
@@ -55,6 +60,12 @@ export class OrderServiceController {
     return this.orderServiceService.findAdminReturnRequests(orderId);
   }
 
+  @Get('admin/return-requests')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  findAllAdminReturnRequests(@Query('status') status?: string) {
+    return this.orderServiceService.findAllAdminReturnRequests(status);
+  }
+
   @Get(':id/return-requests')
   findMyReturnRequests(
     @Headers('x-user-id') userId: string | undefined,
@@ -64,12 +75,36 @@ export class OrderServiceController {
   }
 
   @Post(':id/return-requests')
+  @UseInterceptors(
+    FilesInterceptor('images', 5, {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_request, file, callback) => {
+        if (
+          !['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)
+        ) {
+          callback(
+            new BadRequestException('Chỉ chấp nhận ảnh JPG, PNG hoặc WebP.'),
+            false,
+          );
+          return;
+        }
+
+        callback(null, true);
+      },
+    }),
+  )
   createReturnRequest(
     @Headers('x-user-id') userId: string | undefined,
     @Param('id') orderId: string,
     @Body() dto: CreateReturnRequestDto,
+    @UploadedFiles() images: Express.Multer.File[] = [],
   ) {
-    return this.orderServiceService.createReturnRequest(userId, orderId, dto);
+    return this.orderServiceService.createReturnRequest(
+      userId,
+      orderId,
+      dto,
+      images,
+    );
   }
 
   @Get(':id')

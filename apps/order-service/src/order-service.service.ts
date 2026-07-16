@@ -112,6 +112,9 @@ type ReturnRequestRow = {
   reviewedAt?: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+  orderCode?: string;
+  customerName?: string | null;
+  customerEmail?: string | null;
 };
 
 type AdminDashboardStats = {
@@ -151,6 +154,15 @@ type ReturnRequestSummary = {
   createdAt: string;
   updatedAt: string;
 };
+
+type AdminReturnRequestSummary = ReturnRequestSummary & {
+  orderCode: string;
+  customerName: string;
+  customerEmail: string | null;
+};
+
+const APPROVED_RETURN_MESSAGE =
+  'Yêu cầu trả hàng đã được chấp thuận. Đơn vị vận chuyển sẽ liên hệ và đến nhận sản phẩm trong thời gian sớm nhất. Vui lòng giữ điện thoại bên mình và đóng gói sản phẩm cẩn thận.';
 
 @Injectable()
 export class OrderServiceService {
@@ -440,8 +452,8 @@ export class OrderServiceService {
     orderId: string,
     input: {
       reason: string;
-      imageUrls?: string[];
     },
+    images: Express.Multer.File[],
   ): Promise<ReturnRequestSummary> {
     if (!userId) {
       throw new BadRequestException('Missing x-user-id');
@@ -484,10 +496,16 @@ export class OrderServiceService {
       );
     }
 
+    if (!images.length) {
+      throw new BadRequestException(
+        'Vui lòng gửi ít nhất 1 ảnh minh chứng cho yêu cầu trả hàng.',
+      );
+    }
+
     const uploadedImageUrls = await this.uploadReturnRequestImages(
       orderId,
       userId,
-      input.imageUrls ?? [],
+      images,
     );
 
     const rows = await this.dataSource.query(
@@ -517,7 +535,17 @@ export class OrderServiceService {
       [orderId, userId, input.reason.trim(), JSON.stringify(uploadedImageUrls)],
     );
 
-    return this.mapReturnRequest(rows[0] as ReturnRequestRow);
+    const request = this.mapReturnRequest(rows[0] as ReturnRequestRow);
+
+    void this.sendNewReturnRequestNotification(request).catch((error) => {
+      const message =
+        error instanceof Error ? error.message : 'Unknown email error';
+      this.logger.warn(
+        `Unable to send return request notification ${request.id}: ${message}`,
+      );
+    });
+
+    return request;
   }
 
   async findMyReturnRequests(
@@ -579,6 +607,58 @@ export class OrderServiceService {
     return rows.map((row: ReturnRequestRow) => this.mapReturnRequest(row));
   }
 
+  async findAllAdminReturnRequests(
+    status?: string,
+  ): Promise<AdminReturnRequestSummary[]> {
+    const normalizedStatus = status?.trim().toLowerCase() || null;
+
+    if (
+      normalizedStatus &&
+      !['pending', 'approved', 'rejected'].includes(normalizedStatus)
+    ) {
+      throw new BadRequestException(
+        'Trạng thái yêu cầu trả hàng không hợp lệ.',
+      );
+    }
+
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        rr.id,
+        rr.order_id AS "orderId",
+        rr.user_id AS "userId",
+        rr.status,
+        rr.reason,
+        rr.image_urls AS "imageUrls",
+        rr.admin_note AS "adminNote",
+        rr.reviewed_by AS "reviewedBy",
+        rr.reviewed_at AS "reviewedAt",
+        rr.created_at AS "createdAt",
+        rr.updated_at AS "updatedAt",
+        o.order_code AS "orderCode",
+        COALESCE(
+          u.full_name,
+          o.shipping_address ->> 'recipientName',
+          'Khách hàng'
+        ) AS "customerName",
+        u.email AS "customerEmail"
+      FROM order_service.return_requests rr
+      JOIN order_service.orders o ON o.id = rr.order_id
+      LEFT JOIN user_service.users u ON u.id = rr.user_id
+      WHERE ($1::text IS NULL OR rr.status = $1)
+      ORDER BY rr.created_at DESC
+      `,
+      [normalizedStatus],
+    );
+
+    return rows.map((row: ReturnRequestRow) => ({
+      ...this.mapReturnRequest(row),
+      orderCode: row.orderCode ?? row.orderId,
+      customerName: row.customerName ?? 'Khách hàng',
+      customerEmail: row.customerEmail ?? null,
+    }));
+  }
+
   async reviewReturnRequest(
     returnRequestId: string,
     reviewedBy: string | undefined,
@@ -591,6 +671,34 @@ export class OrderServiceService {
       throw new BadRequestException('Missing x-user-id');
     }
 
+    const note = input.adminNote?.trim() ?? '';
+    if (input.status === 'rejected' && !note) {
+      throw new BadRequestException(
+        'Vui lòng nhập lý do từ chối để thông báo cho khách hàng.',
+      );
+    }
+
+    const currentRows = await this.dataSource.query(
+      `
+      SELECT status
+      FROM order_service.return_requests
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [returnRequestId],
+    );
+
+    if (!currentRows.length) {
+      throw new NotFoundException('Return request not found');
+    }
+
+    if (currentRows[0].status !== 'pending') {
+      throw new BadRequestException('Yêu cầu trả hàng này đã được xử lý.');
+    }
+
+    const customerMessage =
+      input.status === 'approved' ? note || APPROVED_RETURN_MESSAGE : note;
+
     const rows = await this.dataSource.query(
       `
       UPDATE order_service.return_requests
@@ -599,7 +707,7 @@ export class OrderServiceService {
           reviewed_by = $3,
           reviewed_at = NOW(),
           updated_at = NOW()
-      WHERE id = $4
+      WHERE id = $4 AND status = 'pending'
       RETURNING
         id,
         order_id AS "orderId",
@@ -613,19 +721,26 @@ export class OrderServiceService {
         created_at AS "createdAt",
         updated_at AS "updatedAt"
       `,
-      [
-        input.status,
-        input.adminNote?.trim() ?? null,
-        reviewedBy,
-        returnRequestId,
-      ],
+      [input.status, customerMessage, reviewedBy, returnRequestId],
     );
 
-    if (!rows.length) {
+    const updatedRow = Array.isArray(rows[0]) ? rows[0][0] : rows[0];
+
+    if (!updatedRow) {
       throw new NotFoundException('Return request not found');
     }
 
-    return this.mapReturnRequest(rows[0] as ReturnRequestRow);
+    const request = this.mapReturnRequest(updatedRow as ReturnRequestRow);
+
+    void this.sendReturnRequestReviewedNotification(request).catch((error) => {
+      const message =
+        error instanceof Error ? error.message : 'Unknown email error';
+      this.logger.warn(
+        `Unable to send reviewed return notification ${request.id}: ${message}`,
+      );
+    });
+
+    return request;
   }
 
   async getAdminDashboardStats(): Promise<AdminDashboardStats> {
@@ -820,30 +935,12 @@ export class OrderServiceService {
     };
   }
 
-  private parseDataUrlImage(dataUrl: string): {
-    buffer: Buffer;
-    extension: string;
-  } {
-    const matches = dataUrl.match(
-      /^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/,
-    );
-
-    if (!matches) {
-      throw new BadRequestException('Ảnh minh chứng không hợp lệ.');
-    }
-
-    return {
-      extension: matches[1].replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg',
-      buffer: Buffer.from(matches[2], 'base64'),
-    };
-  }
-
   private async uploadReturnRequestImages(
     orderId: string,
     userId: string,
-    imageUrls: string[],
+    images: Express.Multer.File[],
   ): Promise<string[]> {
-    if (!imageUrls.length) {
+    if (!images.length) {
       return [];
     }
 
@@ -852,15 +949,10 @@ export class OrderServiceService {
       'balii/returns';
 
     const uploadedUrls = await Promise.all(
-      imageUrls.map(async (imageUrl, index) => {
-        if (!imageUrl.startsWith('data:image/')) {
-          return imageUrl;
-        }
-
-        const parsed = this.parseDataUrlImage(imageUrl);
-        const publicId = `${userId}_${orderId}_${Date.now()}_${index + 1}.${parsed.extension}`;
+      images.map(async (image, index) => {
+        const publicId = `${userId}_${orderId}_${Date.now()}_${index + 1}`;
         const uploaded = await this.cloudinaryService.uploadBuffer(
-          parsed.buffer,
+          image.buffer,
           folder,
           publicId,
         );
@@ -1243,6 +1335,92 @@ export class OrderServiceService {
         ),
       });
     }
+  }
+
+  private async sendNewReturnRequestNotification(
+    request: ReturnRequestSummary,
+  ) {
+    if (!this.isMailEnabled()) {
+      return;
+    }
+
+    const adminRecipients = (
+      this.configService.get<string>('ADMIN_ORDER_EMAILS') || ''
+    )
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (!adminRecipients.length) {
+      return;
+    }
+
+    const order = await this.findMyOrderById(request.userId, request.orderId);
+    const customer = await this.loadCustomerContact(request.userId);
+    const transporter = this.createMailerTransport();
+    const from =
+      this.configService.get<string>('MAIL_FROM') || 'no-reply@balii.com';
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const evidenceLinks = request.imageUrls
+      .map(
+        (url, index) =>
+          `<li><a href="${url}">Ảnh minh chứng ${index + 1}</a></li>`,
+      )
+      .join('');
+
+    await transporter.sendMail({
+      from,
+      to: adminRecipients.join(', '),
+      subject: `Yêu cầu trả hàng mới #${order.orderNumber}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;color:#0f172a;">
+          <h2>Yêu cầu trả hàng cần kiểm tra</h2>
+          <p><strong>Mã đơn:</strong> #${order.orderNumber}</p>
+          <p><strong>Khách hàng:</strong> ${customer.fullName}</p>
+          <p><strong>Lý do:</strong> ${request.reason}</p>
+          <p><strong>Ảnh minh chứng:</strong></p>
+          <ul>${evidenceLinks}</ul>
+          <p><a href="${frontendUrl}/admin/orders">Mở trang quản lý đơn hàng</a></p>
+        </div>
+      `,
+    });
+  }
+
+  private async sendReturnRequestReviewedNotification(
+    request: ReturnRequestSummary,
+  ) {
+    if (!this.isMailEnabled()) {
+      return;
+    }
+
+    const customer = await this.loadCustomerContact(request.userId);
+    if (!customer.email) {
+      return;
+    }
+
+    const order = await this.findMyOrderById(request.userId, request.orderId);
+    const transporter = this.createMailerTransport();
+    const from =
+      this.configService.get<string>('MAIL_FROM') || 'no-reply@balii.com';
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const isApproved = request.status === 'approved';
+
+    await transporter.sendMail({
+      from,
+      to: customer.email,
+      subject: `${isApproved ? 'Đã chấp thuận' : 'Cập nhật'} yêu cầu trả hàng #${order.orderNumber}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;color:#0f172a;">
+          <h2>${isApproved ? 'Yêu cầu trả hàng đã được chấp thuận' : 'Yêu cầu trả hàng chưa được chấp thuận'}</h2>
+          <p>Xin chào ${customer.fullName},</p>
+          <p>${request.adminNote ?? ''}</p>
+          <p><strong>Mã đơn:</strong> #${order.orderNumber}</p>
+          <p><a href="${frontendUrl}/account/orders/${order.id}">Xem chi tiết yêu cầu trả hàng</a></p>
+        </div>
+      `,
+    });
   }
 
   private async getAdminSummary(): Promise<{

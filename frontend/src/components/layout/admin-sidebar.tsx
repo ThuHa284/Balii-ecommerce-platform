@@ -1,21 +1,25 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   BarChart3,
   Grid2x2,
   LayoutDashboard,
+  Library,
   LogOut,
   Megaphone,
+  Network,
   Package,
-  Settings,
+  Route,
   ShoppingCart,
   Ticket,
   Users,
 } from 'lucide-react';
 
 import { hasRoleAccess } from '@/lib/api/admin.utils';
+import { getAdminReturnRequests } from '@/lib/api/admin.api';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { UserRole } from '@/types/user.types';
@@ -31,20 +35,22 @@ const adminLinks: AdminLink[] = [
   { href: '/admin/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Sản phẩm', icon: Package },
   { href: '/admin/categories', label: 'Danh mục', icon: Grid2x2 },
+  { href: '/admin/collections', label: 'Bộ sưu tập', icon: Library },
   { href: '/admin/campaigns', label: 'Chiến dịch', icon: Megaphone },
   { href: '/admin/orders', label: 'Đơn hàng', icon: ShoppingCart },
+  { href: '/admin/workflows', label: 'Workflow', icon: Route },
+  {
+    href: '/admin/kafka',
+    label: 'Kafka Events',
+    icon: Network,
+    roles: [UserRole.SUPER_ADMIN],
+  },
   { href: '/admin/vouchers', label: 'Voucher', icon: Ticket },
   { href: '/admin/users', label: 'Khách hàng', icon: Users },
   {
     href: '/admin/market-analysis',
     label: 'Phân tích thị trường',
     icon: BarChart3,
-  },
-  {
-    href: '/admin/settings',
-    label: 'Cài đặt hệ thống',
-    icon: Settings,
-    roles: [UserRole.SUPER_ADMIN],
   },
 ];
 
@@ -53,9 +59,44 @@ export default function AdminSidebar() {
   const router = useRouter();
   const logout = useAuthStore((state) => state.logout);
   const userRole = useAuthStore((state) => state.user?.role ?? null);
+  const [pendingReturnCount, setPendingReturnCount] = useState(0);
   const visibleLinks = adminLinks.filter((link) =>
     hasRoleAccess(userRole, link.roles),
   );
+
+  useEffect(() => {
+    let isActive = true;
+
+    const refreshPendingReturns = async () => {
+      try {
+        const requests = await getAdminReturnRequests('pending');
+        if (isActive) {
+          setPendingReturnCount(requests.length);
+        }
+      } catch {
+        if (isActive) {
+          setPendingReturnCount(0);
+        }
+      }
+    };
+    const handleReturnRequestsUpdated = () => {
+      void refreshPendingReturns();
+    };
+
+    void refreshPendingReturns();
+    window.addEventListener(
+      'admin-return-requests-updated',
+      handleReturnRequestsUpdated,
+    );
+
+    return () => {
+      isActive = false;
+      window.removeEventListener(
+        'admin-return-requests-updated',
+        handleReturnRequestsUpdated,
+      );
+    };
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -106,7 +147,20 @@ export default function AdminSidebar() {
               )}
             >
               <link.icon className="h-5 w-5" />
-              {link.label}
+              <span className="flex-1">{link.label}</span>
+              {link.href === '/admin/orders' && pendingReturnCount > 0 ? (
+                <span
+                  className={cn(
+                    'min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold',
+                    isActive
+                      ? 'bg-white text-violet-600'
+                      : 'bg-amber-100 text-amber-700',
+                  )}
+                  title={`${pendingReturnCount} yêu cầu trả hàng đang chờ duyệt`}
+                >
+                  {pendingReturnCount > 99 ? '99+' : pendingReturnCount}
+                </span>
+              ) : null}
             </Link>
           );
         })}

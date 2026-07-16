@@ -1,6 +1,6 @@
 import apiClient from './client';
 import { mapOrder } from './adapters';
-import { Order, ReturnRequest } from '@/types/order.types';
+import { AdminReturnRequest, Order, ReturnRequest } from '@/types/order.types';
 import { User, UserRole } from '@/types/user.types';
 import { mapUser } from './adapters';
 
@@ -62,6 +62,177 @@ export interface AdminRefund {
   gatewayStatus: string | null;
   workflowResolution: string | null;
   retryCount: number;
+}
+
+export interface AdminWorkflowVariable {
+  type: string;
+  value: unknown;
+}
+
+export interface AdminWorkflowStep {
+  activityId: string;
+  activityName: string;
+  activityType: string;
+}
+
+export interface AdminWorkflowActivity extends AdminWorkflowStep {
+  id: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  status: 'ACTIVE' | 'COMPLETED';
+}
+
+export interface AdminWorkflowIncident {
+  id: string;
+  activityId: string | null;
+  incidentType: string | null;
+  message: string | null;
+  createdAt: string | null;
+}
+
+export interface AdminWorkflowSnapshot {
+  kind: 'payment' | 'refund';
+  processDefinitionKey: string;
+  businessKey: string;
+  state:
+    | 'NOT_FOUND'
+    | 'UNAVAILABLE'
+    | 'ACTIVE'
+    | 'COMPLETED'
+    | 'INCIDENT'
+    | 'UNKNOWN';
+  processInstanceId: string | null;
+  processDefinitionId: string | null;
+  bpmnXml: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  currentSteps: AdminWorkflowStep[];
+  activities: AdminWorkflowActivity[];
+  incidents: AdminWorkflowIncident[];
+  variables: Record<string, AdminWorkflowVariable>;
+  highlightedVariables: Record<string, AdminWorkflowVariable>;
+  camundaReachable: boolean;
+  error: string | null;
+}
+
+export interface AdminRefundWorkflowItem {
+  refund: {
+    id: string;
+    paymentId: string;
+    orderId: string;
+    amount: number;
+    refundStatus: string;
+    providerRefundId: string | null;
+    workflowResolution: string | null;
+    createdAt: string;
+    refundedAt: string | null;
+  };
+  workflow: AdminWorkflowSnapshot;
+}
+
+export interface AdminWorkflowMonitorResponse {
+  search: {
+    orderId: string;
+    paymentId: string;
+  };
+  payment: {
+    id: string;
+    orderId: string;
+    userId: string;
+    amount: number;
+    provider: string;
+    status: string;
+    providerRef: string | null;
+    providerTransactionId: string | null;
+    createdAt: string;
+    paidAt: string | null;
+  };
+  paymentWorkflow: AdminWorkflowSnapshot;
+  refundWorkflows: AdminRefundWorkflowItem[];
+}
+
+export interface AdminWorkflowContext {
+  paymentId: string;
+  orderId: string;
+  orderCode: string | null;
+  customerName: string | null;
+  amount: number;
+  provider: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface AdminWorkflowOverviewActivity {
+  activityId: string;
+  activeInstances: number;
+  incidents: number;
+}
+
+export interface AdminWorkflowOverviewDefinition {
+  processDefinitionKey: string;
+  processDefinitionId: string;
+  processName: string;
+  version: number;
+  versions: number;
+  bpmnXml: string;
+  totals: {
+    all: number;
+    active: number;
+    completed: number;
+    incidents: number;
+  };
+  activities: AdminWorkflowOverviewActivity[];
+}
+
+export interface AdminWorkflowOverviewResponse {
+  definitions: AdminWorkflowOverviewDefinition[];
+  generatedAt: string;
+}
+
+export interface AdminKafkaTopic {
+  name: string;
+  partitions: number;
+  replicationFactor: number;
+  messageCount: number;
+}
+
+export interface AdminKafkaConsumerGroup {
+  groupId: string;
+  protocolType: string;
+}
+
+export interface AdminKafkaEventCatalogItem {
+  topic: string;
+  label: string;
+  description: string;
+  producer: string;
+  intendedConsumers: string[];
+}
+
+export interface AdminKafkaOutboxEvent {
+  id: string;
+  type: string;
+  aggregateType: string;
+  aggregateId: string;
+  status: string;
+  retryCount: number;
+  createdAt: string;
+  publishedAt: string | null;
+  lastError: string | null;
+}
+
+export interface AdminKafkaOverviewResponse {
+  connected: boolean;
+  brokers: string[];
+  kafkaUiUrl: string;
+  topics: AdminKafkaTopic[];
+  consumerGroups: AdminKafkaConsumerGroup[];
+  outbox: {
+    counts: Record<string, number>;
+    recentEvents: AdminKafkaOutboxEvent[];
+  };
+  eventCatalog: AdminKafkaEventCatalogItem[];
+  error: string | null;
 }
 
 export interface AdminMarketImageSearchItem {
@@ -225,6 +396,16 @@ export async function getAdminOrderReturnRequests(
   return data;
 }
 
+export async function getAdminReturnRequests(
+  status?: ReturnRequest['status'],
+): Promise<AdminReturnRequest[]> {
+  const { data } = await apiClient.get<AdminReturnRequest[]>(
+    '/orders/admin/return-requests',
+    { params: status ? { status } : undefined },
+  );
+  return data;
+}
+
 export async function reviewAdminReturnRequest(
   returnRequestId: string,
   payload: {
@@ -269,6 +450,43 @@ export async function updateAdminUserRole(
 export async function getAdminRefunds(): Promise<AdminRefund[]> {
   const { data } = await apiClient.get<AdminRefund[]>(
     '/payments/admin/refunds',
+  );
+  return data;
+}
+
+export async function getAdminWorkflowMonitor(params: {
+  orderId?: string;
+  paymentId?: string;
+}): Promise<AdminWorkflowMonitorResponse> {
+  const { data } = await apiClient.get<AdminWorkflowMonitorResponse>(
+    '/payments/admin/workflows',
+    {
+      params,
+    },
+  );
+  return data;
+}
+
+export async function getAdminWorkflowOverview(): Promise<AdminWorkflowOverviewResponse> {
+  const { data } = await apiClient.get<AdminWorkflowOverviewResponse>(
+    '/payments/admin/workflow-overview',
+  );
+  return data;
+}
+
+export async function getAdminKafkaOverview(): Promise<AdminKafkaOverviewResponse> {
+  const { data } = await apiClient.get<AdminKafkaOverviewResponse>(
+    '/payments/admin/kafka-overview',
+  );
+  return data;
+}
+
+export async function getAdminWorkflowContexts(
+  limit = 20,
+): Promise<AdminWorkflowContext[]> {
+  const { data } = await apiClient.get<AdminWorkflowContext[]>(
+    '/payments/admin/workflow-contexts',
+    { params: { limit } },
   );
   return data;
 }

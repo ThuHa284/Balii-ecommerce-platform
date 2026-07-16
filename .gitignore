@@ -104,6 +104,7 @@ __pycache__/
 # Test artifacts
 playwright-report/
 test-results/
+artifacts/
 
 # Local databases and dumps
 *.sqlite

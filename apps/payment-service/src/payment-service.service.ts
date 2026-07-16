@@ -20,6 +20,13 @@ import { PaymentWebhookSecurityService } from './payment-webhook-security.servic
 import { RefundWorkflowService } from './refund-workflow.service';
 import { RefundOperationsService } from './refund-operations.service';
 import { PaymentReconciliationService } from './payment-reconciliation.service';
+import { CamundaClientService } from './camunda/camunda-client.service';
+import {
+  CamundaActivitySummary,
+  CamundaIncidentSummary,
+  CamundaProcessInstanceSummary,
+  CamundaVariableMap,
+} from './camunda/camunda-monitor.types';
 
 type PaymentRow = {
   id: string;
@@ -68,6 +75,31 @@ type AdminRefundSummary = {
   retryCount: number;
 };
 
+type WorkflowLookupPaymentRow = {
+  id: string;
+  orderId: string;
+  userId: string;
+  amount: number | string;
+  provider: string;
+  status: string;
+  providerRef?: string | null;
+  providerTransactionId?: string | null;
+  createdAt: Date | string;
+  paidAt?: Date | string | null;
+};
+
+type WorkflowLookupRefundRow = {
+  id: string;
+  paymentId: string;
+  orderId: string;
+  amount: number | string;
+  refundStatus: string;
+  providerRefundId?: string | null;
+  workflowResolution?: string | null;
+  createdAt: Date | string;
+  refundedAt?: Date | string | null;
+};
+
 @Injectable()
 export class PaymentServiceService {
   constructor(
@@ -80,6 +112,7 @@ export class PaymentServiceService {
     private readonly refundWorkflowService: RefundWorkflowService,
     private readonly refundOperationsService: RefundOperationsService,
     private readonly paymentReconciliationService: PaymentReconciliationService,
+    private readonly camundaClientService: CamundaClientService,
   ) {}
 
   private normalizeUuid(value: string | null | undefined) {
@@ -95,7 +128,11 @@ export class PaymentServiceService {
    * Hàm này tạo bản ghi payment, chuẩn bị URL thanh toán theo provider
    * và cập nhật order sang trạng thái đang chờ thanh toán.
    */
-  async createPayment(userId: string | undefined, dto: CreatePaymentDto) {
+  async createPayment(
+    userId: string | undefined,
+    dto: CreatePaymentDto,
+    clientIp?: string,
+  ) {
     if (!userId) {
       throw new BadRequestException('Missing x-user-id');
     }
@@ -149,6 +186,7 @@ export class PaymentServiceService {
         orderId: savedPayment.orderId,
         amount: savedPayment.amount,
         providerRef: savedPayment.providerRef,
+        clientIp,
       });
       await this.paymentRepository.save(savedPayment);
     } else if (!isOfflinePayment) {
@@ -211,6 +249,7 @@ export class PaymentServiceService {
   }
 
   async completePayment(paymentId: string, providerTransactionId?: string) {
+    this.assertPaymentSimulationEnabled();
     const payment = await this.paymentRepository.findOne({
       where: { id: paymentId },
     });
@@ -246,6 +285,7 @@ export class PaymentServiceService {
   }
 
   async failPayment(paymentId: string) {
+    this.assertPaymentSimulationEnabled();
     const payment = await this.paymentRepository.findOne({
       where: { id: paymentId },
     });
@@ -320,16 +360,31 @@ export class PaymentServiceService {
 
   async handleVnpayReturn(query: VnpayCallbackPayload) {
     try {
-      const handled = await this.processVnpayCallback(query);
+      const handled = await this.validateVnpayCallback(query);
+      const order = await this.orderClientService.getOrder(
+        handled.payment.orderId,
+        handled.payment.userId,
+      );
       const redirectUrl = new URL(this.getPublicReturnUrl());
+      const paymentStatus =
+        handled.payment.status === 'paid'
+          ? 'paid'
+          : handled.payment.status === 'failed' ||
+              handled.paymentResult === 'FAILED'
+            ? 'failed'
+            : 'pending';
 
-      redirectUrl.searchParams.set('orderId', handled.orderId);
-      redirectUrl.searchParams.set('orderCode', handled.orderCode);
-      redirectUrl.searchParams.set('paymentStatus', handled.paymentStatus);
+      redirectUrl.searchParams.set('orderId', handled.payment.orderId);
+      redirectUrl.searchParams.set(
+        'orderCode',
+        order.orderNumber ?? handled.payment.orderId,
+      );
+      redirectUrl.searchParams.set('paymentId', handled.payment.id);
+      redirectUrl.searchParams.set('paymentStatus', paymentStatus);
       redirectUrl.searchParams.set('checkoutMode', 'online');
 
-      if (handled.message) {
-        redirectUrl.searchParams.set('message', handled.message);
+      if (query.vnp_ResponseCode) {
+        redirectUrl.searchParams.set('message', query.vnp_ResponseCode);
       }
 
       return redirectUrl.toString();
@@ -347,24 +402,52 @@ export class PaymentServiceService {
 
   async handleVnpayIpn(query: VnpayCallbackPayload) {
     try {
-      await this.processVnpayCallback(query);
+      const handled = await this.validateVnpayCallback(query);
+
+      if (handled.payment.status !== 'pending') {
+        return {
+          RspCode: '02',
+          Message: 'Order already confirmed',
+        };
+      }
+
+      const result = await this.persistPaymentResultTransaction({
+        paymentId: handled.payment.id,
+        orderId: handled.payment.orderId,
+        rawPayload: JSON.stringify(query),
+        providerTxnId:
+          query.vnp_TransactionNo ?? handled.payment.providerRef ?? undefined,
+        paymentResult: handled.paymentResult,
+      });
+
+      if (result.alreadyProcessed) {
+        return {
+          RspCode: '02',
+          Message: 'Order already confirmed',
+        };
+      }
 
       return {
         RspCode: '00',
         Message: 'Confirm Success',
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        return {
-          RspCode: '97',
-          Message: error.message,
-        };
-      }
-
       if (error instanceof NotFoundException) {
         return {
           RspCode: '01',
           Message: error.message,
+        };
+      }
+
+      if (error instanceof BadRequestException) {
+        const message = error.message;
+        return {
+          RspCode: message.includes('amount')
+            ? '04'
+            : message.includes('signature')
+              ? '97'
+              : '99',
+          Message: message,
         };
       }
 
@@ -883,9 +966,9 @@ export class PaymentServiceService {
         ],
       );
 
-      if (payment.status === 'paid') {
+      if (payment.status !== 'pending') {
         return {
-          paymentFinalStatus: 'paid',
+          paymentFinalStatus: String(payment.status),
           outboxEventId: null,
           alreadyProcessed: true,
           orderId: String(payment.orderId),
@@ -955,20 +1038,6 @@ export class PaymentServiceService {
           }),
         ],
       );
-
-      if (finalStatusCode === 'paid') {
-        await this.orderClientService.updateOrderPayment(
-          String(payment.orderId),
-          'paid',
-          'confirmed',
-        );
-      } else {
-        await this.orderClientService.updateOrderPayment(
-          String(payment.orderId),
-          'failed',
-          'pending',
-        );
-      }
 
       return {
         paymentFinalStatus: finalStatusCode,
@@ -1377,6 +1446,335 @@ export class PaymentServiceService {
     return this.refundOperationsService.getAdminRefunds();
   }
 
+  async getAdminWorkflowContexts(limit = 20) {
+    const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const rows: Array<{
+      paymentId: string;
+      orderId: string;
+      orderCode: string | null;
+      customerName: string | null;
+      amount: string | number;
+      provider: string;
+      status: string;
+      createdAt: string;
+    }> = await this.dataSource.query(
+      `
+      SELECT
+        p.id AS "paymentId",
+        p.order_id AS "orderId",
+        o.order_code AS "orderCode",
+        u.full_name AS "customerName",
+        p.amount,
+        pp.code AS provider,
+        ps.code AS status,
+        p.created_at AS "createdAt"
+      FROM payment_service.payments p
+      JOIN payment_service.payment_providers pp ON pp.id = p.provider_id
+      JOIN payment_service.payment_statuses ps ON ps.id = p.status_id
+      LEFT JOIN order_service.orders o ON o.id = p.order_id
+      LEFT JOIN user_service.users u ON u.id = p.user_id
+      ORDER BY p.created_at DESC
+      LIMIT $1
+      `,
+      [safeLimit],
+    );
+
+    return rows.map((row) => ({
+      ...row,
+      amount: Number(row.amount),
+    }));
+  }
+
+  async getAdminWorkflowMonitor(input: {
+    orderId?: string;
+    paymentId?: string;
+  }) {
+    const keywordOrderId = input.orderId?.trim() ?? '';
+    const keywordPaymentId = input.paymentId?.trim() ?? '';
+
+    if (!keywordOrderId && !keywordPaymentId) {
+      throw new BadRequestException('Missing orderId or paymentId');
+    }
+
+    const paymentRows: WorkflowLookupPaymentRow[] = await this.dataSource.query(
+      `
+      SELECT
+        p.id,
+        p.order_id AS "orderId",
+        p.user_id AS "userId",
+        p.amount,
+        p.provider_ref AS "providerRef",
+        p.provider_txn_id AS "providerTransactionId",
+        p.created_at AS "createdAt",
+        p.paid_at AS "paidAt",
+        pp.code AS provider,
+        ps.code AS status
+      FROM payment_service.payments p
+      JOIN payment_service.payment_providers pp ON pp.id = p.provider_id
+      JOIN payment_service.payment_statuses ps ON ps.id = p.status_id
+      WHERE ($1::uuid IS NOT NULL AND p.order_id = $1::uuid)
+         OR ($2::uuid IS NOT NULL AND p.id = $2::uuid)
+      ORDER BY p.created_at DESC
+      `,
+      [
+        this.normalizeUuid(keywordOrderId),
+        this.normalizeUuid(keywordPaymentId),
+      ],
+    );
+
+    const primaryPayment = paymentRows[0] ?? null;
+
+    if (!primaryPayment) {
+      throw new NotFoundException('No payment workflow context found');
+    }
+
+    const refundRows: WorkflowLookupRefundRow[] = await this.dataSource.query(
+      `
+      SELECT
+        r.id,
+        r.payment_id AS "paymentId",
+        p.order_id AS "orderId",
+        r.amount,
+        r.provider_refund_id AS "providerRefundId",
+        r.metadata ->> 'workflowResolution' AS "workflowResolution",
+        r.created_at AS "createdAt",
+        r.refunded_at AS "refundedAt",
+        ps.code AS "refundStatus"
+      FROM payment_service.refunds r
+      JOIN payment_service.payments p ON p.id = r.payment_id
+      JOIN payment_service.payment_statuses ps ON ps.id = r.status_id
+      WHERE r.payment_id = $1
+      ORDER BY r.created_at DESC
+      `,
+      [primaryPayment.id],
+    );
+
+    const paymentWorkflow = await this.buildWorkflowSnapshot({
+      kind: 'payment',
+      processDefinitionKey: 'Process_Payment_Processing',
+      businessKey: primaryPayment.orderId,
+    });
+
+    const refundWorkflows = await Promise.all(
+      refundRows.map(async (refund) => ({
+        refund: {
+          id: refund.id,
+          paymentId: refund.paymentId,
+          orderId: refund.orderId,
+          amount: Number(refund.amount),
+          refundStatus: refund.refundStatus,
+          providerRefundId: refund.providerRefundId ?? null,
+          workflowResolution: refund.workflowResolution ?? null,
+          createdAt: refund.createdAt,
+          refundedAt: refund.refundedAt ?? null,
+        },
+        workflow: await this.buildWorkflowSnapshot({
+          kind: 'refund',
+          processDefinitionKey: 'Process_Refund_Workflow',
+          businessKey: refund.paymentId,
+        }),
+      })),
+    );
+
+    return {
+      search: {
+        orderId: primaryPayment.orderId,
+        paymentId: primaryPayment.id,
+      },
+      payment: {
+        id: primaryPayment.id,
+        orderId: primaryPayment.orderId,
+        userId: primaryPayment.userId,
+        amount: Number(primaryPayment.amount),
+        provider: primaryPayment.provider,
+        status: primaryPayment.status,
+        providerRef: primaryPayment.providerRef ?? null,
+        providerTransactionId: primaryPayment.providerTransactionId ?? null,
+        createdAt: primaryPayment.createdAt,
+        paidAt: primaryPayment.paidAt ?? null,
+      },
+      paymentWorkflow,
+      refundWorkflows,
+    };
+  }
+
+  private async buildWorkflowSnapshot(input: {
+    kind: 'payment' | 'refund';
+    processDefinitionKey: string;
+    businessKey: string;
+  }) {
+    try {
+      const instance =
+        await this.camundaClientService.findLatestHistoricProcessInstance({
+          processDefinitionKey: input.processDefinitionKey,
+          businessKey: input.businessKey,
+        });
+
+      if (!instance) {
+        return {
+          kind: input.kind,
+          processDefinitionKey: input.processDefinitionKey,
+          businessKey: input.businessKey,
+          state: 'NOT_FOUND',
+          processInstanceId: null,
+          processDefinitionId: null,
+          bpmnXml: null,
+          startedAt: null,
+          endedAt: null,
+          currentSteps: [],
+          activities: [],
+          incidents: [],
+          variables: {},
+          highlightedVariables: {},
+          camundaReachable: true,
+          error: null,
+        };
+      }
+
+      const processDefinitionId =
+        instance.processDefinitionId ?? instance.definitionId ?? null;
+
+      const [activities, incidents, variables, definitionXml] =
+        await Promise.all([
+          this.camundaClientService.findHistoricActivities(instance.id),
+          this.camundaClientService.findIncidents(instance.id),
+          this.camundaClientService.getProcessVariables(instance.id),
+          processDefinitionId
+            ? this.camundaClientService.getProcessDefinitionXml(
+                processDefinitionId,
+              )
+            : Promise.resolve(null),
+        ]);
+
+      const currentActivities = activities.filter(
+        (activity) => !activity.endTime,
+      );
+
+      return {
+        kind: input.kind,
+        processDefinitionKey: input.processDefinitionKey,
+        businessKey: input.businessKey,
+        state: this.resolveWorkflowState(
+          instance,
+          currentActivities,
+          incidents,
+        ),
+        processInstanceId: instance.id,
+        processDefinitionId,
+        bpmnXml: definitionXml?.bpmn20Xml ?? null,
+        startedAt: instance.startTime ?? null,
+        endedAt: instance.endTime ?? null,
+        currentSteps: currentActivities.map((activity) => ({
+          activityId: activity.activityId,
+          activityName: activity.activityName ?? activity.activityId,
+          activityType: activity.activityType ?? 'unknown',
+        })),
+        activities: activities.map((activity) => ({
+          id: activity.id,
+          activityId: activity.activityId,
+          activityName: activity.activityName ?? activity.activityId,
+          activityType: activity.activityType ?? 'unknown',
+          startedAt: activity.startTime ?? null,
+          endedAt: activity.endTime ?? null,
+          status: activity.endTime ? 'COMPLETED' : 'ACTIVE',
+        })),
+        incidents: incidents.map((incident) => ({
+          id: incident.id,
+          activityId: incident.activityId ?? null,
+          incidentType: incident.incidentType ?? null,
+          message: incident.incidentMessage ?? null,
+          createdAt: incident.created ?? null,
+        })),
+        variables: this.normalizeVariables(variables),
+        highlightedVariables: this.pickHighlightedVariables(variables),
+        camundaReachable: true,
+        error: null,
+      };
+    } catch (error) {
+      return {
+        kind: input.kind,
+        processDefinitionKey: input.processDefinitionKey,
+        businessKey: input.businessKey,
+        state: 'UNAVAILABLE',
+        processInstanceId: null,
+        processDefinitionId: null,
+        bpmnXml: null,
+        startedAt: null,
+        endedAt: null,
+        currentSteps: [],
+        activities: [],
+        incidents: [],
+        variables: {},
+        highlightedVariables: {},
+        camundaReachable: false,
+        error: error instanceof Error ? error.message : 'Camunda unavailable',
+      };
+    }
+  }
+
+  private resolveWorkflowState(
+    instance: CamundaProcessInstanceSummary,
+    currentActivities: CamundaActivitySummary[],
+    incidents: CamundaIncidentSummary[],
+  ) {
+    if (incidents.length > 0) {
+      return 'INCIDENT';
+    }
+
+    if (instance.endTime) {
+      return 'COMPLETED';
+    }
+
+    if (currentActivities.length > 0) {
+      return 'ACTIVE';
+    }
+
+    return 'UNKNOWN';
+  }
+
+  private normalizeVariables(variables: CamundaVariableMap) {
+    return Object.fromEntries(
+      Object.entries(variables).map(([key, value]) => [
+        key,
+        {
+          type: value.type ?? 'Unknown',
+          value: value.value,
+        },
+      ]),
+    );
+  }
+
+  private pickHighlightedVariables(variables: CamundaVariableMap) {
+    const preferredKeys = [
+      'orderId',
+      'paymentId',
+      'refundId',
+      'paymentResult',
+      'refundResult',
+      'provider',
+      'providerTxnId',
+      'providerRefundId',
+      'signatureValid',
+      'adminDecision',
+      'refundRoute',
+      'gatewayResult',
+      'routeReason',
+      'reviewRequired',
+    ];
+
+    return Object.fromEntries(
+      preferredKeys
+        .filter((key) => key in variables)
+        .map((key) => [
+          key,
+          {
+            type: variables[key]?.type ?? 'Unknown',
+            value: variables[key]?.value ?? null,
+          },
+        ]),
+    );
+  }
+
   private hashPayload(rawPayload: string): string {
     const normalized =
       typeof rawPayload === 'string' ? rawPayload : JSON.stringify(rawPayload);
@@ -1411,6 +1809,7 @@ export class PaymentServiceService {
     orderId: string;
     amount: number | string;
     providerRef?: string | null;
+    clientIp?: string;
   }) {
     const tmnCode = process.env.VNPAY_TMN_CODE;
     const hashSecret = process.env.VNPAY_HASH_SECRET;
@@ -1421,13 +1820,15 @@ export class PaymentServiceService {
       throw new BadRequestException('VNPay environment is not configured');
     }
 
+    this.assertVnpayEnvironmentIsSafe({ paymentUrl, returnUrl });
+
     const txnRef = payment.providerRef ?? this.generatePaymentCode();
     const params: Record<string, string> = {
       vnp_Amount: Math.round(Number(payment.amount) * 100).toString(),
       vnp_Command: 'pay',
       vnp_CreateDate: this.formatVnpayDate(new Date()),
       vnp_CurrCode: 'VND',
-      vnp_IpAddr: '127.0.0.1',
+      vnp_IpAddr: this.normalizeVnpayClientIp(payment.clientIp),
       vnp_Locale: 'vn',
       vnp_OrderInfo: `Thanh toan don hang ${payment.orderId}`,
       vnp_OrderType: 'other',
@@ -1446,11 +1847,10 @@ export class PaymentServiceService {
   }
 
   /**
-   * Callback VNPay đồng bộ:
-   * verify chữ ký, đối chiếu số tiền, persist kết quả thanh toán
-   * rồi mới lấy order để dựng redirect URL về frontend.
+   * Return URL và IPN dùng chung bước xác thực chữ ký/số tiền.
+   * Chỉ IPN được phép ghi trạng thái thanh toán vào database.
    */
-  private async processVnpayCallback(query: VnpayCallbackPayload) {
+  private async validateVnpayCallback(query: VnpayCallbackPayload) {
     const secureHash = query.vnp_SecureHash;
     const providerRef = query.vnp_TxnRef;
 
@@ -1460,6 +1860,10 @@ export class PaymentServiceService {
 
     if (!this.paymentWebhookSecurityService.verifyVnpaySignature(query)) {
       await this.saveInvalidWebhook(JSON.stringify(query));
+      throw new BadRequestException('Invalid VNPay signature');
+    }
+
+    if (query.vnp_TmnCode && query.vnp_TmnCode !== process.env.VNPAY_TMN_CODE) {
       throw new BadRequestException('Invalid VNPay signature');
     }
 
@@ -1480,25 +1884,64 @@ export class PaymentServiceService {
         ? 'SUCCESS'
         : 'FAILED';
 
-    await this.persistPaymentResultTransaction({
-      paymentId: payment.id,
-      orderId: payment.orderId,
-      rawPayload: JSON.stringify(query),
-      providerTxnId: query.vnp_TransactionNo ?? providerRef,
-      paymentResult,
-    });
-
-    const order = await this.orderClientService.getOrder(
-      payment.orderId,
-      payment.userId,
-    );
-
     return {
-      orderId: payment.orderId,
-      orderCode: order.orderNumber ?? payment.orderId,
-      paymentStatus: paymentResult === 'SUCCESS' ? 'paid' : 'failed',
-      message: query.vnp_ResponseCode ?? '',
+      payment,
+      paymentResult,
     };
+  }
+
+  private assertPaymentSimulationEnabled() {
+    if (process.env.PAYMENT_SIMULATION_ENABLED !== 'true') {
+      throw new BadRequestException(
+        'Endpoint giả lập thanh toán đã bị tắt trên môi trường này.',
+      );
+    }
+  }
+
+  private assertVnpayEnvironmentIsSafe(input: {
+    paymentUrl: string;
+    returnUrl: string;
+  }) {
+    if ((process.env.APP_ENV || process.env.NODE_ENV) !== 'production') {
+      return;
+    }
+
+    if (process.env.PAYMENT_SIMULATION_ENABLED === 'true') {
+      throw new BadRequestException(
+        'Production không được bật giả lập thanh toán.',
+      );
+    }
+
+    if (process.env.VNPAY_ENVIRONMENT !== 'production') {
+      throw new BadRequestException(
+        'VNPay production chưa được kích hoạt bằng bộ cấu hình merchant thật.',
+      );
+    }
+
+    if (input.paymentUrl.toLowerCase().includes('sandbox')) {
+      throw new BadRequestException(
+        'VNPay production chưa được cấu hình: URL thanh toán vẫn là sandbox.',
+      );
+    }
+
+    const ipnUrl = process.env.VNPAY_IPN_URL;
+    if (
+      !input.returnUrl.startsWith('https://') ||
+      !ipnUrl?.startsWith('https://')
+    ) {
+      throw new BadRequestException(
+        'VNPay production yêu cầu Return URL và IPN URL công khai sử dụng HTTPS.',
+      );
+    }
+  }
+
+  private normalizeVnpayClientIp(clientIp?: string) {
+    if (!clientIp) {
+      return '127.0.0.1';
+    }
+
+    const normalized = clientIp.trim().replace(/^::ffff:/, '');
+    return normalized === '::1' ? '127.0.0.1' : normalized;
   }
 
   private buildSortedQuery(input: Record<string, string>) {
@@ -1525,7 +1968,7 @@ export class PaymentServiceService {
   private getPublicReturnUrl() {
     return (
       process.env.PAYMENT_PUBLIC_RETURN_URL ||
-      `${process.env.FRONTEND_URL || 'http://localhost:3000'}/checkout/success`
+      `${process.env.FRONTEND_URL || 'http://localhost:3000'}/checkout/result`
     );
   }
 

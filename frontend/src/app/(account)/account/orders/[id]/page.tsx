@@ -1,7 +1,13 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import { ChangeEvent, useEffect, useEffectEvent, useMemo, useState } from 'react';
+import {
+  ChangeEvent,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useState,
+} from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -53,22 +59,6 @@ function getStepIndex(status: string) {
   return index;
 }
 
-async function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        reject(new Error('Không thể đọc ảnh minh chứng.'));
-        return;
-      }
-
-      resolve(reader.result);
-    };
-    reader.onerror = () => reject(new Error('Không thể đọc ảnh minh chứng.'));
-    reader.readAsDataURL(file);
-  });
-}
-
 function ReturnStatusBadge({ status }: { status: ReturnRequest['status'] }) {
   const styles = {
     pending: 'bg-amber-100 text-amber-700',
@@ -97,7 +87,8 @@ export default function OrderDetailPage() {
   const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [returnReason, setReturnReason] = useState('');
-  const [returnImages, setReturnImages] = useState<string[]>([]);
+  const [returnImages, setReturnImages] = useState<File[]>([]);
+  const [returnImagePreviews, setReturnImagePreviews] = useState<string[]>([]);
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
   const loadOrder = useEffectEvent(async () => {
@@ -118,20 +109,35 @@ export default function OrderDetailPage() {
     void loadOrder();
   }, [params.id]);
 
-  async function handleReturnImageChange(e: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []).slice(0, 5);
-    try {
-      const dataUrls = await Promise.all(
-        files.map((file) => fileToDataUrl(file)),
-      );
-      setReturnImages(dataUrls);
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : 'Không thể tải ảnh minh chứng.',
-      );
+  useEffect(() => {
+    return () => {
+      returnImagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+    };
+  }, [returnImagePreviews]);
+
+  function handleReturnImageChange(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+
+    if (files.length > 5) {
+      toast.error('Mỗi yêu cầu chỉ được gửi tối đa 5 ảnh.');
+      e.target.value = '';
+      return;
     }
+
+    const invalidFile = files.find(
+      (file) =>
+        !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
+        file.size > 5 * 1024 * 1024,
+    );
+
+    if (invalidFile) {
+      toast.error('Ảnh phải là JPG, PNG hoặc WebP và không vượt quá 5 MB.');
+      e.target.value = '';
+      return;
+    }
+
+    setReturnImages(files);
+    setReturnImagePreviews(files.map((file) => URL.createObjectURL(file)));
   }
 
   async function handleSubmitReturnRequest() {
@@ -139,6 +145,11 @@ export default function OrderDetailPage() {
 
     if (!returnReason.trim()) {
       toast.error('Vui lòng nhập lý do trả hàng.');
+      return;
+    }
+
+    if (returnReason.trim().length < 10) {
+      toast.error('Lý do trả hàng cần có ít nhất 10 ký tự.');
       return;
     }
 
@@ -151,11 +162,12 @@ export default function OrderDetailPage() {
       setIsSubmittingReturn(true);
       const created = await createOrderReturnRequest(order.id, {
         reason: returnReason.trim(),
-        imageUrls: returnImages,
+        images: returnImages,
       });
       setReturnRequests((current) => [created, ...current]);
       setReturnReason('');
       setReturnImages([]);
+      setReturnImagePreviews([]);
       toast.success('Đã gửi yêu cầu trả hàng để admin xác nhận.');
     } catch (error) {
       toast.error(
@@ -464,8 +476,15 @@ export default function OrderDetailPage() {
                       )}
 
                       {request.adminNote ? (
-                        <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs text-muted-foreground">
-                          Phản hồi admin: {request.adminNote}
+                        <div
+                          className={`mt-3 rounded-xl border px-4 py-3 text-sm ${
+                            request.status === 'approved'
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                              : 'border-rose-200 bg-rose-50 text-rose-800'
+                          }`}
+                        >
+                          <p className="font-semibold">Thông báo từ Balii</p>
+                          <p className="mt-1 leading-6">{request.adminNote}</p>
                         </div>
                       ) : null}
                     </div>
@@ -493,16 +512,16 @@ export default function OrderDetailPage() {
                     </span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       multiple
                       className="hidden"
-                      onChange={(e) => void handleReturnImageChange(e)}
+                      onChange={handleReturnImageChange}
                     />
                   </label>
 
-                  {returnImages.length > 0 && (
+                  {returnImagePreviews.length > 0 && (
                     <div className="grid grid-cols-3 gap-3">
-                      {returnImages.map((imageUrl, index) => (
+                      {returnImagePreviews.map((imageUrl, index) => (
                         <div
                           key={index}
                           className="relative aspect-square overflow-hidden rounded-xl bg-slate-100"
@@ -511,6 +530,7 @@ export default function OrderDetailPage() {
                             src={imageUrl}
                             alt={`Ảnh minh chứng ${index + 1}`}
                             fill
+                            unoptimized
                             className="object-cover"
                           />
                         </div>

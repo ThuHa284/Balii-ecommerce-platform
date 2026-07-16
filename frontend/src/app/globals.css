@@ -1,6 +1,68 @@
+@import 'bpmn-js/dist/assets/diagram-js.css';
+@import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.bpmn-workflow-viewer .djs-palette,
+.bpmn-workflow-viewer .djs-context-pad,
+.bpmn-workflow-viewer .bjs-powered-by {
+  display: none;
+}
+
+.bpmn-workflow-viewer
+  .djs-element.workflow-completed
+  .djs-visual
+  > :first-child {
+  fill: #e0f2fe !important;
+  stroke: #0284c7 !important;
+  stroke-width: 3px !important;
+}
+
+.bpmn-workflow-viewer .djs-element.workflow-active .djs-visual > :first-child {
+  fill: #dcfce7 !important;
+  stroke: #16a34a !important;
+  stroke-width: 4px !important;
+}
+
+.bpmn-workflow-viewer
+  .djs-element.workflow-incident
+  .djs-visual
+  > :first-child {
+  fill: #fee2e2 !important;
+  stroke: #dc2626 !important;
+  stroke-width: 4px !important;
+}
+
+.bpmn-workflow-viewer .djs-element.workflow-active .djs-visual {
+  filter: drop-shadow(0 0 6px rgb(22 163 74 / 45%));
+}
+
+.bpmn-workflow-viewer .djs-element.workflow-incident .djs-visual {
+  filter: drop-shadow(0 0 6px rgb(220 38 38 / 45%));
+}
+
+.workflow-count-badge {
+  display: flex;
+  min-width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  border-radius: 9999px;
+  background: #7c3aed;
+  padding: 0 7px;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 4px 12px rgb(76 29 149 / 35%);
+}
+
+.workflow-count-badge-incident {
+  background: #dc2626;
+}
 
 /* ============================================
    BALII SLEEPWEAR — Design System
@@ -11,13 +73,17 @@
 @layer base {
   @font-face {
     font-family: 'BaliiNumbers';
-    src: local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
-    unicode-range: U+0030-0039, U+002C, U+002E, U+20AB, U+0025; /* 0-9, comma, dot, ₫, % */
+    src:
+      local('Segoe UI'), local('Roboto'), local('Helvetica Neue'),
+      local('Arial');
+    unicode-range:
+      U+0030-0039, U+002C, U+002E, U+20AB, U+0025; /* 0-9, comma, dot, ₫, % */
   }
 
   :root {
-    --font-playfair: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-    --font-body: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-playfair:
+      'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+    --font-body: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     --background: 30 25% 97%;
     --foreground: 250 10% 15%;
     --card: 0 0% 100%;
@@ -60,20 +126,33 @@
   * {
     @apply border-border;
     font-variant-numeric: lining-nums;
-    font-feature-settings: "lnum" 1;
+    font-feature-settings: 'lnum' 1;
   }
 
   body {
     @apply bg-background text-foreground font-body antialiased;
     background-color: hsl(30, 25%, 97%);
     background-image:
-      radial-gradient(ellipse at 20% 0%, hsl(262, 40%, 95%) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 100%, hsl(25, 50%, 95%) 0%, transparent 50%);
+      radial-gradient(
+        ellipse at 20% 0%,
+        hsl(262, 40%, 95%) 0%,
+        transparent 50%
+      ),
+      radial-gradient(
+        ellipse at 80% 100%,
+        hsl(25, 50%, 95%) 0%,
+        transparent 50%
+      );
     background-attachment: fixed;
     min-height: 100vh;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-heading;
   }
 }
@@ -229,7 +308,7 @@
     overflow: hidden;
   }
   .ai-shimmer::after {
-    content: "";
+    content: '';
     position: absolute;
     inset: 0;
     background: linear-gradient(
@@ -264,11 +343,41 @@
     pointer-events: none;
   }
 
-  .ai-particle:nth-child(2) { animation-delay: 0.5s; left: 20%; background: rgba(168, 85, 247, 0.4); width: 4px; height: 4px; }
-  .ai-particle:nth-child(3) { animation-delay: 1s; left: 50%; background: rgba(196, 181, 253, 0.5); width: 8px; height: 8px; }
-  .ai-particle:nth-child(4) { animation-delay: 1.5s; left: 75%; background: rgba(139, 92, 246, 0.3); width: 5px; height: 5px; }
-  .ai-particle:nth-child(5) { animation-delay: 2s; left: 90%; background: rgba(168, 85, 247, 0.5); width: 7px; height: 7px; }
-  .ai-particle:nth-child(6) { animation-delay: 0.3s; left: 35%; background: rgba(196, 181, 253, 0.4); width: 3px; height: 3px; }
+  .ai-particle:nth-child(2) {
+    animation-delay: 0.5s;
+    left: 20%;
+    background: rgba(168, 85, 247, 0.4);
+    width: 4px;
+    height: 4px;
+  }
+  .ai-particle:nth-child(3) {
+    animation-delay: 1s;
+    left: 50%;
+    background: rgba(196, 181, 253, 0.5);
+    width: 8px;
+    height: 8px;
+  }
+  .ai-particle:nth-child(4) {
+    animation-delay: 1.5s;
+    left: 75%;
+    background: rgba(139, 92, 246, 0.3);
+    width: 5px;
+    height: 5px;
+  }
+  .ai-particle:nth-child(5) {
+    animation-delay: 2s;
+    left: 90%;
+    background: rgba(168, 85, 247, 0.5);
+    width: 7px;
+    height: 7px;
+  }
+  .ai-particle:nth-child(6) {
+    animation-delay: 0.3s;
+    left: 35%;
+    background: rgba(196, 181, 253, 0.4);
+    width: 3px;
+    height: 3px;
+  }
 
   /* Image morph transition */
   .ai-morph-in {
@@ -290,12 +399,17 @@
 }
 
 @keyframes ai-shimmer-move {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @keyframes ai-glow-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow:
       0 0 20px rgba(139, 92, 246, 0.15),
       0 0 60px rgba(139, 92, 246, 0.08);
@@ -308,31 +422,69 @@
 }
 
 @keyframes ai-particle-float {
-  0%, 100% { transform: translateY(0) scale(1); opacity: 0; }
-  10% { opacity: 1; }
-  50% { transform: translateY(-80px) scale(1.3); opacity: 0.7; }
-  90% { opacity: 0; }
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-80px) scale(1.3);
+    opacity: 0.7;
+  }
+  90% {
+    opacity: 0;
+  }
 }
 
 @keyframes ai-morph-reveal {
-  0% { opacity: 0; transform: scale(0.9); filter: blur(10px); }
-  60% { filter: blur(3px); }
-  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+    filter: blur(10px);
+  }
+  60% {
+    filter: blur(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
 }
 
 @keyframes tryon-bg-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 @keyframes combo-bg-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 @keyframes promo-pulse-anim {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.05); opacity: 0.9; }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
 }
 
 /* ============================================

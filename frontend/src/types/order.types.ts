@@ -32,6 +32,12 @@ export interface ReturnRequest {
   updatedAt: string;
 }
 
+export interface AdminReturnRequest extends ReturnRequest {
+  orderCode: string;
+  customerName: string;
+  customerEmail: string | null;
+}
+
 export interface OrderItem {
   id: string;
   productId: string;

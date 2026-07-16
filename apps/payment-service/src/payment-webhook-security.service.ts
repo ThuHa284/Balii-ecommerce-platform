@@ -71,7 +71,18 @@ export class PaymentWebhookSecurityService {
       .update(Buffer.from(signData, 'utf-8'))
       .digest('hex');
 
-    return expectedHash === incomingHash;
+    if (!incomingHash) {
+      return false;
+    }
+
+    const expectedBuffer = Buffer.from(expectedHash, 'utf-8');
+    const incomingBuffer = Buffer.from(incomingHash.toLowerCase(), 'utf-8');
+
+    if (expectedBuffer.length !== incomingBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(expectedBuffer, incomingBuffer);
   }
 
   private isTrustedGenericWebhook(

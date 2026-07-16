@@ -15,42 +15,42 @@
 
   <bpmn:message id="Message_RefundResultReceived" name="refund.result.received" />
 
-  <bpmn:process id="Process_Refund_Workflow" name="Balii Refund Workflow - Auto and Admin Review" isExecutable="true" camunda:historyTimeToLive="180">
+  <bpmn:process id="Process_Refund_Workflow" name="Quy trình hoàn tiền Balii - Tự động và Admin duyệt" isExecutable="true" camunda:historyTimeToLive="180">
 
-    <bpmn:startEvent id="StartEvent_RefundRequested" name="Refund Requested">
+    <bpmn:startEvent id="StartEvent_RefundRequested" name="Yêu cầu hoàn tiền">
       <bpmn:outgoing>Flow_Start_ValidateRequest</bpmn:outgoing>
     </bpmn:startEvent>
 
-    <bpmn:serviceTask id="Task_ValidateRefundRequest" name="Validate Refund Request" camunda:type="external" camunda:topic="refund.validate-request">
+    <bpmn:serviceTask id="Task_ValidateRefundRequest" name="Kiểm tra yêu cầu hoàn tiền" camunda:type="external" camunda:topic="refund.validate-request">
       <bpmn:incoming>Flow_Start_ValidateRequest</bpmn:incoming>
       <bpmn:outgoing>Flow_Validate_CheckPayment</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_CheckPaymentStatus" name="Check Payment Status" camunda:type="external" camunda:topic="refund.check-payment-status">
+    <bpmn:serviceTask id="Task_CheckPaymentStatus" name="Kiểm tra trạng thái thanh toán" camunda:type="external" camunda:topic="refund.check-payment-status">
       <bpmn:incoming>Flow_Validate_CheckPayment</bpmn:incoming>
       <bpmn:outgoing>Flow_CheckPayment_CheckOrder</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_CheckOrderFulfillmentStatus" name="Check Order / Delivery Status" camunda:type="external" camunda:topic="refund.check-order-fulfillment-status">
+    <bpmn:serviceTask id="Task_CheckOrderFulfillmentStatus" name="Kiểm tra trạng thái đơn hàng và giao hàng" camunda:type="external" camunda:topic="refund.check-order-fulfillment-status">
       <bpmn:incoming>Flow_CheckPayment_CheckOrder</bpmn:incoming>
       <bpmn:outgoing>Flow_CheckOrder_Route</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:exclusiveGateway id="Gateway_RefundRoute" name="Refund Route?">
+    <bpmn:exclusiveGateway id="Gateway_RefundRoute" name="Chọn hướng xử lý?">
       <bpmn:incoming>Flow_CheckOrder_Route</bpmn:incoming>
       <bpmn:outgoing>Flow_Route_AutoRefund</bpmn:outgoing>
       <bpmn:outgoing>Flow_Route_AdminReview</bpmn:outgoing>
       <bpmn:outgoing>Flow_Route_Reject</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
-    <bpmn:userTask id="UserTask_AdminReviewRefundRequest" name="Admin Review Refund Request" camunda:candidateGroups="payment-admin,order-admin">
+    <bpmn:userTask id="UserTask_AdminReviewRefundRequest" name="Admin kiểm tra yêu cầu hoàn tiền" camunda:candidateGroups="payment-admin,order-admin">
       <bpmn:documentation>Admin checks order status, delivery status, customer evidence, stock availability, and decides whether to approve refund, partial refund, reject refund, or exchange product.</bpmn:documentation>
       <bpmn:extensionElements>
         <camunda:formData>
           <camunda:formField id="adminDecision" label="Admin Decision" type="enum">
-            <camunda:value id="APPROVE_REFUND" name="Approve Refund" />
-            <camunda:value id="PARTIAL_REFUND" name="Partial Refund" />
-            <camunda:value id="REJECT" name="Reject Refund" />
+            <camunda:value id="APPROVE_REFUND" name="Duyệt hoàn tiền" />
+            <camunda:value id="PARTIAL_REFUND" name="Hoàn tiền một phần" />
+            <camunda:value id="REJECT" name="Từ chối hoàn tiền" />
             <camunda:value id="EXCHANGE_PRODUCT" name="Exchange Product" />
           </camunda:formField>
           <camunda:formField id="adminNote" label="Admin Note" type="string" />
@@ -62,111 +62,111 @@
       <bpmn:outgoing>Flow_AdminReview_Decision</bpmn:outgoing>
     </bpmn:userTask>
 
-    <bpmn:exclusiveGateway id="Gateway_AdminDecision" name="Admin Decision?">
+    <bpmn:exclusiveGateway id="Gateway_AdminDecision" name="Quyết định của Admin?">
       <bpmn:incoming>Flow_AdminReview_Decision</bpmn:incoming>
       <bpmn:outgoing>Flow_Admin_ApproveRefund</bpmn:outgoing>
       <bpmn:outgoing>Flow_Admin_RejectRefund</bpmn:outgoing>
       <bpmn:outgoing>Flow_Admin_ExchangeProduct</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
-    <bpmn:serviceTask id="Task_CheckRefundIdempotency" name="Check Refund Idempotency" camunda:type="external" camunda:topic="refund.check-idempotency">
+    <bpmn:serviceTask id="Task_CheckRefundIdempotency" name="Kiểm tra yêu cầu hoàn tiền trùng lặp" camunda:type="external" camunda:topic="refund.check-idempotency">
       <bpmn:incoming>Flow_Route_AutoRefund</bpmn:incoming>
       <bpmn:incoming>Flow_Admin_ApproveRefund</bpmn:incoming>
       <bpmn:outgoing>Flow_CheckIdempotency_CreateRecord</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_CreateRefundRecord" name="Create Refund Record" camunda:type="external" camunda:topic="refund.create-record">
+    <bpmn:serviceTask id="Task_CreateRefundRecord" name="Tạo bản ghi hoàn tiền" camunda:type="external" camunda:topic="refund.create-record">
       <bpmn:incoming>Flow_CheckIdempotency_CreateRecord</bpmn:incoming>
       <bpmn:outgoing>Flow_CreateRecord_CallGateway</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_CallGatewayRefundApi" name="Call VNPay / MoMo Refund API" camunda:type="external" camunda:topic="refund.call-gateway-api">
+    <bpmn:serviceTask id="Task_CallGatewayRefundApi" name="Gọi API hoàn tiền VNPay / MoMo" camunda:type="external" camunda:topic="refund.call-gateway-api">
       <bpmn:incoming>Flow_CreateRecord_CallGateway</bpmn:incoming>
       <bpmn:incoming>Flow_IncreaseRetry_CallGateway</bpmn:incoming>
       <bpmn:outgoing>Flow_CallGateway_WaitResult</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:intermediateCatchEvent id="Event_WaitRefundResult" name="Wait Refund Result">
+    <bpmn:intermediateCatchEvent id="Event_WaitRefundResult" name="Chờ kết quả hoàn tiền">
       <bpmn:incoming>Flow_CallGateway_WaitResult</bpmn:incoming>
       <bpmn:outgoing>Flow_WaitResult_PersistResult</bpmn:outgoing>
       <bpmn:messageEventDefinition id="MessageEventDefinition_RefundResult" messageRef="Message_RefundResultReceived" />
     </bpmn:intermediateCatchEvent>
 
-    <bpmn:boundaryEvent id="BoundaryEvent_RefundResultTimeout" name="Refund Result Timeout" attachedToRef="Event_WaitRefundResult" cancelActivity="true">
+    <bpmn:boundaryEvent id="BoundaryEvent_RefundResultTimeout" name="Hết thời gian chờ kết quả hoàn tiền" attachedToRef="Event_WaitRefundResult" cancelActivity="true">
       <bpmn:outgoing>Flow_RefundTimeout_RetryGateway</bpmn:outgoing>
       <bpmn:timerEventDefinition id="TimerEventDefinition_RefundTimeout">
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT30M</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
 
-    <bpmn:serviceTask id="Task_PersistRefundResultTransaction" name="Persist Refund Result Transaction" camunda:type="external" camunda:topic="refund.persist-result-transaction">
+    <bpmn:serviceTask id="Task_PersistRefundResultTransaction" name="Lưu kết quả giao dịch hoàn tiền" camunda:type="external" camunda:topic="refund.persist-result-transaction">
       <bpmn:incoming>Flow_WaitResult_PersistResult</bpmn:incoming>
       <bpmn:outgoing>Flow_PersistResult_IsSuccess</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:exclusiveGateway id="Gateway_IsRefundSuccessful" name="Refund Success?">
+    <bpmn:exclusiveGateway id="Gateway_IsRefundSuccessful" name="Hoàn tiền thành công?">
       <bpmn:incoming>Flow_PersistResult_IsSuccess</bpmn:incoming>
       <bpmn:outgoing>Flow_RefundSuccess_Outbox</bpmn:outgoing>
       <bpmn:outgoing>Flow_RefundFailed_RetryDecision</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
-    <bpmn:exclusiveGateway id="Gateway_RetryRefund" name="Retry Refund?">
+    <bpmn:exclusiveGateway id="Gateway_RetryRefund" name="Thử hoàn tiền lại?">
       <bpmn:incoming>Flow_RefundFailed_RetryDecision</bpmn:incoming>
       <bpmn:incoming>Flow_RefundTimeout_RetryGateway</bpmn:incoming>
       <bpmn:outgoing>Flow_RetryYes_IncreaseRetry</bpmn:outgoing>
       <bpmn:outgoing>Flow_RetryNo_AdminReview</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
-    <bpmn:serviceTask id="Task_IncreaseRefundRetry" name="Increase Refund Retry Count" camunda:type="external" camunda:topic="refund.increase-retry-count">
+    <bpmn:serviceTask id="Task_IncreaseRefundRetry" name="Tăng số lần thử hoàn tiền" camunda:type="external" camunda:topic="refund.increase-retry-count">
       <bpmn:incoming>Flow_RetryYes_IncreaseRetry</bpmn:incoming>
       <bpmn:outgoing>Flow_IncreaseRetry_CallGateway</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_SignalOutboxPublisherRefunded" name="Signal Outbox Publisher" camunda:type="external" camunda:topic="outbox.signal-publisher">
+    <bpmn:serviceTask id="Task_SignalOutboxPublisherRefunded" name="Phát sự kiện qua Outbox" camunda:type="external" camunda:topic="outbox.signal-publisher">
       <bpmn:incoming>Flow_RefundSuccess_Outbox</bpmn:incoming>
       <bpmn:outgoing>Flow_Outbox_NotifyRefundCompleted</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_NotifyCustomerRefunded" name="Notify Customer: Refund Completed" camunda:type="external" camunda:topic="notification.refund-completed">
+    <bpmn:serviceTask id="Task_NotifyCustomerRefunded" name="Thông báo khách hàng: đã hoàn tiền" camunda:type="external" camunda:topic="notification.refund-completed">
       <bpmn:incoming>Flow_Outbox_NotifyRefundCompleted</bpmn:incoming>
       <bpmn:outgoing>Flow_NotifyRefundCompleted_End</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:endEvent id="EndEvent_RefundCompleted" name="Refund Completed">
+    <bpmn:endEvent id="EndEvent_RefundCompleted" name="Hoàn tiền hoàn tất">
       <bpmn:incoming>Flow_NotifyRefundCompleted_End</bpmn:incoming>
     </bpmn:endEvent>
 
-    <bpmn:serviceTask id="Task_UpdateRefundRejected" name="Update Refund Rejected" camunda:type="external" camunda:topic="refund.update-rejected">
+    <bpmn:serviceTask id="Task_UpdateRefundRejected" name="Cập nhật yêu cầu bị từ chối" camunda:type="external" camunda:topic="refund.update-rejected">
       <bpmn:incoming>Flow_Route_Reject</bpmn:incoming>
       <bpmn:incoming>Flow_Admin_RejectRefund</bpmn:incoming>
       <bpmn:outgoing>Flow_UpdateRejected_NotifyRejected</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_NotifyCustomerRefundRejected" name="Notify Customer: Refund Rejected" camunda:type="external" camunda:topic="notification.refund-rejected">
+    <bpmn:serviceTask id="Task_NotifyCustomerRefundRejected" name="Thông báo khách hàng: từ chối hoàn tiền" camunda:type="external" camunda:topic="notification.refund-rejected">
       <bpmn:incoming>Flow_UpdateRejected_NotifyRejected</bpmn:incoming>
       <bpmn:outgoing>Flow_NotifyRejected_End</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:endEvent id="EndEvent_RefundRejected" name="Refund Rejected">
+    <bpmn:endEvent id="EndEvent_RefundRejected" name="Yêu cầu hoàn tiền bị từ chối">
       <bpmn:incoming>Flow_NotifyRejected_End</bpmn:incoming>
     </bpmn:endEvent>
 
-    <bpmn:serviceTask id="Task_CreateExchangeRequest" name="Create Exchange Request" camunda:type="external" camunda:topic="refund.create-exchange-request">
+    <bpmn:serviceTask id="Task_CreateExchangeRequest" name="Tạo yêu cầu đổi sản phẩm" camunda:type="external" camunda:topic="refund.create-exchange-request">
       <bpmn:incoming>Flow_Admin_ExchangeProduct</bpmn:incoming>
       <bpmn:outgoing>Flow_CreateExchange_UpdateOrderInventory</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_UpdateOrderInventoryForExchange" name="Update Order / Inventory for Exchange" camunda:type="external" camunda:topic="refund.update-order-inventory-exchange">
+    <bpmn:serviceTask id="Task_UpdateOrderInventoryForExchange" name="Cập nhật đơn hàng và tồn kho để đổi sản phẩm" camunda:type="external" camunda:topic="refund.update-order-inventory-exchange">
       <bpmn:incoming>Flow_CreateExchange_UpdateOrderInventory</bpmn:incoming>
       <bpmn:outgoing>Flow_UpdateExchange_NotifyExchange</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:serviceTask id="Task_NotifyCustomerExchange" name="Notify Customer: Exchange Created" camunda:type="external" camunda:topic="notification.exchange-created">
+    <bpmn:serviceTask id="Task_NotifyCustomerExchange" name="Thông báo khách hàng: đã tạo yêu cầu đổi hàng" camunda:type="external" camunda:topic="notification.exchange-created">
       <bpmn:incoming>Flow_UpdateExchange_NotifyExchange</bpmn:incoming>
       <bpmn:outgoing>Flow_NotifyExchange_End</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:endEvent id="EndEvent_ExchangeCreated" name="Exchange Created">
+    <bpmn:endEvent id="EndEvent_ExchangeCreated" name="Đã tạo yêu cầu đổi hàng">
       <bpmn:incoming>Flow_NotifyExchange_End</bpmn:incoming>
     </bpmn:endEvent>
 
@@ -175,24 +175,24 @@
     <bpmn:sequenceFlow id="Flow_CheckPayment_CheckOrder" sourceRef="Task_CheckPaymentStatus" targetRef="Task_CheckOrderFulfillmentStatus" />
     <bpmn:sequenceFlow id="Flow_CheckOrder_Route" sourceRef="Task_CheckOrderFulfillmentStatus" targetRef="Gateway_RefundRoute" />
 
-    <bpmn:sequenceFlow id="Flow_Route_AutoRefund" name="Auto Refund" sourceRef="Gateway_RefundRoute" targetRef="Task_CheckRefundIdempotency">
+    <bpmn:sequenceFlow id="Flow_Route_AutoRefund" name="Hoàn tiền tự động" sourceRef="Gateway_RefundRoute" targetRef="Task_CheckRefundIdempotency">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundRoute == "AUTO_REFUND"}]]></bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_Route_AdminReview" name="Need Admin Review" sourceRef="Gateway_RefundRoute" targetRef="UserTask_AdminReviewRefundRequest">
+    <bpmn:sequenceFlow id="Flow_Route_AdminReview" name="Cần Admin kiểm tra" sourceRef="Gateway_RefundRoute" targetRef="UserTask_AdminReviewRefundRequest">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundRoute == "ADMIN_REVIEW"}]]></bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_Route_Reject" name="Reject" sourceRef="Gateway_RefundRoute" targetRef="Task_UpdateRefundRejected">
+    <bpmn:sequenceFlow id="Flow_Route_Reject" name="Từ chối" sourceRef="Gateway_RefundRoute" targetRef="Task_UpdateRefundRejected">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundRoute == "REJECT"}]]></bpmn:conditionExpression>
     </bpmn:sequenceFlow>
 
     <bpmn:sequenceFlow id="Flow_AdminReview_Decision" sourceRef="UserTask_AdminReviewRefundRequest" targetRef="Gateway_AdminDecision" />
-    <bpmn:sequenceFlow id="Flow_Admin_ApproveRefund" name="Approve / Partial Refund" sourceRef="Gateway_AdminDecision" targetRef="Task_CheckRefundIdempotency">
+    <bpmn:sequenceFlow id="Flow_Admin_ApproveRefund" name="Duyệt / Hoàn một phần" sourceRef="Gateway_AdminDecision" targetRef="Task_CheckRefundIdempotency">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${adminDecision == "APPROVE_REFUND" || adminDecision == "PARTIAL_REFUND"}]]></bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_Admin_RejectRefund" name="Reject" sourceRef="Gateway_AdminDecision" targetRef="Task_UpdateRefundRejected">
+    <bpmn:sequenceFlow id="Flow_Admin_RejectRefund" name="Từ chối" sourceRef="Gateway_AdminDecision" targetRef="Task_UpdateRefundRejected">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${adminDecision == "REJECT"}]]></bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_Admin_ExchangeProduct" name="Exchange Product" sourceRef="Gateway_AdminDecision" targetRef="Task_CreateExchangeRequest">
+    <bpmn:sequenceFlow id="Flow_Admin_ExchangeProduct" name="Đổi sản phẩm" sourceRef="Gateway_AdminDecision" targetRef="Task_CreateExchangeRequest">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${adminDecision == "EXCHANGE_PRODUCT"}]]></bpmn:conditionExpression>
     </bpmn:sequenceFlow>
 
@@ -202,18 +202,18 @@
     <bpmn:sequenceFlow id="Flow_WaitResult_PersistResult" sourceRef="Event_WaitRefundResult" targetRef="Task_PersistRefundResultTransaction" />
     <bpmn:sequenceFlow id="Flow_PersistResult_IsSuccess" sourceRef="Task_PersistRefundResultTransaction" targetRef="Gateway_IsRefundSuccessful" />
 
-    <bpmn:sequenceFlow id="Flow_RefundSuccess_Outbox" name="Yes" sourceRef="Gateway_IsRefundSuccessful" targetRef="Task_SignalOutboxPublisherRefunded">
+    <bpmn:sequenceFlow id="Flow_RefundSuccess_Outbox" name="Có" sourceRef="Gateway_IsRefundSuccessful" targetRef="Task_SignalOutboxPublisherRefunded">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundStatus == "SUCCESS"}]]></bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_RefundFailed_RetryDecision" name="No" sourceRef="Gateway_IsRefundSuccessful" targetRef="Gateway_RetryRefund">
+    <bpmn:sequenceFlow id="Flow_RefundFailed_RetryDecision" name="Không" sourceRef="Gateway_IsRefundSuccessful" targetRef="Gateway_RetryRefund">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundStatus != "SUCCESS"}]]></bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_RefundTimeout_RetryGateway" sourceRef="BoundaryEvent_RefundResultTimeout" targetRef="Gateway_RetryRefund" />
 
-    <bpmn:sequenceFlow id="Flow_RetryYes_IncreaseRetry" name="Yes" sourceRef="Gateway_RetryRefund" targetRef="Task_IncreaseRefundRetry">
+    <bpmn:sequenceFlow id="Flow_RetryYes_IncreaseRetry" name="Có" sourceRef="Gateway_RetryRefund" targetRef="Task_IncreaseRefundRetry">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundRetryAllowed == true}]]></bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_RetryNo_AdminReview" name="No" sourceRef="Gateway_RetryRefund" targetRef="UserTask_AdminReviewRefundRequest">
+    <bpmn:sequenceFlow id="Flow_RetryNo_AdminReview" name="Không" sourceRef="Gateway_RetryRefund" targetRef="UserTask_AdminReviewRefundRequest">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"><![CDATA[${refundRetryAllowed == false}]]></bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_IncreaseRetry_CallGateway" sourceRef="Task_IncreaseRefundRetry" targetRef="Task_CallGatewayRefundApi" />

@@ -25,6 +25,12 @@ const REQUIRED_KEYS = [
   'TRYON_SERVICE_URL',
   'MARKET_ANALYSIS_SERVICE_URL',
   'CHATBOT_SERVICE_URL',
+  'VNPAY_ENVIRONMENT',
+  'VNPAY_TMN_CODE',
+  'VNPAY_HASH_SECRET',
+  'VNPAY_PAYMENT_URL',
+  'VNPAY_RETURN_URL',
+  'VNPAY_IPN_URL',
 ];
 
 const SUGGESTED_KEYS = [
@@ -36,10 +42,6 @@ const SUGGESTED_KEYS = [
   'CLOUDINARY_CLOUD_NAME',
   'CLOUDINARY_API_KEY',
   'CLOUDINARY_API_SECRET',
-  'VNPAY_TMN_CODE',
-  'VNPAY_HASH_SECRET',
-  'VNPAY_PAYMENT_URL',
-  'VNPAY_RETURN_URL',
   'PAYMENT_PUBLIC_RETURN_URL',
   'SERPAPI_KEY',
   'GEMINI_API_KEY',
@@ -137,7 +139,9 @@ if (
   env.NEXT_PUBLIC_API_URL.includes('localhost') &&
   env.APP_ENV === 'production'
 ) {
-  problems.push('NEXT_PUBLIC_API_URL dang tro localhost trong khi APP_ENV=production.');
+  problems.push(
+    'NEXT_PUBLIC_API_URL dang tro localhost trong khi APP_ENV=production.',
+  );
 }
 
 if (
@@ -145,7 +149,9 @@ if (
   env.NEXT_PUBLIC_SOCKET_URL.includes('localhost') &&
   env.APP_ENV === 'production'
 ) {
-  problems.push('NEXT_PUBLIC_SOCKET_URL dang tro localhost trong khi APP_ENV=production.');
+  problems.push(
+    'NEXT_PUBLIC_SOCKET_URL dang tro localhost trong khi APP_ENV=production.',
+  );
 }
 
 if (
@@ -153,7 +159,39 @@ if (
   env.FRONTEND_URL.includes('localhost') &&
   env.APP_ENV === 'production'
 ) {
-  problems.push('FRONTEND_URL dang tro localhost trong khi APP_ENV=production.');
+  problems.push(
+    'FRONTEND_URL dang tro localhost trong khi APP_ENV=production.',
+  );
+}
+
+if (env.APP_ENV === 'production') {
+  if (env.VNPAY_ENVIRONMENT !== 'production') {
+    problems.push(
+      'VNPAY_ENVIRONMENT phải là production trước khi nhận thanh toán thật.',
+    );
+  }
+
+  if (env.VNPAY_PAYMENT_URL?.toLowerCase().includes('sandbox')) {
+    problems.push(
+      'VNPAY_PAYMENT_URL vẫn đang trỏ tới sandbox; cần dùng URL production do VNPay cấp.',
+    );
+  }
+
+  for (const key of ['VNPAY_RETURN_URL', 'VNPAY_IPN_URL']) {
+    if (env[key] && !env[key].startsWith('https://')) {
+      problems.push(`${key} phải là URL HTTPS công khai trên production.`);
+    }
+  }
+
+  if (env.PAYMENT_SIMULATION_ENABLED !== 'false') {
+    problems.push('PAYMENT_SIMULATION_ENABLED phải là false trên production.');
+  }
+
+  if (env.NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION !== 'false') {
+    problems.push(
+      'NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION phải là false trên production.',
+    );
+  }
 }
 
 if (problems.length) {

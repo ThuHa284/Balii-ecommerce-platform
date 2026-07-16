@@ -1,0 +1,57 @@
+name: Backend CI/CD
+
+on:
+  pull_request:
+    paths: ['apps/**', 'libs/**', 'database/**', 'infra/camunda/**', 'package*.json', 'Dockerfile.backend', 'docker-compose.prod.yml', '.github/workflows/backend-ci-cd.yml']
+  push:
+    branches: [main, master]
+    paths: ['apps/**', 'libs/**', 'database/**', 'infra/camunda/**', 'package*.json', 'Dockerfile.backend', 'docker-compose.prod.yml', '.github/workflows/backend-ci-cd.yml']
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit -p apps/api-gateway/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/order-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/payment-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/virtual-tryon-service/tsconfig.app.json
+
+  deploy-vps:
+    needs: verify
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy backend source to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: 'apps,libs,database,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,docker-compose.prod.yml,.dockerignore'
+          target: ${{ secrets.VPS_DEPLOY_PATH }}
+      - name: Rebuild backend services
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            cd '${{ secrets.VPS_DEPLOY_PATH }}'
+            APP_ENV_FILE=.env.production.vps docker compose --env-file .env.production.vps -f docker-compose.prod.yml up --build -d
+            curl --fail --retry 12 --retry-delay 5 http://127.0.0.1:4000/health/ready
+            CAMUNDA_URL=http://127.0.0.1:8080/engine-rest bash infra/camunda/deploy-bpmn.sh
+      - name: Run production smoke test
+        env:
+          PROD_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
+        run: node scripts/test-production-api.mjs --mode=smoke

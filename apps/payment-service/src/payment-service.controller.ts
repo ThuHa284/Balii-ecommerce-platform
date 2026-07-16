@@ -6,10 +6,12 @@ import {
   Controller,
   Get,
   Headers,
+  Ip,
   Param,
   Post,
   Query,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { PaymentServiceService } from './payment-service.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -17,6 +19,8 @@ import type { Response } from 'express';
 import { CamundaClientService } from './camunda/camunda-client.service';
 import { StartRefundWorkflowDto } from './dto/start-refund-workflow.dto';
 import { PaymentWebhookSecurityService } from './payment-webhook-security.service';
+import { HeaderRolesGuard } from './auth/header-roles.guard';
+import { PaymentOutboxPublisher } from './kafka';
 
 @Controller('payments')
 export class PaymentServiceController {
@@ -24,14 +28,19 @@ export class PaymentServiceController {
     private readonly paymentServiceService: PaymentServiceService,
     private readonly camundaClientService: CamundaClientService,
     private readonly paymentWebhookSecurityService: PaymentWebhookSecurityService,
+    private readonly paymentOutboxPublisher: PaymentOutboxPublisher,
   ) {}
 
   @Post()
   createPayment(
     @Headers('x-user-id') userId: string | undefined,
+    @Headers('x-forwarded-for') forwardedFor: string | undefined,
+    @Headers('x-real-ip') realIp: string | undefined,
+    @Ip() requestIp: string,
     @Body() dto: CreatePaymentDto,
   ) {
-    return this.paymentServiceService.createPayment(userId, dto);
+    const clientIp = forwardedFor?.split(',')[0]?.trim() || realIp || requestIp;
+    return this.paymentServiceService.createPayment(userId, dto, clientIp);
   }
 
   @Get()
@@ -165,8 +174,45 @@ export class PaymentServiceController {
   }
 
   @Get('admin/refunds')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   getAdminRefunds(): ReturnType<PaymentServiceService['getAdminRefunds']> {
     return this.paymentServiceService.getAdminRefunds();
+  }
+
+  @Get('admin/workflow-contexts')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  getAdminWorkflowContexts(
+    @Query('limit') limit?: string,
+  ): ReturnType<PaymentServiceService['getAdminWorkflowContexts']> {
+    return this.paymentServiceService.getAdminWorkflowContexts(Number(limit));
+  }
+
+  @Get('admin/workflow-overview')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  getAdminWorkflowOverview(): ReturnType<
+    CamundaClientService['getWorkflowOverview']
+  > {
+    return this.camundaClientService.getWorkflowOverview();
+  }
+
+  @Get('admin/kafka-overview')
+  @UseGuards(new HeaderRolesGuard(['SUPER_ADMIN']))
+  getAdminKafkaOverview(): ReturnType<
+    PaymentOutboxPublisher['getAdminKafkaOverview']
+  > {
+    return this.paymentOutboxPublisher.getAdminKafkaOverview();
+  }
+
+  @Get('admin/workflows')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  getAdminWorkflows(
+    @Query('orderId') orderId?: string,
+    @Query('paymentId') paymentId?: string,
+  ): ReturnType<PaymentServiceService['getAdminWorkflowMonitor']> {
+    return this.paymentServiceService.getAdminWorkflowMonitor({
+      orderId,
+      paymentId,
+    });
   }
 
   @Post('refunds/webhook/:provider')

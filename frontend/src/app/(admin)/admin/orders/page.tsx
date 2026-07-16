@@ -2,13 +2,25 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Eye, Package, Printer, Search, X } from 'lucide-react';
+import Link from 'next/link';
+import {
+  BellRing,
+  CheckCircle2,
+  Eye,
+  Package,
+  Printer,
+  Route,
+  Search,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import InvoiceModal from '@/components/admin/invoice-modal';
 import {
   AdminOrder,
   getAdminOrders,
   getAdminOrderReturnRequests,
+  getAdminReturnRequests,
   reviewAdminReturnRequest,
   updateAdminOrderStatus,
 } from '@/lib/api/admin.api';
@@ -19,7 +31,7 @@ import {
   PAYMENT_METHOD_LABELS,
 } from '@/lib/constants';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
-import { ReturnRequest } from '@/types/order.types';
+import { AdminReturnRequest, ReturnRequest } from '@/types/order.types';
 
 const STATUS_ACTIONS = [
   'confirmed',
@@ -46,13 +58,19 @@ function OrderDetailModal({
   order,
   onClose,
   onStatusUpdated,
+  onReturnRequestReviewed,
 }: {
   order: AdminOrder | null;
   onClose: () => void;
   onStatusUpdated: (order: AdminOrder) => void;
+  onReturnRequestReviewed: (request: ReturnRequest) => void;
 }) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [reviewingRequestId, setReviewingRequestId] = useState<string | null>(
+    null,
+  );
   const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let isActive = true;
@@ -73,6 +91,11 @@ function OrderDetailModal({
       .then((requests) => {
         if (isActive) {
           setReturnRequests(requests);
+          setReviewNotes(
+            Object.fromEntries(
+              requests.map((request) => [request.id, request.adminNote ?? '']),
+            ),
+          );
         }
       })
       .catch(() => {
@@ -112,20 +135,36 @@ function OrderDetailModal({
     returnRequestId: string,
     status: 'approved' | 'rejected',
   ) {
+    const adminNote = reviewNotes[returnRequestId]?.trim() ?? '';
+    if (status === 'rejected' && !adminNote) {
+      toast.error('Vui lòng nhập lý do từ chối để gửi cho khách hàng.');
+      return;
+    }
+
     try {
+      setReviewingRequestId(returnRequestId);
       const updated = await reviewAdminReturnRequest(returnRequestId, {
         status,
+        adminNote: adminNote || undefined,
       });
       setReturnRequests((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
       );
-      toast.success('Đã cập nhật yêu cầu trả hàng.');
+      onReturnRequestReviewed(updated);
+      window.dispatchEvent(new Event('admin-return-requests-updated'));
+      toast.success(
+        status === 'approved'
+          ? 'Đã duyệt và gửi thông báo nhận hàng hoàn cho khách.'
+          : 'Đã từ chối và gửi lý do cho khách hàng.',
+      );
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
           : 'Không thể cập nhật yêu cầu trả hàng.',
       );
+    } finally {
+      setReviewingRequestId(null);
     }
   }
 
@@ -320,8 +359,20 @@ function OrderDetailModal({
                           {request.reason}
                         </p>
                       </div>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        {request.status}
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                          request.status === 'pending'
+                            ? 'bg-amber-100 text-amber-700'
+                            : request.status === 'approved'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-rose-100 text-rose-700'
+                        }`}
+                      >
+                        {request.status === 'pending'
+                          ? 'Chờ duyệt'
+                          : request.status === 'approved'
+                            ? 'Đã duyệt'
+                            : 'Đã từ chối'}
                       </span>
                     </div>
 
@@ -344,37 +395,64 @@ function OrderDetailModal({
                     ) : null}
 
                     {request.status === 'pending' ? (
-                      <div className="mt-4 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handleReviewReturnRequest(
-                              request.id,
-                              'approved',
-                            )
-                          }
-                          className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-medium text-white"
-                        >
-                          Duyệt trả hàng
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handleReviewReturnRequest(
-                              request.id,
-                              'rejected',
-                            )
-                          }
-                          className="rounded-xl bg-rose-500 px-4 py-2 text-sm font-medium text-white"
-                        >
-                          Từ chối
-                        </button>
+                      <div className="mt-4 space-y-3">
+                        <div>
+                          <label
+                            htmlFor={`return-note-${request.id}`}
+                            className="mb-1.5 block text-xs font-semibold text-slate-700"
+                          >
+                            Tin nhắn gửi khách hàng
+                          </label>
+                          <textarea
+                            id={`return-note-${request.id}`}
+                            value={reviewNotes[request.id] ?? ''}
+                            onChange={(event) =>
+                              setReviewNotes((current) => ({
+                                ...current,
+                                [request.id]: event.target.value,
+                              }))
+                            }
+                            rows={3}
+                            placeholder="Có thể để trống khi duyệt để dùng thông báo lấy hàng mặc định; bắt buộc nhập nếu từ chối."
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleReviewReturnRequest(
+                                request.id,
+                                'approved',
+                              )
+                            }
+                            disabled={reviewingRequestId === request.id}
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            Duyệt trả hàng
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleReviewReturnRequest(
+                                request.id,
+                                'rejected',
+                              )
+                            }
+                            disabled={reviewingRequestId === request.id}
+                            className="inline-flex items-center gap-2 rounded-xl bg-rose-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Từ chối
+                          </button>
+                        </div>
                       </div>
                     ) : null}
 
                     {request.adminNote ? (
                       <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs text-muted-foreground">
-                        Ghi chú admin: {request.adminNote}
+                        Tin nhắn đã gửi khách: {request.adminNote}
                       </div>
                     ) : null}
                   </div>
@@ -390,6 +468,9 @@ function OrderDetailModal({
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [pendingReturnRequests, setPendingReturnRequests] = useState<
+    AdminReturnRequest[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -404,7 +485,12 @@ export default function AdminOrdersPage() {
       try {
         setLoading(true);
         setError(null);
-        setOrders(await getAdminOrders());
+        const [orderList, returnRequestList] = await Promise.all([
+          getAdminOrders(),
+          getAdminReturnRequests('pending'),
+        ]);
+        setOrders(orderList);
+        setPendingReturnRequests(returnRequestList);
       } catch (err) {
         setError(
           err instanceof Error
@@ -418,6 +504,16 @@ export default function AdminOrdersPage() {
 
     void loadOrders();
   }, []);
+
+  const pendingReturnCountByOrder = useMemo(() => {
+    return pendingReturnRequests.reduce<Record<string, number>>(
+      (counts, request) => {
+        counts[request.orderId] = (counts[request.orderId] ?? 0) + 1;
+        return counts;
+      },
+      {},
+    );
+  }, [pendingReturnRequests]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -456,6 +552,22 @@ export default function AdminOrdersPage() {
     }
   }
 
+  function handleReturnRequestReviewed(request: ReturnRequest) {
+    setPendingReturnRequests((current) =>
+      current.filter((item) => item.id !== request.id),
+    );
+  }
+
+  function openReturnRequest(request: AdminReturnRequest) {
+    const order = orders.find((item) => item.id === request.orderId);
+    if (!order) {
+      toast.error('Không tìm thấy đơn hàng của yêu cầu trả hàng này.');
+      return;
+    }
+
+    setDetailOrder(order);
+  }
+
   return (
     <div>
       <h1 className="mb-2 font-heading text-3xl font-bold text-foreground">
@@ -470,6 +582,39 @@ export default function AdminOrdersPage() {
       {error ? (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
           {error}
+        </div>
+      ) : null}
+
+      {pendingReturnRequests.length > 0 ? (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/90 p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-amber-100 p-2 text-amber-700">
+              <BellRing className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-heading text-base font-bold text-amber-950">
+                {pendingReturnRequests.length} yêu cầu trả hàng đang chờ duyệt
+              </h2>
+              <p className="mt-1 text-sm text-amber-800">
+                Kiểm tra lý do và ảnh minh chứng trước khi xác nhận đơn vị vận
+                chuyển đến nhận hàng.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {pendingReturnRequests.slice(0, 5).map((request) => (
+                  <button
+                    key={request.id}
+                    type="button"
+                    onClick={() => openReturnRequest(request)}
+                    className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-left text-xs text-slate-700 transition hover:border-amber-400 hover:shadow-sm"
+                  >
+                    <span className="font-semibold">#{request.orderCode}</span>
+                    <span className="mx-1 text-slate-300">·</span>
+                    {request.customerName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -554,7 +699,14 @@ export default function AdminOrdersPage() {
                   className="border-b border-white/20 transition-colors hover:bg-white/30"
                 >
                   <td className="px-6 py-4 text-sm font-medium">
-                    {order.orderCode}
+                    <div className="flex items-center gap-2">
+                      <span>{order.orderCode}</span>
+                      {pendingReturnCountByOrder[order.id] ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                          {pendingReturnCountByOrder[order.id]} trả hàng
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm">{order.customerName}</p>
@@ -577,6 +729,13 @@ export default function AdminOrdersPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex justify-end gap-1.5">
+                      <Link
+                        href={`/admin/workflows?orderId=${order.id}`}
+                        className="rounded-lg p-2 text-emerald-600 transition-colors hover:bg-emerald-50"
+                        title="Xem BPMN workflow"
+                      >
+                        <Route className="h-4 w-4" />
+                      </Link>
                       <button
                         onClick={() => {
                           setActiveOrder(order);
@@ -615,6 +774,7 @@ export default function AdminOrdersPage() {
         order={detailOrder}
         onClose={() => setDetailOrder(null)}
         onStatusUpdated={replaceOrder}
+        onReturnRequestReviewed={handleReturnRequestReviewed}
       />
     </div>
   );

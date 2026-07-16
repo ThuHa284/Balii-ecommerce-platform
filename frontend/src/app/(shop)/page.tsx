@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
+  AlertTriangle,
   ArrowRight,
   RotateCcw,
   ShieldCheck,
   Sparkles,
   Truck,
   Wand2,
+  X,
 } from 'lucide-react';
 import ComboBanner from '@/components/product/combo-banner';
 import ProductGrid from '@/components/product/product-grid';
@@ -26,6 +28,10 @@ import { Campaign, Category, Collection, Product } from '@/types/product.types';
 
 const HERO_VIDEO_URL =
   'https://res.cloudinary.com/ddbnubhxr/video/upload/f_auto,q_auto,ac_none/v1777210564/video_background_ijdowe.mp4';
+const SHOW_ACADEMIC_NOTICE =
+  process.env.NEXT_PUBLIC_SHOW_ACADEMIC_NOTICE === 'true' ||
+  (process.env.NODE_ENV === 'production' &&
+    process.env.NEXT_PUBLIC_SHOW_ACADEMIC_NOTICE !== 'false');
 
 export default function HomePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -36,6 +42,8 @@ export default function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [isAcademicNoticeOpen, setIsAcademicNoticeOpen] =
+    useState(SHOW_ACADEMIC_NOTICE);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -99,6 +107,54 @@ export default function HomePage() {
 
   return (
     <div>
+      {isAcademicNoticeOpen ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="academic-notice-title"
+        >
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-amber-200 bg-white shadow-2xl">
+            <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500" />
+            <button
+              type="button"
+              onClick={() => setIsAcademicNoticeOpen(false)}
+              className="absolute right-4 top-5 rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+              aria-label="Đóng thông báo"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="p-7 sm:p-9">
+              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <AlertTriangle className="h-7 w-7" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber-700">
+                Thông báo quan trọng
+              </p>
+              <h1
+                id="academic-notice-title"
+                className="mt-2 pr-8 font-heading text-2xl font-bold text-slate-950 sm:text-3xl"
+              >
+                Balii là hệ thống phục vụ đồ án tốt nghiệp
+              </h1>
+              <p className="mt-4 text-base leading-7 text-slate-600">
+                Website được xây dựng cho mục đích học thuật và trình diễn kỹ
+                thuật, không phải kênh bán hàng thương mại chính thức. Chỉ thực
+                hiện thanh toán thật khi bạn đã được chủ dự án xác nhận và hiểu
+                rõ phạm vi thử nghiệm.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsAcademicNoticeOpen(false)}
+                className="mt-7 w-full rounded-2xl bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
+              >
+                Tôi đã hiểu và tiếp tục
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="relative flex h-screen items-center justify-center overflow-hidden">
         {!videoError ? (
           <video
