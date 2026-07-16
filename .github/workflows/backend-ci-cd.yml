@@ -33,35 +33,36 @@ jobs:
       - name: Validate VPS secrets
         shell: bash
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
-          test -n "$VPS_HOST" || { echo "Missing VPS_HOST"; exit 1; }
-          test -n "$VPS_USERNAME" || { echo "Missing VPS_USERNAME"; exit 1; }
-          test -n "$VPS_SSH_PRIVATE_KEY" || { echo "Missing VPS_SSH_PRIVATE_KEY"; exit 1; }
-          test -n "$VPS_DEPLOY_PATH" || { echo "Missing VPS_DEPLOY_PATH"; exit 1; }
+          test -n "$VPS_SSH_PRIVATE_KEY" || test -n "$VPS_PASSWORD" || {
+            echo "Missing VPS authentication: configure VPS_PASSWORD or VPS_SSH_PRIVATE_KEY"
+            exit 1
+          }
       - name: Copy backend source to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
+          host: ${{ secrets.VPS_HOST || '163.61.110.43' }}
+          username: ${{ secrets.VPS_USERNAME || 'root' }}
+          password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           source: 'apps,libs,database,frontend,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,docker-compose.prod.yml,.dockerignore'
-          target: ${{ secrets.VPS_DEPLOY_PATH }}
+          target: ${{ secrets.VPS_DEPLOY_PATH || '/opt/balii-backend' }}
       - name: Rebuild backend services
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
+          host: ${{ secrets.VPS_HOST || '163.61.110.43' }}
+          username: ${{ secrets.VPS_USERNAME || 'root' }}
+          password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           script: |
-            cd '${{ secrets.VPS_DEPLOY_PATH }}'
+            cd '${{ secrets.VPS_DEPLOY_PATH || '/opt/balii-backend' }}'
             APP_ENV_FILE=.env.production.vps docker compose --env-file .env.production.vps -f docker-compose.prod.yml up --build -d
             curl --fail --retry 12 --retry-delay 5 http://127.0.0.1:4000/health/ready
+            sed -i 's/\r$//' infra/camunda/deploy-bpmn.sh
             CAMUNDA_URL=http://127.0.0.1:8080/engine-rest bash infra/camunda/deploy-bpmn.sh
       - name: Run production smoke test
         env:

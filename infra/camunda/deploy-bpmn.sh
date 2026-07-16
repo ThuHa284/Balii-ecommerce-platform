@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 CAMUNDA_URL=${CAMUNDA_URL:-http://localhost:8080/engine-rest}
 DEPLOYMENT_NAME=${DEPLOYMENT_NAME:-balii-payment-workflows}
