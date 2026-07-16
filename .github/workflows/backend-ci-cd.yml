@@ -2,10 +2,10 @@ name: Backend CI/CD
 
 on:
   pull_request:
-    paths: ['apps/**', 'libs/**', 'database/**', 'infra/camunda/**', 'package*.json', 'Dockerfile.backend', 'docker-compose.prod.yml', '.github/workflows/backend-ci-cd.yml']
+    paths: ['apps/**', 'libs/**', 'database/**', 'frontend/**', 'infra/camunda/**', 'package*.json', 'Dockerfile.backend', 'docker-compose.prod.yml', '.github/workflows/backend-ci-cd.yml']
   push:
     branches: [main, master]
-    paths: ['apps/**', 'libs/**', 'database/**', 'infra/camunda/**', 'package*.json', 'Dockerfile.backend', 'docker-compose.prod.yml', '.github/workflows/backend-ci-cd.yml']
+    paths: ['apps/**', 'libs/**', 'database/**', 'frontend/**', 'infra/camunda/**', 'package*.json', 'Dockerfile.backend', 'docker-compose.prod.yml', '.github/workflows/backend-ci-cd.yml']
   workflow_dispatch:
 
 jobs:
@@ -30,6 +30,18 @@ jobs:
     environment: Production
     steps:
       - uses: actions/checkout@v4
+      - name: Validate VPS secrets
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          test -n "$VPS_HOST" || { echo "Missing VPS_HOST"; exit 1; }
+          test -n "$VPS_USERNAME" || { echo "Missing VPS_USERNAME"; exit 1; }
+          test -n "$VPS_SSH_PRIVATE_KEY" || { echo "Missing VPS_SSH_PRIVATE_KEY"; exit 1; }
+          test -n "$VPS_DEPLOY_PATH" || { echo "Missing VPS_DEPLOY_PATH"; exit 1; }
       - name: Copy backend source to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -37,7 +49,7 @@ jobs:
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          source: 'apps,libs,database,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,docker-compose.prod.yml,.dockerignore'
+          source: 'apps,libs,database,frontend,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,docker-compose.prod.yml,.dockerignore'
           target: ${{ secrets.VPS_DEPLOY_PATH }}
       - name: Rebuild backend services
         uses: appleboy/ssh-action@v1.2.0
