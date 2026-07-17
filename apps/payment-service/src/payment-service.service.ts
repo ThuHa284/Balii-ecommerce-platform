@@ -178,21 +178,18 @@ export class PaymentServiceService {
         : new Date(Date.now() + 15 * 60 * 1000),
     });
 
-    const savedPayment = await this.paymentRepository.save(payment);
-
     if (!isOfflinePayment && dto.method === 'vnpay') {
-      savedPayment.paymentUrl = this.buildVnpayPaymentUrl({
-        id: savedPayment.id,
-        orderId: savedPayment.orderId,
-        amount: savedPayment.amount,
-        providerRef: savedPayment.providerRef,
+      payment.paymentUrl = this.buildVnpayPaymentUrl({
+        orderId: payment.orderId,
+        amount: payment.amount,
+        providerRef: payment.providerRef,
         clientIp,
       });
-      await this.paymentRepository.save(savedPayment);
     } else if (!isOfflinePayment) {
-      savedPayment.paymentUrl = dto.returnUrl ?? null;
-      await this.paymentRepository.save(savedPayment);
+      payment.paymentUrl = dto.returnUrl ?? null;
     }
+
+    const savedPayment = await this.paymentRepository.save(payment);
 
     await this.orderClientService.updateOrderPayment(dto.orderId, 'pending');
 
@@ -813,7 +810,6 @@ export class PaymentServiceService {
         ? null
         : input.method === 'vnpay'
           ? this.buildVnpayPaymentUrl({
-              id: payment.id,
               orderId: payment.orderId,
               amount: payment.amount,
               providerRef: payment.providerRef,
@@ -1805,7 +1801,6 @@ export class PaymentServiceService {
    * Các lỗi format amount, timestamp hoặc encoding là nguyên nhân phổ biến làm sai chữ ký.
    */
   private buildVnpayPaymentUrl(payment: {
-    id: string;
     orderId: string;
     amount: number | string;
     providerRef?: string | null;
@@ -1912,7 +1907,28 @@ export class PaymentServiceService {
       );
     }
 
-    if (process.env.VNPAY_ENVIRONMENT !== 'production') {
+    const vnpayEnvironment = process.env.VNPAY_ENVIRONMENT;
+    const ipnUrl = process.env.VNPAY_IPN_URL;
+
+    if (
+      !input.returnUrl.startsWith('https://') ||
+      !ipnUrl?.startsWith('https://')
+    ) {
+      throw new BadRequestException(
+        'VNPay requires public HTTPS Return and IPN URLs.',
+      );
+    }
+
+    if (vnpayEnvironment === 'sandbox') {
+      if (!input.paymentUrl.toLowerCase().includes('sandbox')) {
+        throw new BadRequestException(
+          'VNPAY_ENVIRONMENT is sandbox but the payment URL is not Sandbox.',
+        );
+      }
+      return;
+    }
+
+    if (vnpayEnvironment !== 'production') {
       throw new BadRequestException(
         'VNPay production chưa được kích hoạt bằng bộ cấu hình merchant thật.',
       );
@@ -1924,7 +1940,6 @@ export class PaymentServiceService {
       );
     }
 
-    const ipnUrl = process.env.VNPAY_IPN_URL;
     if (
       !input.returnUrl.startsWith('https://') ||
       !ipnUrl?.startsWith('https://')

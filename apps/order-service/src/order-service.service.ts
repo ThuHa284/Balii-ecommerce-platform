@@ -221,7 +221,15 @@ export class OrderServiceService {
     });
 
     const savedOrder = await this.orderRepository.save(order);
-    await this.cartClientService.clearCart(userId, dto.sessionId);
+    try {
+      await this.cartClientService.clearCart(userId, dto.sessionId);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown cart error';
+      this.logger.warn(
+        `Order ${savedOrder.id} was created but the cart could not be cleared: ${message}`,
+      );
+    }
 
     const response = await this.findMyOrderById(userId, savedOrder.id);
     void this.sendOrderCreatedNotifications(response).catch((error) => {

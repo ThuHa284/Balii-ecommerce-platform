@@ -2,10 +2,32 @@ name: Backend CI/CD
 
 on:
   pull_request:
-    paths: ['apps/**', 'libs/**', 'database/**', 'frontend/**', 'infra/camunda/**', 'package*.json', 'Dockerfile.backend', 'docker-compose.prod.yml', '.github/workflows/backend-ci-cd.yml']
+    paths:
+      [
+        'apps/**',
+        'libs/**',
+        'database/**',
+        'frontend/**',
+        'infra/camunda/**',
+        'package*.json',
+        'Dockerfile.backend',
+        'docker-compose.prod.yml',
+        '.github/workflows/backend-ci-cd.yml',
+      ]
   push:
     branches: [main, master]
-    paths: ['apps/**', 'libs/**', 'database/**', 'frontend/**', 'infra/camunda/**', 'package*.json', 'Dockerfile.backend', 'docker-compose.prod.yml', '.github/workflows/backend-ci-cd.yml']
+    paths:
+      [
+        'apps/**',
+        'libs/**',
+        'database/**',
+        'frontend/**',
+        'infra/camunda/**',
+        'package*.json',
+        'Dockerfile.backend',
+        'docker-compose.prod.yml',
+        '.github/workflows/backend-ci-cd.yml',
+      ]
   workflow_dispatch:
 
 jobs:
@@ -62,6 +84,9 @@ jobs:
             cd /opt/balii-backend
             rm -f 'frontend/src/app/(admin)/admin/settings/page.tsx'
             APP_ENV_FILE=.env.production.vps docker compose --env-file .env.production.vps -f docker-compose.prod.yml up --build -d
+            docker compose --env-file .env.production.vps -f docker-compose.prod.yml exec -T postgres \
+              sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+              < database/migrations/20260717-add-order-return-requests.sql
             curl --fail --retry 12 --retry-delay 5 http://127.0.0.1:4000/health/ready
             sed -i 's/\r$//' infra/camunda/deploy-bpmn.sh
             CAMUNDA_URL=http://127.0.0.1:8080/engine-rest bash infra/camunda/deploy-bpmn.sh

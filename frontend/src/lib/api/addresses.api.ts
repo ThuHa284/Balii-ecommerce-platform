@@ -1,11 +1,11 @@
-import apiClient from "./client";
-import { mapAddress } from "./adapters";
+import apiClient from './client';
+import { mapAddress } from './adapters';
 import {
   enrichAddressWithLocationNames,
   enrichAddressesWithLocationNames,
-} from "@/lib/address-utils";
-import { ApiResponse } from "@/types/api.types";
-import { Address } from "@/types/user.types";
+} from '@/lib/address-utils';
+import { ApiResponse } from '@/types/api.types';
+import { Address } from '@/types/user.types';
 
 type AddressPayload = {
   recipientName: string;
@@ -18,14 +18,22 @@ type AddressPayload = {
 };
 
 export async function getMyAddresses(): Promise<Address[]> {
-  const { data } = await apiClient.get<ApiResponse<unknown[]>>("/users/me/addresses");
+  const { data } = await apiClient.get<ApiResponse<unknown[]> | unknown[]>(
+    '/users/me/addresses',
+  );
+  const items = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : [];
+
   return enrichAddressesWithLocationNames(
-    data.data.map((item) => mapAddress(item as Parameters<typeof mapAddress>[0])),
+    items.map((item) => mapAddress(item as Parameters<typeof mapAddress>[0])),
   );
 }
 
 export async function createAddress(payload: AddressPayload): Promise<Address> {
-  const { data } = await apiClient.post("/users/me/addresses", payload);
+  const { data } = await apiClient.post('/users/me/addresses', payload);
   return enrichAddressWithLocationNames(mapAddress(data));
 }
 
