@@ -187,6 +187,7 @@ services:
       DB_PORT: 5432
       ORDER_SERVICE_URL: http://order-service:3004
       KAFKA_BROKERS: kafka:29092
+      KAFKA_AUTO_CREATE_TOPICS: "true"
       CAMUNDA_BASE_URL: http://camunda:8080/engine-rest
 
   voucher-service:
