@@ -48,6 +48,10 @@ type PaymentRow = {
 
 type ExistingPaymentCandidateRow = {
   id: string;
+  orderId: string;
+  amount: number | string;
+  providerRef?: string | null;
+  paymentUrl?: string | null;
   status: string;
   method: string;
   expiresAt?: Date | null;
@@ -157,6 +161,23 @@ export class PaymentServiceService {
       reusablePayment?.status === 'pending' &&
       !this.isPaymentExpired(reusablePayment.expiresAt)
     ) {
+      if (dto.method === 'vnpay' && !reusablePayment.paymentUrl) {
+        const paymentUrl = this.buildVnpayPaymentUrl({
+          orderId: reusablePayment.orderId,
+          amount: reusablePayment.amount,
+          providerRef: reusablePayment.providerRef,
+          clientIp,
+        });
+        await this.dataSource.query(
+          `
+          UPDATE payment_service.payments
+          SET payment_url = $1,
+              updated_at = NOW()
+          WHERE id = $2
+          `,
+          [paymentUrl, reusablePayment.id],
+        );
+      }
       return this.getPaymentDetail(reusablePayment.id);
     }
 
@@ -583,6 +604,10 @@ export class PaymentServiceService {
       `
       SELECT
         p.id,
+        p.order_id AS "orderId",
+        p.amount,
+        p.provider_ref AS "providerRef",
+        p.payment_url AS "paymentUrl",
         ps.code AS status,
         pp.code AS method,
         p.expires_at AS "expiresAt"
