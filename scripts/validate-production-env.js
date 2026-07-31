@@ -121,11 +121,20 @@ const placeholderSuggested = SUGGESTED_KEYS.filter(
 const missingSuggested = SUGGESTED_KEYS.filter((key) => !env[key]?.trim());
 
 const problems = [];
+const warnings = [];
+const isThesisDemo = env.DEPLOYMENT_PROFILE === 'thesis-demo';
 
 for (const [key, minimumLength] of Object.entries(MINIMUM_SECRET_LENGTHS)) {
   const value = env[key]?.trim();
   if (value && !isPlaceholder(value) && value.length < minimumLength) {
-    problems.push(`${key} phải có ít nhất ${minimumLength} ký tự.`);
+    const message = `${key} phải có ít nhất ${minimumLength} ký tự.`;
+    if (isThesisDemo && key === 'DB_PASSWORD') {
+      warnings.push(
+        `${message} Chưa tự đổi để tránh làm gián đoạn PostgreSQL hiện tại.`,
+      );
+    } else {
+      problems.push(message);
+    }
   }
 }
 
@@ -191,7 +200,7 @@ if (
   );
 }
 
-if (env.APP_ENV === 'production') {
+if (env.APP_ENV === 'production' && !isThesisDemo) {
   if (env.PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS !== 'false') {
     problems.push(
       'PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS phải là false trên production.',
@@ -254,6 +263,18 @@ if (env.APP_ENV === 'production') {
   }
 }
 
+if (env.APP_ENV === 'production' && isThesisDemo) {
+  if (env.PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS !== 'false') {
+    problems.push(
+      'PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS phải là false kể cả trong profile thesis-demo.',
+    );
+  }
+
+  warnings.push(
+    'Đang dùng profile thesis-demo: cho phép VNPay sandbox, mô phỏng thanh toán, bỏ qua xác minh email và mô phỏng hoàn tiền.',
+  );
+}
+
 if (problems.length) {
   console.error(`Kiem tra env that bai: ${envFileArg}`);
   console.error(problems.join('\n'));
@@ -264,6 +285,13 @@ if (problems.length) {
 }
 
 console.log(`Env hop le o muc co the deploy baseline: ${envFileArg}`);
+
+if (warnings.length) {
+  console.warn('\nCảnh báo triển khai:');
+  for (const warning of warnings) {
+    console.warn(`- ${warning}`);
+  }
+}
 
 if (missingSuggested.length) {
   console.log('\nBien tuy chon/chuc nang nang cao chua dien:');

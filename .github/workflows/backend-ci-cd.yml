@@ -93,6 +93,7 @@ jobs:
             set -eu
             cd /opt/balii-backend
             export APP_ENV_FILE=.env.production.vps
+            bash scripts/prepare-thesis-demo-env.sh "$APP_ENV_FILE"
             rm -f \
               'apps/product-service/src/product-service.controller.spec.ts' \
               'apps/product-service/src/product-service.controller.ts' \
@@ -101,7 +102,7 @@ jobs:
               'frontend/src/components/product/combo-selector.tsx' \
               'frontend/src/lib/combo-utils.ts'
             if ! docker compose --env-file .env.production.vps -f docker-compose.prod.yml up --build -d; then
-              docker compose --env-file .env.production.vps -f docker-compose.prod.yml logs --no-color production-env-check
+              docker compose --env-file .env.production.vps -f docker-compose.prod.yml logs --no-color --tail 150 production-env-check postgres
               exit 1
             fi
             docker compose --env-file .env.production.vps -f docker-compose.prod.yml exec -T postgres \
