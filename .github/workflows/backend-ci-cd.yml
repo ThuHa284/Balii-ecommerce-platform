@@ -44,9 +44,14 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit -p apps/api-gateway/tsconfig.app.json
       - run: npx tsc --noEmit -p apps/user-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/product-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/cart-service/tsconfig.app.json
       - run: npx tsc --noEmit -p apps/order-service/tsconfig.app.json
       - run: npx tsc --noEmit -p apps/payment-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/voucher-service/tsconfig.app.json
       - run: npx tsc --noEmit -p apps/virtual-tryon-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/market-analysis-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/chatbot-service/tsconfig.app.json
 
   deploy-vps:
     needs: verify
@@ -75,6 +80,7 @@ jobs:
           port: ${{ secrets.VPS_PORT || 22 }}
           source: 'apps,libs,database,frontend,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,Dockerfile.migrations,docker-compose.prod.yml,.dockerignore'
           target: /opt/balii-backend
+          overwrite: true
       - name: Rebuild backend services
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -84,9 +90,17 @@ jobs:
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           script: |
+            set -eu
             cd /opt/balii-backend
-            rm -f 'frontend/src/app/(admin)/admin/settings/page.tsx'
-            APP_ENV_FILE=.env.production.vps docker compose --env-file .env.production.vps -f docker-compose.prod.yml up --build -d
+            export APP_ENV_FILE=.env.production.vps
+            rm -f \
+              'apps/product-service/src/product-service.controller.spec.ts' \
+              'apps/product-service/src/product-service.controller.ts' \
+              'apps/product-service/src/product-service.service.ts' \
+              'frontend/src/app/(admin)/admin/settings/page.tsx' \
+              'frontend/src/components/product/combo-selector.tsx' \
+              'frontend/src/lib/combo-utils.ts'
+            docker compose --env-file .env.production.vps -f docker-compose.prod.yml up --build -d
             docker compose --env-file .env.production.vps -f docker-compose.prod.yml exec -T postgres \
               sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
               < database/migrations/20260717-add-order-return-requests.sql
