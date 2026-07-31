@@ -13,6 +13,12 @@ export class Voucher {
   @Column({ type: 'varchar', length: 50, unique: true })
   code!: string;
 
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  name!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  description!: string | null;
+
   @Column({ name: 'type_id', type: 'int' })
   typeId!: number;
 

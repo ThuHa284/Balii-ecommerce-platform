@@ -50,9 +50,13 @@ export async function createOrder(orderData: {
   address: Address;
   paymentMethod: string;
   note?: string;
+  idempotencyKey: string;
+  voucherCode?: string;
 }): Promise<Order> {
   const { data } = await apiClient.post<BackendOrder>('/orders', {
     paymentMethod: orderData.paymentMethod,
+    idempotencyKey: orderData.idempotencyKey,
+    voucherCode: orderData.voucherCode,
     customerNote: orderData.note,
     shippingAddress: {
       recipientName: orderData.address.fullName,
@@ -84,10 +88,12 @@ export async function createOrderReturnRequest(
   payload: {
     reason: string;
     images: File[];
+    items: Array<{ orderItemId: string; quantity: number }>;
   },
 ): Promise<ReturnRequest> {
   const formData = new FormData();
   formData.append('reason', payload.reason);
+  formData.append('items', JSON.stringify(payload.items));
   payload.images.forEach((image) => formData.append('images', image));
 
   const { data } = await apiClient.post<ReturnRequest>(

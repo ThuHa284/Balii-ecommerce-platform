@@ -4,6 +4,7 @@ import { LocationOption } from '@/types/location.types';
 const provinceCache = new Map<string, Promise<LocationOption[]>>();
 const districtCache = new Map<number, Promise<LocationOption[]>>();
 const wardCache = new Map<number, Promise<LocationOption[]>>();
+const provinceWardCache = new Map<number, Promise<LocationOption[]>>();
 
 function normalizeLocations(data: unknown): LocationOption[] {
   if (!Array.isArray(data)) {
@@ -19,6 +20,8 @@ function normalizeLocations(data: unknown): LocationOption[] {
         typeof value.code === 'string' || value.code == null
           ? (value.code as string | null | undefined)
           : null,
+      districtId:
+        value.districtId == null ? undefined : Number(value.districtId),
     };
   });
 }
@@ -68,4 +71,21 @@ export async function getWards(districtId: number): Promise<LocationOption[]> {
   }
 
   return wardCache.get(districtId)!;
+}
+
+export async function getWardsByProvince(
+  provinceId: number,
+): Promise<LocationOption[]> {
+  if (!provinceWardCache.has(provinceId)) {
+    provinceWardCache.set(
+      provinceId,
+      apiClient
+        .get('/locations/wards', {
+          params: { provinceId },
+        })
+        .then(({ data }) => normalizeLocations(data)),
+    );
+  }
+
+  return provinceWardCache.get(provinceId)!;
 }

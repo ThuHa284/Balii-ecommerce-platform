@@ -5,18 +5,26 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Clock,
   Inbox,
   Loader2,
   Network,
   RadioTower,
   RefreshCw,
+  Send,
   Server,
   Users,
+  Zap,
 } from 'lucide-react';
 import AuthGuard from '@/components/auth/auth-guard';
 import {
   AdminKafkaOverviewResponse,
   getAdminKafkaOverview,
+  getKafkaDemoStatus,
+  KafkaDemoRunResult,
+  KafkaDemoStatus,
+  runKafkaDemoAsync,
+  runKafkaDemoSync,
 } from '@/lib/api/admin.api';
 import { formatDateTime } from '@/lib/utils';
 import { UserRole } from '@/types/user.types';
@@ -166,6 +174,8 @@ function KafkaDashboard() {
               {data.error}
             </div>
           ) : null}
+
+          <KafkaDemoPanel />
 
           <section className="glass-card p-5">
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -345,6 +355,220 @@ function KafkaDashboard() {
         </>
       ) : null}
     </div>
+  );
+}
+
+function KafkaDemoPanel() {
+  const [recipient, setRecipient] = useState('khach-hang@balii.vn');
+  const [message, setMessage] = useState(
+    'Đơn hàng #BALII-2026 của bạn đã được xác nhận.',
+  );
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [asyncBusy, setAsyncBusy] = useState(false);
+  const [syncResult, setSyncResult] = useState<
+    (KafkaDemoRunResult & { clientRttMs: number }) | null
+  >(null);
+  const [asyncResult, setAsyncResult] = useState<
+    (KafkaDemoRunResult & { clientRttMs: number }) | null
+  >(null);
+  const [status, setStatus] = useState<KafkaDemoStatus | null>(null);
+  const [demoError, setDemoError] = useState<string | null>(null);
+
+  // Poll the consumer processing log so async events show up as they're handled.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () => {
+      void getKafkaDemoStatus()
+        .then((next) => {
+          if (!cancelled) setStatus(next);
+        })
+        .catch(() => {
+          /* status is best-effort */
+        });
+    };
+    tick();
+    const timer = window.setInterval(tick, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  async function handleSync() {
+    setSyncBusy(true);
+    setDemoError(null);
+    const t0 = performance.now();
+    try {
+      const result = await runKafkaDemoSync({ recipient, message });
+      setSyncResult({ ...result, clientRttMs: Math.round(performance.now() - t0) });
+    } catch (err) {
+      setDemoError(err instanceof Error ? err.message : 'Lỗi khi chạy demo đồng bộ.');
+    } finally {
+      setSyncBusy(false);
+    }
+  }
+
+  async function handleAsync() {
+    setAsyncBusy(true);
+    setDemoError(null);
+    const t0 = performance.now();
+    try {
+      const result = await runKafkaDemoAsync({ recipient, message });
+      setAsyncResult({ ...result, clientRttMs: Math.round(performance.now() - t0) });
+    } catch (err) {
+      setDemoError(err instanceof Error ? err.message : 'Lỗi khi chạy demo Kafka.');
+    } finally {
+      setAsyncBusy(false);
+    }
+  }
+
+  return (
+    <section className="glass-card p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-heading text-xl font-semibold text-foreground">
+            Demo: Kafka vs không Kafka
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Cùng một hành động &quot;gửi thông báo đơn hàng&quot;, làm theo 2 cách.
+            Đồng bộ: caller bị chặn tới khi xử lý xong. Bất đồng bộ (Kafka): caller
+            được trả về ngay, consumer xử lý nền (xem log bên dưới).
+          </p>
+        </div>
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+            status?.connected
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-amber-100 text-amber-700'
+          }`}
+        >
+          {status?.connected ? 'Consumer demo đang chạy' : 'Consumer demo chưa kết nối'}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="text-sm">
+          <span className="text-xs font-semibold text-muted-foreground">
+            Người nhận
+          </span>
+          <input
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+            className="mt-1 w-full rounded-xl border border-white/50 bg-white/70 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="text-sm">
+          <span className="text-xs font-semibold text-muted-foreground">
+            Nội dung
+          </span>
+          <input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            className="mt-1 w-full rounded-xl border border-white/50 bg-white/70 px-3 py-2 text-sm"
+          />
+        </label>
+      </div>
+
+      {demoError ? (
+        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          {demoError}
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {/* Synchronous / no Kafka */}
+        <div className="rounded-2xl border border-white/50 bg-white/40 p-4">
+          <div className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-rose-600" />
+            <h3 className="font-semibold">Không dùng Kafka (đồng bộ)</h3>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Gọi trực tiếp và chờ. Caller bị chặn suốt thời gian xử lý.
+          </p>
+          <button
+            type="button"
+            onClick={() => void handleSync()}
+            disabled={syncBusy}
+            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {syncBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            Gửi đồng bộ
+          </button>
+          {syncResult ? (
+            <div className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-800">
+              <p className="font-semibold">
+                Caller bị chặn {syncResult.clientRttMs} ms (round-trip)
+              </p>
+              <p className="mt-1">{syncResult.note}</p>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Async / Kafka */}
+        <div className="rounded-2xl border border-white/50 bg-white/40 p-4">
+          <div className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-emerald-600" />
+            <h3 className="font-semibold">Qua Kafka (bất đồng bộ)</h3>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Publish event rồi trả về ngay. Consumer xử lý nền, không chặn caller.
+          </p>
+          <button
+            type="button"
+            onClick={() => void handleAsync()}
+            disabled={asyncBusy}
+            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {asyncBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Zap className="h-4 w-4" />
+            )}
+            Gửi qua Kafka
+          </button>
+          {asyncResult ? (
+            <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              <p className="font-semibold">
+                Caller được trả về sau {asyncResult.clientRttMs} ms
+                {asyncResult.published === false ? ' (Kafka chưa kết nối)' : ''}
+              </p>
+              <p className="mt-1">{asyncResult.note}</p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <h3 className="text-sm font-semibold text-foreground">
+          Log consumer xử lý (Kafka)
+        </h3>
+        {status && status.processedLog.length > 0 ? (
+          <div className="mt-2 space-y-2">
+            {status.processedLog.map((entry) => (
+              <div
+                key={entry.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/40 bg-white/50 px-3 py-2 text-xs"
+              >
+                <span className="font-mono">{entry.recipient}</span>
+                <span className="truncate">{entry.message}</span>
+                <span className="text-muted-foreground">
+                  xử lý sau {entry.latencyMs} ms · {formatDateTime(entry.processedAt)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Chưa có event nào được consumer xử lý. Bấm &quot;Gửi qua Kafka&quot; để thấy
+            message được xử lý nền sau vài giây.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 

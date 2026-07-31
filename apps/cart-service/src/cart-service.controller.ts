@@ -7,11 +7,13 @@ import {
   Param,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { CartService } from './cart-service.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { MergeCartDto } from './dto/merge-cart.dto';
+import { InternalServiceGuard } from './auth/internal-service.guard';
 
 @Controller('cart')
 export class CartController {
@@ -57,8 +59,9 @@ export class CartController {
   clearCart(
     @Headers('x-user-id') userId: string | undefined,
     @Headers('x-session-id') sessionId: string | undefined,
+    @Headers('x-cart-version') expectedUpdatedAt: string | undefined,
   ) {
-    return this.cartService.clearCart(userId, sessionId);
+    return this.cartService.clearCart(userId, sessionId, expectedUpdatedAt);
   }
 
   @Post('merge')
@@ -75,6 +78,7 @@ export class CartController {
   }
 
   @Get('internal/checkout')
+  @UseGuards(InternalServiceGuard)
   getCartForCheckout(
     @Headers('x-user-id') userId: string | undefined,
     @Headers('x-session-id') sessionId: string | undefined,

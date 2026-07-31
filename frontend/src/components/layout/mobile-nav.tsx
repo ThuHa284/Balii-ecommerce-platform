@@ -1,58 +1,87 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { X } from "lucide-react";
-import { NAV_LINKS } from "@/lib/constants";
-import { useUIStore } from "@/store/ui.store";
-import { cn } from "@/lib/utils";
+import { useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { X } from 'lucide-react';
+import { NAV_LINKS } from '@/lib/constants';
+import { useUIStore } from '@/store/ui.store';
+import { cn } from '@/lib/utils';
 
 export default function MobileNav() {
   const pathname = usePathname();
   const { isMobileNavOpen, setMobileNavOpen } = useUIStore();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isMobileNavOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileNavOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMobileNavOpen, setMobileNavOpen]);
 
   return (
     <>
       {/* Overlay */}
       <div
         className={cn(
-          "fixed inset-0 z-50 bg-black/30 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
-          isMobileNavOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          'fixed inset-0 z-50 bg-black/30 backdrop-blur-sm transition-opacity duration-300 lg:hidden',
+          isMobileNavOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
         )}
         onClick={() => setMobileNavOpen(false)}
+        aria-hidden="true"
       />
 
       {/* Drawer */}
       <div
         className={cn(
-          "fixed top-0 left-0 bottom-0 z-50 w-72 glass-card rounded-none border-l-0 transition-transform duration-300 lg:hidden",
-          isMobileNavOpen ? "translate-x-0" : "-translate-x-full"
+          'fixed top-0 left-0 bottom-0 z-50 w-72 glass-card rounded-none border-l-0 transition-transform duration-300 lg:hidden',
+          isMobileNavOpen ? 'translate-x-0' : '-translate-x-full',
         )}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Điều hướng chính"
+        aria-hidden={!isMobileNavOpen}
       >
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
-            <span className="font-heading text-2xl font-bold text-gradient">Balii</span>
+            <span className="font-heading text-2xl font-bold text-gradient">
+              Balii
+            </span>
             <button
+              ref={closeButtonRef}
               onClick={() => setMobileNavOpen(false)}
               className="p-2 rounded-xl hover:bg-white/40 transition-colors"
+              aria-label="Đóng menu"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Navigation */}
-          <nav className="space-y-1">
+          <nav className="space-y-1" aria-label="Danh mục cửa hàng">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileNavOpen(false)}
                 className={cn(
-                  "block px-4 py-3 rounded-xl text-sm font-medium transition-all",
+                  'block px-4 py-3 rounded-xl text-sm font-medium transition-all',
                   pathname === link.href
-                    ? "bg-violet-100 text-primary"
-                    : "text-foreground/80 hover:bg-white/40"
+                    ? 'bg-violet-100 text-primary'
+                    : 'text-foreground/80 hover:bg-white/40',
                 )}
               >
                 {link.label}

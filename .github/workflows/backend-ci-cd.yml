@@ -11,6 +11,7 @@ on:
         'infra/camunda/**',
         'package*.json',
         'Dockerfile.backend',
+        'Dockerfile.migrations',
         'docker-compose.prod.yml',
         '.github/workflows/backend-ci-cd.yml',
       ]
@@ -25,6 +26,7 @@ on:
         'infra/camunda/**',
         'package*.json',
         'Dockerfile.backend',
+        'Dockerfile.migrations',
         'docker-compose.prod.yml',
         '.github/workflows/backend-ci-cd.yml',
       ]
@@ -41,9 +43,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit -p apps/api-gateway/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/user-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/product-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/cart-service/tsconfig.app.json
       - run: npx tsc --noEmit -p apps/order-service/tsconfig.app.json
       - run: npx tsc --noEmit -p apps/payment-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/voucher-service/tsconfig.app.json
       - run: npx tsc --noEmit -p apps/virtual-tryon-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/market-analysis-service/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/chatbot-service/tsconfig.app.json
 
   deploy-vps:
     needs: verify
@@ -62,6 +70,34 @@ jobs:
             echo "Missing VPS authentication: configure VPS_PASSWORD or VPS_SSH_PRIVATE_KEY"
             exit 1
           }
+      - name: Inspect VPS storage before upload
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 163.61.110.43
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -u
+            available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+            if [ "$available_kb" -lt 4194304 ]; then
+              echo "VPS còn dưới 4 GiB; dọn cache Docker nhưng giữ nguyên volume/database."
+              docker builder prune -af || true
+              docker image prune -f || true
+              docker container prune -f --filter label=com.docker.compose.project=balii-backend || true
+            fi
+            df -h / /tmp /opt/balii-backend
+            df -i / /tmp /opt/balii-backend
+            du -sh /opt/balii-backend || true
+            docker system df || true
+            ls -ld /tmp /opt/balii-backend
+            available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+            test "$available_kb" -ge 1048576 || {
+              echo "VPS vẫn còn dưới 1 GiB sau khi dọn Docker cache." >&2
+              exit 1
+            }
+
       - name: Copy backend source to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -70,8 +106,10 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          source: 'apps,libs,database,frontend,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,docker-compose.prod.yml,.dockerignore'
+          source: 'apps,libs,database,frontend,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,Dockerfile.migrations,docker-compose.prod.yml,.dockerignore'
           target: /opt/balii-backend
+          overwrite: true
+          debug: true
       - name: Rebuild backend services
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -81,9 +119,35 @@ jobs:
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           script: |
+            set -eu
             cd /opt/balii-backend
-            rm -f 'frontend/src/app/(admin)/admin/settings/page.tsx'
-            APP_ENV_FILE=.env.production.vps docker compose --env-file .env.production.vps -f docker-compose.prod.yml up --build -d
+            export APP_ENV_FILE=.env.production.vps
+            bash scripts/prepare-thesis-demo-env.sh "$APP_ENV_FILE"
+            rm -f \
+              'apps/product-service/src/product-service.controller.spec.ts' \
+              'apps/product-service/src/product-service.controller.ts' \
+              'apps/product-service/src/product-service.service.ts' \
+              'frontend/src/app/(admin)/admin/settings/page.tsx' \
+              'frontend/src/components/product/combo-selector.tsx' \
+              'frontend/src/lib/combo-utils.ts'
+            if ! docker compose --env-file .env.production.vps -f docker-compose.prod.yml build; then
+              df -h /
+              exit 1
+            fi
+            docker builder prune -af || true
+            docker image prune -f || true
+            df -h /
+            available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+            test "$available_kb" -ge 1048576 || {
+              echo "VPS còn dưới 1 GiB sau build; không khởi động database/services." >&2
+              exit 1
+            }
+            if ! docker compose --env-file .env.production.vps -f docker-compose.prod.yml up -d; then
+              docker compose --env-file .env.production.vps -f docker-compose.prod.yml logs --no-color --tail 150 production-env-check migrations postgres
+              df -h /
+              docker system df || true
+              exit 1
+            fi
             docker compose --env-file .env.production.vps -f docker-compose.prod.yml exec -T postgres \
               sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
               < database/migrations/20260717-add-order-return-requests.sql

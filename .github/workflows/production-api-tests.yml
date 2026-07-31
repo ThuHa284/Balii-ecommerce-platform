@@ -1,0 +1,41 @@
+name: Production API Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Test mode
+        type: choice
+        options: [smoke, read]
+        default: read
+  schedule:
+    - cron: '17 */6 * * *'
+
+jobs:
+  production-api:
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run production API checks
+        env:
+          PROD_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
+          PROD_TEST_CUSTOMER_EMAIL: ${{ secrets.PROD_TEST_CUSTOMER_EMAIL }}
+          PROD_TEST_CUSTOMER_PASSWORD: ${{ secrets.PROD_TEST_CUSTOMER_PASSWORD }}
+          PROD_TEST_ADMIN_EMAIL: ${{ secrets.PROD_TEST_ADMIN_EMAIL }}
+          PROD_TEST_ADMIN_PASSWORD: ${{ secrets.PROD_TEST_ADMIN_PASSWORD }}
+          PROD_TEST_PRODUCT_ID: ${{ secrets.PROD_TEST_PRODUCT_ID }}
+          PROD_TEST_PRODUCT_SLUG: ${{ secrets.PROD_TEST_PRODUCT_SLUG }}
+          PROD_TEST_VARIANT_ID: ${{ secrets.PROD_TEST_VARIANT_ID }}
+          PROD_TEST_COLLECTION_SLUG: ${{ secrets.PROD_TEST_COLLECTION_SLUG }}
+          PROD_TEST_CAMPAIGN_SLUG: ${{ secrets.PROD_TEST_CAMPAIGN_SLUG }}
+        run: node scripts/test-production-api.mjs --mode=${{ github.event.inputs.mode || 'read' }}
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-api-report
+          path: artifacts/production-api-report.json

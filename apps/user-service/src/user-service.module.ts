@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { LocationsModule } from './locations/locations.module';
+import { RedisModule } from '@app/redis';
 
 loadEnv();
 
@@ -19,6 +20,7 @@ loadEnv();
       isGlobal: true,
       ignoreEnvFile: true,
     }),
+    RedisModule,
 
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

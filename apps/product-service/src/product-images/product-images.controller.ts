@@ -21,7 +21,9 @@ export class ProductImagesController {
 
   @Post(':productId/images')
   @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   uploadProductImage(
     @Param('productId') productId: string,
     @Body() dto: UpdateProductImageDto,

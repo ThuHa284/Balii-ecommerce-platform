@@ -12,6 +12,8 @@ import { GatewayAuthContextMiddleware } from './gateway-auth-context.middleware'
 import { GatewayHealthController } from './gateway-health.controller';
 import { GatewayHealthService } from './gateway-health.service';
 import { GatewayRouteService } from './gateway-route.service';
+import { RedisModule } from '@app/redis';
+import { GatewayRateLimitMiddleware } from './gateway-rate-limit.middleware';
 
 loadEnv();
 
@@ -19,11 +21,13 @@ loadEnv();
   imports: [
     ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
     JwtModule.register({}),
+    RedisModule,
   ],
   controllers: [GatewayHealthController],
   providers: [
     ApiGatewayProxyMiddleware,
     GatewayAuthContextMiddleware,
+    GatewayRateLimitMiddleware,
     GatewayHealthService,
     GatewayRouteService,
   ],
@@ -31,7 +35,11 @@ loadEnv();
 export class ApiGatewayModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
-      .apply(GatewayAuthContextMiddleware, ApiGatewayProxyMiddleware)
+      .apply(
+        GatewayAuthContextMiddleware,
+        GatewayRateLimitMiddleware,
+        ApiGatewayProxyMiddleware,
+      )
       .forRoutes({ path: '*', method: RequestMethod.ALL });
   }
 }

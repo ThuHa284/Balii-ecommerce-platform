@@ -54,7 +54,7 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   camunda:
-    image: camunda/camunda-bpm-platform:run-latest
+    image: ${CAMUNDA_IMAGE:-camunda/camunda-bpm-platform:run-7.23.0}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -67,11 +67,52 @@ services:
     ports:
       - '127.0.0.1:8080:8080'
 
+  camunda-deploy:
+    image: curlimages/curl:8.10.1
+    restart: 'no'
+    depends_on:
+      camunda:
+        condition: service_started
+    entrypoint: ['/bin/sh', '/deploy/deploy-bpmn.sh']
+    environment:
+      CAMUNDA_URL: http://camunda:8080/engine-rest
+      CAMUNDA_STARTUP_TIMEOUT_SECONDS: 180
+    volumes:
+      - ./infra/camunda:/deploy:ro
+
   qdrant:
     image: qdrant/qdrant
     restart: unless-stopped
     volumes:
       - qdrant_data:/qdrant/storage
+
+  production-env-check:
+    image: node:20-alpine
+    restart: 'no'
+    working_dir: /workspace
+    command:
+      ['node', 'scripts/validate-production-env.js', '/config/production.env']
+    volumes:
+      - ./scripts/validate-production-env.js:/workspace/scripts/validate-production-env.js:ro
+      - ${APP_ENV_FILE:-.env.production}:/config/production.env:ro
+
+  migrations:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrations
+    restart: 'no'
+    depends_on:
+      production-env-check:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
 
   user-service:
     build:
@@ -82,8 +123,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     env_file:
@@ -105,8 +146,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment:
@@ -148,8 +189,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
       payment-service:
         condition: service_started
     env_file:
@@ -171,12 +212,14 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
       kafka:
         condition: service_started
       camunda:
         condition: service_started
+      camunda-deploy:
+        condition: service_completed_successfully
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment:
@@ -187,7 +230,7 @@ services:
       DB_PORT: 5432
       ORDER_SERVICE_URL: http://order-service:3004
       KAFKA_BROKERS: kafka:29092
-      KAFKA_AUTO_CREATE_TOPICS: "true"
+      KAFKA_AUTO_CREATE_TOPICS: 'true'
       CAMUNDA_BASE_URL: http://camunda:8080/engine-rest
 
   voucher-service:
@@ -199,8 +242,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment:
@@ -219,8 +262,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment:
@@ -239,8 +282,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     env_file:
@@ -262,12 +305,18 @@ services:
         APP_NAME: chatbot-service
     restart: unless-stopped
     init: true
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      qdrant:
+        condition: service_started
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment:
       NODE_ENV: production
       APP_ENV: production
       CHATBOT_SERVICE_PORT: 3012
+      QDRANT_URL: http://qdrant:6333
 
   api-gateway:
     build:
@@ -324,7 +373,7 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
         NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:?NEXT_PUBLIC_SOCKET_URL is required}
         NEXT_PUBLIC_SHOW_ACADEMIC_NOTICE: ${NEXT_PUBLIC_SHOW_ACADEMIC_NOTICE:-true}
-        NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION: 'false'
+        NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION: ${NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION:-false}
     restart: unless-stopped
     init: true
     depends_on:
@@ -335,7 +384,7 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
       NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:?NEXT_PUBLIC_SOCKET_URL is required}
       NEXT_PUBLIC_SHOW_ACADEMIC_NOTICE: ${NEXT_PUBLIC_SHOW_ACADEMIC_NOTICE:-true}
-      NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION: 'false'
+      NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION: ${NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION:-false}
     ports:
       - '3000:3000'
     healthcheck:

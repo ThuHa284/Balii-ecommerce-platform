@@ -54,6 +54,33 @@ export class Campaign {
   @Column({ name: 'gift_description', type: 'text', nullable: true })
   giftDescription?: string | null;
 
+  @Column({ name: 'minimum_purchase_quantity', type: 'int', default: 1 })
+  minimumPurchaseQuantity: number | undefined;
+
+  @Column({ name: 'gift_variant_id', type: 'uuid', nullable: true })
+  giftVariantId?: string | null;
+
+  @Column({ name: 'gift_quantity', type: 'int', default: 0 })
+  giftQuantity: number | undefined;
+
+  @Column({
+    name: 'gift_unit_price',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0,
+  })
+  giftUnitPrice: number | undefined;
+
+  @Column({ name: 'repeatable', type: 'boolean', default: true })
+  repeatable: boolean | undefined;
+
+  @Column({ name: 'max_applications', type: 'int', nullable: true })
+  maxApplications?: number | null;
+
+  @Column({ name: 'stackable_with_sale', type: 'boolean', default: false })
+  stackableWithSale: boolean | undefined;
+
   @Column({ name: 'badge_text', type: 'varchar', length: 120, nullable: true })
   badgeText?: string | null;
 

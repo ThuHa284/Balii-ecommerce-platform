@@ -1,6 +1,11 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../constants';
 
+let refreshPromise: Promise<{
+  accessToken: string;
+  user?: { id?: string };
+}> | null = null;
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -51,25 +56,21 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = window.__BALII_REFRESH_TOKEN__;
-        const userId = window.__BALII_USER_ID__;
-
-        if (!refreshToken || !userId) {
-          throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        if (!refreshPromise) {
+          refreshPromise = axios
+            .post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true })
+            .then((response) => response.data)
+            .finally(() => {
+              refreshPromise = null;
+            });
         }
-
-        const { data } = await axios.post(
-          `${API_BASE_URL}/auth/refresh`,
-          { userId, refreshToken },
-          { withCredentials: true },
-        );
+        const data = await refreshPromise;
 
         const newAccessToken = data.accessToken;
 
         if (typeof window !== 'undefined') {
           window.__BALII_ACCESS_TOKEN__ = newAccessToken;
-          window.__BALII_REFRESH_TOKEN__ = data.refreshToken;
-          window.__BALII_USER_ID__ = data.user?.id ?? userId;
+          window.__BALII_USER_ID__ = data.user?.id ?? window.__BALII_USER_ID__;
         }
 
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
@@ -77,7 +78,6 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         if (typeof window !== 'undefined') {
           window.__BALII_ACCESS_TOKEN__ = undefined;
-          window.__BALII_REFRESH_TOKEN__ = undefined;
           window.__BALII_USER_ID__ = undefined;
         }
 
@@ -204,7 +204,6 @@ export default apiClient;
 declare global {
   interface Window {
     __BALII_ACCESS_TOKEN__?: string;
-    __BALII_REFRESH_TOKEN__?: string;
     __BALII_USER_ID__?: string;
   }
 }

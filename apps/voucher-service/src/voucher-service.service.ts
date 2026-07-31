@@ -21,6 +21,8 @@ import { VoucherUsage } from './entities/voucher-usage.entity';
 type VoucherRow = {
   id: string;
   code: string;
+  name: string | null;
+  description: string | null;
   typeId: number;
   typeCode: string;
   typeLabel: string;
@@ -75,6 +77,8 @@ export class VoucherServiceService {
       SELECT
         v.id,
         v.code,
+        v.name,
+        v.description,
         v.type_id AS "typeId",
         vt.code AS "typeCode",
         vt.label AS "typeLabel",
@@ -125,6 +129,8 @@ export class VoucherServiceService {
       SELECT
         v.id,
         v.code,
+        v.name,
+        v.description,
         v.type_id AS "typeId",
         vt.code AS "typeCode",
         vt.label AS "typeLabel",
@@ -163,6 +169,8 @@ export class VoucherServiceService {
 
     const voucher = this.voucherRepository.create({
       code: dto.code.trim().toUpperCase(),
+      name: dto.name?.trim() || dto.code.trim().toUpperCase(),
+      description: dto.description?.trim() || null,
       typeId: await this.getVoucherTypeId(dto.discountType),
       discountValue: dto.discountValue,
       maxDiscountAmount: dto.maxDiscount ?? null,
@@ -211,6 +219,14 @@ export class VoucherServiceService {
 
     if (dto.code !== undefined) {
       voucher.code = dto.code.trim().toUpperCase();
+    }
+
+    if (dto.name !== undefined) {
+      voucher.name = dto.name.trim() || voucher.code;
+    }
+
+    if (dto.description !== undefined) {
+      voucher.description = dto.description.trim() || null;
     }
 
     if (dto.discountType !== undefined) {
@@ -383,6 +399,8 @@ export class VoucherServiceService {
         ) AS "usedAt",
         v.id,
         v.code,
+        v.name,
+        v.description,
         v.type_id AS "typeId",
         vt.code AS "typeCode",
         vt.label AS "typeLabel",
@@ -611,6 +629,8 @@ export class VoucherServiceService {
       SELECT
         v.id,
         v.code,
+        v.name,
+        v.description,
         v.type_id AS "typeId",
         vt.code AS "typeCode",
         vt.label AS "typeLabel",
@@ -649,6 +669,8 @@ export class VoucherServiceService {
       SELECT
         v.id,
         v.code,
+        v.name,
+        v.description,
         v.type_id AS "typeId",
         vt.code AS "typeCode",
         vt.label AS "typeLabel",
@@ -689,13 +711,15 @@ export class VoucherServiceService {
     return {
       id: row.id,
       code: row.code,
-      name: row.code,
-      description: this.buildVoucherDescription(
-        typeCode,
-        discountValue,
-        Number(row.minOrderAmount),
-        maxDiscount,
-      ),
+      name: row.name?.trim() || row.code,
+      description:
+        row.description?.trim() ||
+        this.buildVoucherDescription(
+          typeCode,
+          discountValue,
+          Number(row.minOrderAmount),
+          maxDiscount,
+        ),
       discountType: typeCode,
       discountValue,
       minOrderValue: Number(row.minOrderAmount),

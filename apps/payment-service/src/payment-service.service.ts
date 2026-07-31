@@ -5,10 +5,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
+  Logger,
   BadRequestException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { createHash, createHmac } from 'crypto';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { validate as isUuid } from 'uuid';
@@ -146,6 +148,11 @@ export class PaymentServiceService {
     if (order.paymentStatus === 'paid') {
       throw new BadRequestException('Order has already been paid');
     }
+    if (order.status !== 'pending') {
+      throw new BadRequestException(
+        `Không thể tạo thanh toán cho đơn hàng đang ở trạng thái ${order.status}.`,
+      );
+    }
 
     const reusablePayment = await this.findReusableCheckoutPayment({
       orderId: dto.orderId,
@@ -181,40 +188,130 @@ export class PaymentServiceService {
       return this.getPaymentDetail(reusablePayment.id);
     }
 
+    if (
+      reusablePayment?.status === 'pending' &&
+      this.isPaymentExpired(reusablePayment.expiresAt)
+    ) {
+      const providerRef = this.createProviderReference();
+      const expiresAt =
+        dto.method === 'cod' ? null : new Date(Date.now() + 15 * 60 * 1000);
+      const paymentUrl =
+        dto.method === 'vnpay'
+          ? this.buildVnpayPaymentUrl({
+              orderId: dto.orderId,
+              amount: order.totalAmount,
+              providerRef,
+              clientIp,
+            })
+          : dto.method === 'cod'
+            ? null
+            : (dto.returnUrl ?? null);
+
+      await this.dataSource.query(
+        `
+        UPDATE payment_service.payments p
+        SET provider_ref = $2,
+            payment_url = $3,
+            expires_at = $4,
+            is_simulated = $5,
+            failure_reason = NULL,
+            updated_at = NOW()
+        FROM payment_service.payment_statuses ps
+        WHERE p.id = $1
+          AND ps.id = p.status_id
+          AND ps.code = 'pending'
+        `,
+        [
+          reusablePayment.id,
+          providerRef,
+          paymentUrl,
+          expiresAt,
+          this.isPaymentSimulationEnabled(),
+        ],
+      );
+
+      return this.getPaymentDetail(reusablePayment.id);
+    }
+
     const providerId = await this.getProviderId(dto.method);
     const pendingStatusId = await this.getPaymentStatusId('pending');
-    const providerRef = this.generatePaymentCode();
+    const providerRef = this.createProviderReference();
     const isOfflinePayment = dto.method === 'cod';
-    const payment = this.paymentRepository.create({
-      orderId: dto.orderId,
-      userId,
-      providerId,
-      statusId: pendingStatusId,
-      amount: order.totalAmount,
-      currency: 'VND',
-      providerRef,
-      paymentUrl: null,
-      expiresAt: isOfflinePayment
-        ? null
-        : new Date(Date.now() + 15 * 60 * 1000),
-    });
-
+    const expiresAt = isOfflinePayment
+      ? null
+      : new Date(Date.now() + 15 * 60 * 1000);
+    let paymentUrl: string | null = null;
     if (!isOfflinePayment && dto.method === 'vnpay') {
-      payment.paymentUrl = this.buildVnpayPaymentUrl({
-        orderId: payment.orderId,
-        amount: payment.amount,
-        providerRef: payment.providerRef,
+      paymentUrl = this.buildVnpayPaymentUrl({
+        orderId: dto.orderId,
+        amount: order.totalAmount,
+        providerRef,
         clientIp,
       });
     } else if (!isOfflinePayment) {
-      payment.paymentUrl = dto.returnUrl ?? null;
+      paymentUrl = dto.returnUrl ?? null;
     }
 
-    const savedPayment = await this.paymentRepository.save(payment);
+    const idempotencyKey = `checkout:${dto.orderId}:${dto.method}`;
+    let paymentId: string;
+    try {
+      const rows = await this.dataSource.query(
+        `
+        INSERT INTO payment_service.payments (
+          order_id,
+          user_id,
+          provider_id,
+          status_id,
+          amount,
+          currency,
+          provider_ref,
+          payment_url,
+          expires_at,
+          idempotency_key,
+          is_simulated,
+          created_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, 'VND', $6, $7, $8, $9, $10, NOW(), NOW())
+        RETURNING id
+        `,
+        [
+          dto.orderId,
+          userId,
+          providerId,
+          pendingStatusId,
+          order.totalAmount,
+          providerRef,
+          paymentUrl,
+          expiresAt,
+          idempotencyKey,
+          this.isPaymentSimulationEnabled(),
+        ],
+      );
+      paymentId = String(rows[0].id);
+    } catch (error) {
+      if ((error as { code?: string }).code !== '23505') {
+        throw error;
+      }
+
+      const rows = await this.dataSource.query(
+        `
+        SELECT id
+        FROM payment_service.payments
+        WHERE idempotency_key = $1
+        LIMIT 1
+        `,
+        [idempotencyKey],
+      );
+      if (!rows.length) {
+        throw error;
+      }
+      paymentId = String(rows[0].id);
+    }
 
     await this.orderClientService.updateOrderPayment(dto.orderId, 'pending');
 
-    return this.getPaymentDetail(savedPayment.id);
+    return this.getPaymentDetail(paymentId);
   }
 
   async findMyPayments(userId: string | undefined) {
@@ -268,74 +365,43 @@ export class PaymentServiceService {
 
   async completePayment(paymentId: string, providerTransactionId?: string) {
     this.assertPaymentSimulationEnabled();
-    const payment = await this.paymentRepository.findOne({
-      where: { id: paymentId },
+    const payment = await this.getPaymentDetail(paymentId);
+    if (payment.status === 'paid') {
+      return payment;
+    }
+
+    await this.persistPaymentResultTransaction({
+      paymentId,
+      orderId: payment.orderId,
+      providerTxnId:
+        providerTransactionId ?? `simulation_${randomUUID().replace(/-/g, '')}`,
+      paymentResult: 'SUCCESS',
+      rawPayload: JSON.stringify({
+        source: 'production-simulation',
+        paymentId,
+      }),
     });
-
-    if (!payment) {
-      throw new NotFoundException('Payment not found');
-    }
-
-    const currentStatus = await this.getPaymentStatusCode(payment.statusId);
-    if (currentStatus === 'paid') {
-      return this.getPaymentDetail(payment.id);
-    }
-
-    if (currentStatus !== 'pending') {
-      throw new BadRequestException(
-        `Cannot mark payment as paid from status ${currentStatus}`,
-      );
-    }
-
-    payment.statusId = await this.getPaymentStatusId('paid');
-    payment.providerTransactionId =
-      providerTransactionId ?? `mock_${Date.now().toString()}`;
-    payment.paidAt = new Date();
-
-    const savedPayment = await this.paymentRepository.save(payment);
-    await this.orderClientService.updateOrderPayment(
-      payment.orderId,
-      'paid',
-      'confirmed',
-    );
-
-    return this.getPaymentDetail(savedPayment.id);
+    return this.getPaymentDetail(paymentId);
   }
 
   async failPayment(paymentId: string) {
     this.assertPaymentSimulationEnabled();
-    const payment = await this.paymentRepository.findOne({
-      where: { id: paymentId },
+    const payment = await this.getPaymentDetail(paymentId);
+    if (payment.status === 'failed') {
+      return payment;
+    }
+
+    await this.persistPaymentResultTransaction({
+      paymentId,
+      orderId: payment.orderId,
+      paymentResult: 'FAILED',
+      rawPayload: JSON.stringify({ source: 'admin-simulation', paymentId }),
     });
-
-    if (!payment) {
-      throw new NotFoundException('Payment not found');
-    }
-
-    const currentStatus = await this.getPaymentStatusCode(payment.statusId);
-    if (currentStatus === 'failed') {
-      return this.getPaymentDetail(payment.id);
-    }
-
-    if (currentStatus !== 'pending') {
-      throw new BadRequestException(
-        `Cannot mark payment as failed from status ${currentStatus}`,
-      );
-    }
-
-    payment.statusId = await this.getPaymentStatusId('failed');
-    const savedPayment = await this.paymentRepository.save(payment);
-    await this.orderClientService.updateOrderPayment(
-      payment.orderId,
-      'failed',
-      'pending',
-    );
-
-    return this.getPaymentDetail(savedPayment.id);
+    return this.getPaymentDetail(paymentId);
   }
 
   async simulatePaymentSuccess(userId: string | undefined, paymentId: string) {
-    if (process.env.PAYMENT_SIMULATION_ENABLED !== 'true') {
+    if (!this.isPaymentSimulationEnabled()) {
       throw new BadRequestException(
         'Tính năng giả lập thanh toán chưa được bật.',
       );
@@ -366,6 +432,10 @@ export class PaymentServiceService {
     }
 
     const currentStatus = await this.getPaymentStatusCode(payment.statusId);
+
+    if (currentStatus === 'paid') {
+      return this.getPaymentDetail(paymentId);
+    }
 
     if (currentStatus !== 'pending') {
       throw new BadRequestException(
@@ -595,6 +665,128 @@ export class PaymentServiceService {
     return rows[0] as PaymentRow;
   }
 
+  /**
+   * SePay bank-transfer webhook.
+   *
+   * SePay watches a linked bank account (personal or business) and POSTs here
+   * whenever money arrives. We match the incoming transfer to a pending payment
+   * by the payment code embedded in the transfer content (VietQR "addInfo"),
+   * verify the amount, then reuse the same authoritative writer as VNPay/IPN.
+   *
+   * Enable by setting SEPAY_WEBHOOK_API_KEY and pointing a SePay webhook at
+   * POST {gateway}/payments/webhook/sepay. Disabled (401) until the key is set,
+   * so it has no effect on the existing flows out of the box.
+   */
+  async handleSepayWebhook(
+    payload: {
+      id?: number | string;
+      gateway?: string;
+      transactionDate?: string;
+      accountNumber?: string;
+      code?: string | null;
+      content?: string;
+      description?: string;
+      transferType?: string;
+      transferAmount?: number | string;
+      referenceCode?: string;
+    },
+    authorizationHeader?: string,
+  ): Promise<{ success: boolean; message?: string }> {
+    const logger = new Logger('SepayWebhook');
+    const apiKey = process.env.SEPAY_WEBHOOK_API_KEY?.trim();
+
+    if (!apiKey) {
+      throw new UnauthorizedException('SePay webhook is not enabled');
+    }
+
+    const provided = (authorizationHeader || '')
+      .replace(/^Apikey\s+/i, '')
+      .trim();
+    if (!this.safeCompare(provided, apiKey)) {
+      throw new UnauthorizedException('Invalid SePay webhook credentials');
+    }
+
+    // Only incoming transfers can finalize a payment.
+    if (payload.transferType && payload.transferType !== 'in') {
+      return { success: true, message: 'Ignored non-incoming transfer' };
+    }
+
+    const paymentCode = this.extractSepayPaymentCode(payload);
+    if (!paymentCode) {
+      logger.warn(
+        `SePay webhook without a recognizable payment code: "${payload.content ?? payload.description ?? ''}"`,
+      );
+      // Ack so SePay does not retry; nothing to reconcile.
+      return { success: true, message: 'No payment code matched' };
+    }
+
+    let payment: PaymentRow;
+    try {
+      payment = await this.getPaymentByProviderRef(paymentCode);
+    } catch {
+      logger.warn(`SePay webhook: no payment found for code ${paymentCode}`);
+      return { success: true, message: 'Payment not found' };
+    }
+
+    if (payment.status !== 'pending') {
+      return { success: true, message: 'Payment already finalized' };
+    }
+
+    const transferAmount = Number(payload.transferAmount ?? 0);
+    const expectedAmount = Math.round(Number(payment.amount));
+    if (transferAmount < expectedAmount) {
+      await this.markReviewRequired({
+        paymentId: payment.id,
+        reason: `SePay amount mismatch: received ${transferAmount}, expected ${expectedAmount}`,
+      });
+      return { success: true, message: 'Amount mismatch, marked for review' };
+    }
+
+    await this.persistPaymentResultTransaction({
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      rawPayload: JSON.stringify(payload),
+      providerTxnId:
+        payload.referenceCode ||
+        (payload.id != null ? String(payload.id) : paymentCode),
+      paymentResult: 'SUCCESS',
+    });
+
+    logger.log(
+      `SePay webhook confirmed payment ${payment.id} via code ${paymentCode}`,
+    );
+    return { success: true };
+  }
+
+  /**
+   * Pull the payment code (= payment.provider_ref) out of a SePay transfer.
+   * SePay can auto-extract it into `code`; otherwise we scan the free-text
+   * content for our PAY-code pattern.
+   */
+  private extractSepayPaymentCode(payload: {
+    code?: string | null;
+    content?: string;
+    description?: string;
+  }): string | null {
+    const fromCode = payload.code?.trim();
+    if (fromCode) {
+      return fromCode;
+    }
+
+    const haystack = `${payload.content ?? ''} ${payload.description ?? ''}`;
+    const match = haystack.match(/PAY[A-Z0-9]{6,}/i);
+    return match ? match[0].toUpperCase() : null;
+  }
+
+  private safeCompare(a: string, b: string): boolean {
+    const bufferA = Buffer.from(a);
+    const bufferB = Buffer.from(b);
+    if (bufferA.length !== bufferB.length) {
+      return false;
+    }
+    return timingSafeEqual(bufferA, bufferB);
+  }
+
   private async findReusableCheckoutPayment(input: {
     orderId: string;
     userId: string;
@@ -764,7 +956,7 @@ export class PaymentServiceService {
     const providerId = await this.getProviderId(input.method);
     const pendingStatusId = await this.getPaymentStatusId('pending');
     const merchantTxnId = `BALII_${input.orderId}_${Date.now()}`;
-    const providerRef = this.generatePaymentCode();
+    const providerRef = this.createProviderReference();
 
     const rows = await this.dataSource.query(
       `
@@ -781,13 +973,14 @@ export class PaymentServiceService {
       idempotency_key,
       merchant_txn_id,
       metadata,
+      is_simulated,
       created_at,
       updated_at
     )
     VALUES (
       $1, $2, $3, $4, $5, 'VND', $6, NULL,
       NOW() + INTERVAL '15 minutes',
-      $7, $8, $9::jsonb, NOW(), NOW()
+      $7, $8, $9::jsonb, $10, NOW(), NOW()
     )
     RETURNING id, merchant_txn_id AS "merchantTxnId"
     `,
@@ -804,6 +997,7 @@ export class PaymentServiceService {
           method: input.method,
           source: 'camunda-payment-workflow',
         }),
+        this.isPaymentSimulationEnabled(),
       ],
     );
 
@@ -941,6 +1135,20 @@ export class PaymentServiceService {
   }) {
     const payloadHash = this.hashPayload(input.rawPayload);
     const result = await this.dataSource.transaction(async (manager) => {
+      const orderRows = await manager.query(
+        `
+        SELECT o.id, os.code AS status
+        FROM order_service.orders o
+        JOIN order_service.order_statuses os ON os.id = o.status_id
+        WHERE o.id = $1
+        FOR UPDATE OF o
+        `,
+        [input.orderId],
+      );
+      if (!orderRows.length) {
+        throw new NotFoundException('Order not found');
+      }
+
       const paymentRows = await manager.query(
         `
       SELECT
@@ -951,7 +1159,7 @@ export class PaymentServiceService {
       FROM payment_service.payments p
       JOIN payment_service.payment_statuses ps ON ps.id = p.status_id
       WHERE p.id = $1
-      FOR UPDATE
+      FOR UPDATE OF p
       `,
         [input.paymentId],
       );
@@ -961,6 +1169,11 @@ export class PaymentServiceService {
       }
 
       const payment = paymentRows[0];
+
+      if (String(payment.orderId) !== input.orderId) {
+        throw new BadRequestException('Payment does not belong to order');
+      }
+      const orderStatus = String(orderRows[0].status);
 
       await manager.query(
         `
@@ -1002,6 +1215,15 @@ export class PaymentServiceService {
           : input.paymentResult === 'FAILED'
             ? 'failed'
             : 'failed';
+
+      if (
+        finalStatusCode === 'paid' &&
+        ['cancelled', 'refunded'].includes(orderStatus)
+      ) {
+        throw new BadRequestException(
+          `Không thể ghi nhận thanh toán cho đơn hàng ${orderStatus}.`,
+        );
+      }
 
       const statusId = await this.getPaymentStatusId(finalStatusCode);
 
@@ -1079,7 +1301,7 @@ export class PaymentServiceService {
         await this.orderClientService.updateOrderPayment(
           result.orderId,
           'failed',
-          'pending',
+          'cancelled',
         );
       }
     }
@@ -1114,7 +1336,7 @@ export class PaymentServiceService {
     await this.orderClientService.updateOrderPayment(
       input.orderId,
       'failed',
-      'pending',
+      'cancelled',
     );
 
     return {
@@ -1238,7 +1460,7 @@ export class PaymentServiceService {
     await this.orderClientService.updateOrderPayment(
       input.orderId,
       'failed',
-      'pending',
+      'cancelled',
     );
 
     return result;
@@ -1346,8 +1568,78 @@ export class PaymentServiceService {
     refundAllowed: boolean;
     amount: number;
     refundableAmount: number;
+    approvedReturnRequest?: boolean;
   }) {
     return this.refundWorkflowService.checkRefundOrderFulfillmentStatus(input);
+  }
+
+  async startApprovedReturnRefund(input: {
+    returnRequestId: string;
+    orderId: string;
+    userId: string;
+    reason: string;
+    amount: number;
+  }) {
+    const idempotencyKey = `return:${input.returnRequestId}`;
+    const paymentRows = await this.dataSource.query(
+      `
+      SELECT p.id, p.amount
+      FROM payment_service.payments p
+      JOIN payment_service.payment_statuses ps ON ps.id = p.status_id
+      WHERE p.order_id = $1
+        AND p.user_id = $2
+        AND ps.code IN ('paid', 'partially_refunded')
+      ORDER BY p.created_at DESC
+      LIMIT 1
+      `,
+      [input.orderId, input.userId],
+    );
+
+    if (!paymentRows.length) {
+      throw new BadRequestException(
+        'Không tìm thấy giao dịch đã thanh toán để hoàn tiền.',
+      );
+    }
+
+    const paymentId = String(paymentRows[0].id);
+    const paymentAmount = Number(paymentRows[0].amount);
+    const amount = Math.round(Number(input.amount) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0 || amount > paymentAmount) {
+      throw new BadRequestException(
+        'Số tiền hoàn không hợp lệ hoặc vượt quá giao dịch đã thanh toán.',
+      );
+    }
+    const existing = await this.refundWorkflowService.checkRefundIdempotency({
+      paymentId,
+      amount,
+      idempotencyKey,
+    });
+
+    if (existing.exists) {
+      return {
+        paymentId,
+        refundId: existing.refundId,
+        reused: true,
+        workflowStarted: false,
+      };
+    }
+
+    await this.camundaClientService.startRefundWorkflow({
+      paymentId,
+      orderId: input.orderId,
+      userId: input.userId,
+      amount,
+      reason: input.reason,
+      idempotencyKey,
+      approvedReturnRequest: true,
+    });
+
+    return {
+      paymentId,
+      refundId: null,
+      reused: false,
+      workflowStarted: true,
+    };
   }
 
   async checkRefundIdempotency(input: {
@@ -1504,6 +1796,108 @@ export class PaymentServiceService {
       ...row,
       amount: Number(row.amount),
     }));
+  }
+
+  // Topics the demo is allowed to jam. All sit before the callback wait, so the
+  // injected incident is easy to see on the diagram and safe to demo.
+  private static readonly DEMO_FAULT_TOPICS = [
+    'payment.validate-request',
+    'payment.check-idempotency',
+    'payment.create-or-reuse',
+    'payment.generate-provider-url',
+  ];
+
+  async runAdminWorkflowDemo(input: {
+    action: 'start_wait_callback' | 'start_service_incident';
+    orderId?: string;
+    paymentId?: string;
+    faultTopic?: string;
+  }) {
+    const payment = await this.findAdminWorkflowDemoPayment({
+      orderId: input.orderId,
+      paymentId: input.paymentId,
+    });
+
+    const method = payment.provider === 'cod' ? 'vnpay' : payment.provider;
+
+    if (input.action === 'start_wait_callback') {
+      // Scenario 1: process parks on the "Wait Gateway Callback" catch event
+      // because no IPN/callback arrives (customer never finishes paying).
+      await this.camundaClientService.startPaymentProcessing({
+        orderId: payment.orderId,
+        userId: payment.userId,
+        amount: Number(payment.amount),
+        method,
+        idempotencyKey: `demo_wait_${payment.id}_${Date.now()}`,
+      });
+    } else if (input.action === 'start_service_incident') {
+      // Scenario 2/3: force an incident on a chosen service task so the token
+      // gets stuck there (simulates a failing downstream / bug in a Task).
+      const faultTopic = input.faultTopic ?? 'payment.create-or-reuse';
+      if (!PaymentServiceService.DEMO_FAULT_TOPICS.includes(faultTopic)) {
+        throw new BadRequestException(
+          `Unsupported demo faultTopic. Allowed: ${PaymentServiceService.DEMO_FAULT_TOPICS.join(', ')}`,
+        );
+      }
+
+      await this.camundaClientService.startPaymentProcessing({
+        orderId: payment.orderId,
+        userId: payment.userId,
+        amount: Number(payment.amount),
+        method,
+        idempotencyKey: `demo_incident_${payment.id}_${Date.now()}`,
+        demoFaultTopic: faultTopic,
+      });
+    } else {
+      throw new BadRequestException('Unsupported workflow demo action');
+    }
+
+    return this.getAdminWorkflowMonitor({ paymentId: payment.id });
+  }
+
+  private async findAdminWorkflowDemoPayment(input: {
+    orderId?: string;
+    paymentId?: string;
+  }): Promise<WorkflowLookupPaymentRow> {
+    const keywordOrderId = input.orderId?.trim() ?? '';
+    const keywordPaymentId = input.paymentId?.trim() ?? '';
+
+    if (!keywordOrderId && !keywordPaymentId) {
+      throw new BadRequestException('Missing orderId or paymentId');
+    }
+
+    const rows: WorkflowLookupPaymentRow[] = await this.dataSource.query(
+      `
+      SELECT
+        p.id,
+        p.order_id AS "orderId",
+        p.user_id AS "userId",
+        p.amount,
+        p.provider_ref AS "providerRef",
+        p.provider_txn_id AS "providerTransactionId",
+        p.created_at AS "createdAt",
+        p.paid_at AS "paidAt",
+        pp.code AS provider,
+        ps.code AS status
+      FROM payment_service.payments p
+      JOIN payment_service.payment_providers pp ON pp.id = p.provider_id
+      JOIN payment_service.payment_statuses ps ON ps.id = p.status_id
+      WHERE ($1::uuid IS NOT NULL AND p.order_id = $1::uuid)
+         OR ($2::uuid IS NOT NULL AND p.id = $2::uuid)
+      ORDER BY p.created_at DESC
+      LIMIT 1
+      `,
+      [
+        this.normalizeUuid(keywordOrderId),
+        this.normalizeUuid(keywordPaymentId),
+      ],
+    );
+
+    if (!rows.length) {
+      throw new NotFoundException('No payment workflow context found');
+    }
+
+    return rows[0];
   }
 
   async getAdminWorkflowMonitor(input: {
@@ -1831,6 +2225,17 @@ export class PaymentServiceService {
     providerRef?: string | null;
     clientIp?: string;
   }) {
+    if (this.isPaymentSimulationEnabled()) {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const simulationUrl = new URL('/checkout/vnpay', frontendUrl);
+      simulationUrl.searchParams.set('simulation', 'true');
+      simulationUrl.searchParams.set(
+        'paymentRef',
+        payment.providerRef ?? this.generatePaymentCode(),
+      );
+      return simulationUrl.toString();
+    }
+
     const tmnCode = process.env.VNPAY_TMN_CODE;
     const hashSecret = process.env.VNPAY_HASH_SECRET;
     const paymentUrl = process.env.VNPAY_PAYMENT_URL;
@@ -1910,8 +2315,18 @@ export class PaymentServiceService {
     };
   }
 
-  private assertPaymentSimulationEnabled() {
+  private isPaymentSimulationEnabled() {
     if (process.env.PAYMENT_SIMULATION_ENABLED !== 'true') {
+      return false;
+    }
+    return (
+      (process.env.APP_ENV || process.env.NODE_ENV) !== 'production' ||
+      process.env.PAYMENT_SIMULATION_ALLOW_PRODUCTION === 'true'
+    );
+  }
+
+  private assertPaymentSimulationEnabled() {
+    if (!this.isPaymentSimulationEnabled()) {
       throw new BadRequestException(
         'Endpoint giả lập thanh toán đã bị tắt trên môi trường này.',
       );
@@ -1922,14 +2337,11 @@ export class PaymentServiceService {
     paymentUrl: string;
     returnUrl: string;
   }) {
-    if ((process.env.APP_ENV || process.env.NODE_ENV) !== 'production') {
+    if (
+      (process.env.APP_ENV || process.env.NODE_ENV) !== 'production' ||
+      this.isPaymentSimulationEnabled()
+    ) {
       return;
-    }
-
-    if (process.env.PAYMENT_SIMULATION_ENABLED === 'true') {
-      throw new BadRequestException(
-        'Production không được bật giả lập thanh toán.',
-      );
     }
 
     const vnpayEnvironment = process.env.VNPAY_ENVIRONMENT;
@@ -2020,12 +2432,12 @@ export class PaymentServiceService {
   }
 
   private generatePaymentCode(): string {
-    const timestamp = Date.now().toString().slice(-8);
-    const random = Math.floor(Math.random() * 10000)
-      .toString()
-      .padStart(4, '0');
+    return `PAY${randomUUID().replace(/-/g, '').toUpperCase()}`;
+  }
 
-    return `PAY${timestamp}${random}`;
+  private createProviderReference(): string {
+    const reference = this.generatePaymentCode();
+    return this.isPaymentSimulationEnabled() ? `SIM_${reference}` : reference;
   }
 
   private isPaymentExpired(expiresAt?: Date | string | null) {

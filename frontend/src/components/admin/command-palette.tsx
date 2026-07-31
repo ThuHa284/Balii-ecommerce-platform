@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   Ticket,
   Users,
+  Warehouse,
 } from 'lucide-react';
 import { hasRoleAccess } from '@/lib/api/admin.utils';
 import { useAuthStore } from '@/store/auth.store';
@@ -42,6 +43,13 @@ const NAV_OPTIONS: NavOption[] = [
     category: 'Bán hàng',
     icon: Package,
     keywords: 'san pham products hang hoa kho',
+  },
+  {
+    label: 'Đối soát Tồn kho',
+    href: '/admin/inventory',
+    category: 'Bán hàng',
+    icon: Warehouse,
+    keywords: 'ton kho inventory bien dong giu cho doi soat stock',
   },
   {
     label: 'Quản lý Bộ sưu tập',

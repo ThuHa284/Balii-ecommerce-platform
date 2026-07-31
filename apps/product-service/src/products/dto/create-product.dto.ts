@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Min,
 } from 'class-validator';
 
 export class CreateProductDto {
@@ -25,14 +26,17 @@ export class CreateProductDto {
   description?: string;
 
   @IsNumber()
+  @Min(0)
   basePrice!: number;
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
   originalPrice?: number;
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
   salePrice?: number;
 
   @IsOptional()

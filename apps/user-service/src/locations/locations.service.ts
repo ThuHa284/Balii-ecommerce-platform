@@ -38,4 +38,15 @@ export class LocationsService {
       order: { id: 'ASC' },
     });
   }
+
+  findWardsByProvince(provinceId: number) {
+    return this.wardRepo
+      .createQueryBuilder('ward')
+      .innerJoin(District, 'district', 'district.id = ward.district_id')
+      .where('district.province_id = :provinceId', { provinceId })
+      .andWhere('ward.code IS NOT NULL')
+      .orderBy('ward.name', 'ASC')
+      .addOrderBy('ward.code', 'ASC')
+      .getMany();
+  }
 }

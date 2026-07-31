@@ -19,10 +19,12 @@ export interface CartItem {
   quantity: number;
   price: number;
   totalPrice: number;
+  isPromotionReward?: boolean;
 }
 
 export interface Cart {
   items: CartItem[];
+  promotionItems: CartItem[];
   subtotal: number;
   discount: number;
   shippingFee: number;

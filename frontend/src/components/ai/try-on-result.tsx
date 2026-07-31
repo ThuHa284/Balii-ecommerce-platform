@@ -1,12 +1,16 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Download, ExternalLink, Sparkles, Wand2 } from 'lucide-react';
+import { Download, Loader2, LogIn, Save, Sparkles, Wand2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import { cn } from '@/lib/utils';
 import { useTryOnStore } from '@/store/tryon.store';
+import { saveTryOnResult } from '@/lib/api/tryon.api';
+import { useAuthStore } from '@/store/auth.store';
+import { toast } from 'sonner';
 
 interface TryOnResultProps {
   className?: string;
@@ -26,7 +30,9 @@ export default function TryOnResult({
 }: TryOnResultProps) {
   const {
     resultImage,
-    resultUrl,
+    resultId,
+    isResultSaved,
+    setResultSaved,
     isGenerating,
     generationProgress,
     confidence,
@@ -34,6 +40,9 @@ export default function TryOnResult({
     garmentImage,
     clearResult,
   } = useTryOnStore();
+  const router = useRouter();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const [isSaving, setIsSaving] = useState(false);
 
   const phaseLabel = useMemo(() => {
     if (generationProgress < 25) return PHASE_LABELS.analyzing;
@@ -42,8 +51,44 @@ export default function TryOnResult({
     return PHASE_LABELS.finalizing;
   }, [generationProgress]);
 
-  const handleDownload = () => {
-    if (!resultImage) return;
+  const redirectToLogin = () => {
+    toast.info('Vui lòng đăng nhập để lưu ảnh thử đồ.');
+    router.push(`/login?redirect=${encodeURIComponent('/try-on')}`);
+  };
+
+  const ensureSaved = async (): Promise<boolean> => {
+    if (!isAuthenticated) {
+      redirectToLogin();
+      return false;
+    }
+
+    if (isResultSaved) return true;
+
+    if (!resultId) {
+      toast.error('Kết quả cũ không có mã lưu. Vui lòng thử đồ lại.');
+      return false;
+    }
+
+    setIsSaving(true);
+    try {
+      await saveTryOnResult(resultId);
+      setResultSaved(true);
+      toast.success('Đã lưu ảnh thử đồ vào tài khoản.');
+      return true;
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Không thể lưu ảnh thử đồ lúc này.',
+      );
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!resultImage || !(await ensureSaved())) return;
     const link = document.createElement('a');
     link.href = resultImage;
     link.download = `balii-tryon-${Date.now()}.jpg`;
@@ -185,28 +230,47 @@ export default function TryOnResult({
         <div className={cn('glass-card space-y-3', compact ? 'p-3' : 'p-4')}>
           <div className="rounded-xl bg-white/50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Cloudinary URL
+              {isResultSaved ? 'Đã lưu vào tài khoản' : 'Kết quả tạm thời'}
             </p>
-            {resultUrl ? (
-              <a
-                href={resultUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 inline-flex items-center gap-1.5 break-all text-sm text-violet-600 hover:text-violet-700"
-              >
-                {resultUrl}
-                <ExternalLink className="h-4 w-4 shrink-0" />
-              </a>
-            ) : (
-              <p className="mt-1 text-sm text-muted-foreground">Chưa có URL.</p>
-            )}
+            <p className="mt-1 text-sm text-muted-foreground">
+              {isResultSaved
+                ? 'Bạn có thể xem lại ảnh này trong lịch sử thử đồ.'
+                : 'Đăng nhập khi bạn muốn lưu hoặc tải ảnh này xuống.'}
+            </p>
           </div>
         </div>
 
         <button
-          onClick={handleDownload}
+          onClick={() => void ensureSaved()}
+          disabled={isSaving || isResultSaved}
           className={cn(
-            'flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/50 bg-white/60 px-4 font-bold text-slate-700 shadow-sm transition-all hover:bg-white',
+            'btn-primary flex w-full items-center justify-center gap-1.5 px-4 font-bold disabled:cursor-not-allowed disabled:opacity-70',
+            compact ? 'py-2 text-[11px]' : 'py-2.5 text-xs',
+          )}
+        >
+          {isSaving ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : isResultSaved ? (
+            <Save className="h-3.5 w-3.5" />
+          ) : isAuthenticated ? (
+            <Save className="h-3.5 w-3.5" />
+          ) : (
+            <LogIn className="h-3.5 w-3.5" />
+          )}
+          {isSaving
+            ? 'Đang lưu...'
+            : isResultSaved
+              ? 'Đã lưu vào tài khoản'
+              : isAuthenticated
+                ? 'Lưu vào tài khoản'
+                : 'Đăng nhập để lưu'}
+        </button>
+
+        <button
+          onClick={() => void handleDownload()}
+          disabled={isSaving}
+          className={cn(
+            'flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/50 bg-white/60 px-4 font-bold text-slate-700 shadow-sm transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-70',
             compact ? 'py-2 text-[11px]' : 'py-2.5 text-xs',
           )}
         >
@@ -225,7 +289,11 @@ export default function TryOnResult({
             Thử sản phẩm khác
           </button>
           <Link
-            href="/account/try-on-history"
+            href={
+              isAuthenticated
+                ? '/account/try-on-history'
+                : `/login?redirect=${encodeURIComponent('/account/try-on-history')}`
+            }
             className={cn(
               'btn-primary flex items-center justify-center',
               compact ? 'py-2 text-[11px]' : 'py-2.5 text-xs',

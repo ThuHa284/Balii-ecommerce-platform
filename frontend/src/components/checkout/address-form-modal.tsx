@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Loader2, MapPin, Phone, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { getProvinces } from '@/lib/api/locations.api';
+import { getProvinces, getWardsByProvince } from '@/lib/api/locations.api';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { LocationOption } from '@/types/location.types';
@@ -21,7 +21,7 @@ const addressSchema = z.object({
       'Vui lòng nhập số điện thoại hợp lệ (ví dụ: 0901234567)',
     ),
   provinceId: z.string().min(1, 'Vui lòng chọn tỉnh/thành phố'),
-  ward: z.string().min(2, 'Vui lòng nhập phường/xã'),
+  wardId: z.string().min(1, 'Vui lòng chọn phường/xã'),
   street: z.string().min(5, 'Vui lòng nhập địa chỉ cụ thể'),
   isDefault: z.boolean().optional(),
 });
@@ -66,19 +66,22 @@ export default function AddressFormModal({
   const { addAddress, addresses } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [isLoadingWards, setIsLoadingWards] = useState(false);
   const [provinces, setProvinces] = useState<LocationOption[]>([]);
+  const [wards, setWards] = useState<LocationOption[]>([]);
 
   const {
     register,
     handleSubmit,
     reset,
     control,
+    setValue,
     formState: { errors },
   } = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
       provinceId: '',
-      ward: '',
+      wardId: '',
       street: '',
       isDefault: addresses.length === 0,
     },
@@ -90,16 +93,23 @@ export default function AddressFormModal({
     () => provinces.find((item) => String(item.id) === provinceId) ?? null,
     [provinceId, provinces],
   );
+  const wardId = useWatch({ control, name: 'wardId' });
+  const selectedWard = useMemo(
+    () => wards.find((item) => String(item.id) === wardId) ?? null,
+    [wardId, wards],
+  );
 
   const handleClose = useCallback(() => {
     reset({
       fullName: '',
       phone: '',
       provinceId: '',
-      ward: '',
+      wardId: '',
       street: '',
       isDefault: addresses.length === 0,
     });
+    setWards([]);
+    setIsLoadingWards(false);
     onClose();
   }, [addresses.length, onClose, reset]);
 
@@ -133,9 +143,45 @@ export default function AddressFormModal({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !provinceId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadWards() {
+      try {
+        setIsLoadingWards(true);
+        const wardList = await getWardsByProvince(Number(provinceId));
+        if (isMounted) {
+          setWards(wardList);
+        }
+      } catch {
+        if (isMounted) {
+          toast.error('Không thể tải danh sách phường/xã.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingWards(false);
+        }
+      }
+    }
+
+    void loadWards();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, provinceId]);
+
   const onSubmit = async (data: AddressFormData) => {
     if (!selectedProvince) {
       toast.error('Vui lòng chọn tỉnh/thành phố hợp lệ.');
+      return;
+    }
+    if (!selectedWard?.districtId) {
+      toast.error('Vui lòng chọn phường/xã hợp lệ.');
       return;
     }
 
@@ -145,17 +191,17 @@ export default function AddressFormModal({
         fullName: data.fullName,
         phone: data.phone,
         provinceId: selectedProvince.id,
-        districtId: 0,
-        wardId: 0,
+        districtId: selectedWard.districtId,
+        wardId: selectedWard.id,
         province: selectedProvince.name,
         district: '',
-        ward: data.ward.trim(),
+        ward: selectedWard.name,
         street: data.street.trim(),
         isDefault: data.isDefault ?? false,
       });
 
       toast.success('Thêm địa chỉ thành công.', {
-        description: `${data.street.trim()}, ${data.ward.trim()}, ${selectedProvince.name}`,
+        description: `${data.street.trim()}, ${selectedWard.name}, ${selectedProvince.name}`,
       });
 
       handleClose();
@@ -236,7 +282,13 @@ export default function AddressFormModal({
 
           <Field label="Tỉnh/Thành phố" error={errors.provinceId?.message}>
             <select
-              {...register('provinceId')}
+              {...register('provinceId', {
+                onChange: (event) => {
+                  setWards([]);
+                  setValue('wardId', '', { shouldValidate: false });
+                  setIsLoadingWards(Boolean(event.target.value));
+                },
+              })}
               className={cn(inputCls, errors.provinceId && inputErrorCls)}
               disabled={isLoadingLocations}
             >
@@ -253,13 +305,25 @@ export default function AddressFormModal({
             </select>
           </Field>
 
-          <Field label="Phường/Xã" error={errors.ward?.message}>
-            <input
-              {...register('ward')}
-              type="text"
-              placeholder="Ví dụ: Phường Tân Định"
-              className={cn(inputCls, errors.ward && inputErrorCls)}
-            />
+          <Field label="Phường/Xã" error={errors.wardId?.message}>
+            <select
+              {...register('wardId')}
+              className={cn(inputCls, errors.wardId && inputErrorCls)}
+              disabled={!provinceId || isLoadingWards}
+            >
+              <option value="">
+                {!provinceId
+                  ? 'Chọn tỉnh/thành phố trước'
+                  : isLoadingWards
+                    ? 'Đang tải phường/xã...'
+                    : 'Chọn phường/xã'}
+              </option>
+              {wards.map((ward) => (
+                <option key={ward.id} value={ward.id}>
+                  {ward.name}
+                </option>
+              ))}
+            </select>
           </Field>
 
           <Field label="Địa chỉ cụ thể" error={errors.street?.message}>
@@ -300,7 +364,7 @@ export default function AddressFormModal({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoadingWards}
               className="btn-primary flex flex-1 items-center justify-center gap-2 text-sm"
             >
               {isSubmitting ? (

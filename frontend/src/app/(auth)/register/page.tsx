@@ -2,15 +2,22 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, Mail, Lock, User, Phone, Loader2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import {
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  User,
+  Phone,
+  Loader2,
+} from 'lucide-react';
 import { registerApi } from '@/lib/api/auth.api';
-import { useCartStore } from '@/store/cart.store';
+import { getSafeInternalRedirect } from '@/lib/safe-redirect';
 
 export default function RegisterPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const hydrateCart = useCartStore((state) => state.hydrateCart);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -21,6 +28,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -37,9 +45,8 @@ export default function RegisterPage() {
 
     setIsLoading(true);
     try {
-      await registerApi(formData);
-      await hydrateCart().catch(() => undefined);
-      router.push(searchParams.get('redirect') || '/');
+      const result = await registerApi(formData);
+      setSuccessMessage(result.message);
     } catch (err: unknown) {
       setError(
         err instanceof Error && err.message
@@ -78,7 +85,7 @@ export default function RegisterPage() {
       label: 'Mật khẩu',
       type: showPassword ? 'text' : 'password',
       icon: Lock,
-      placeholder: 'Ít nhất 6 ký tự',
+      placeholder: 'Từ 10 đến 128 ký tự',
     },
     {
       name: 'confirmPassword',
@@ -89,6 +96,31 @@ export default function RegisterPage() {
     },
   ];
 
+  const redirectAfterLogin = getSafeInternalRedirect(
+    searchParams.get('redirect'),
+  );
+  const loginHref =
+    redirectAfterLogin === '/'
+      ? '/login'
+      : `/login?redirect=${encodeURIComponent(redirectAfterLogin)}`;
+
+  if (successMessage) {
+    return (
+      <div className="glass-card p-8 max-w-lg mx-auto w-full text-center">
+        <CheckCircle2 className="mx-auto mb-4 h-14 w-14 text-emerald-500" />
+        <h1 className="font-heading text-2xl font-bold text-foreground mb-2">
+          Đăng ký thành công
+        </h1>
+        <p className="text-sm text-muted-foreground mb-6" role="status">
+          {successMessage}
+        </p>
+        <Link href={loginHref} className="btn-primary inline-flex">
+          Đi tới đăng nhập
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-card p-6 max-w-2xl mx-auto w-full">
       <div className="text-center mb-5">
@@ -98,7 +130,10 @@ export default function RegisterPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 rounded-xl mb-4">
+        <div
+          className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 rounded-xl mb-4"
+          role="alert"
+        >
           {error}
         </div>
       )}
@@ -117,18 +152,44 @@ export default function RegisterPage() {
                 field.name === 'confirmPassword' ? 'md:col-span-2' : ''
               }
             >
-              <label className="block text-xs font-semibold text-foreground mb-1">
+              <label
+                htmlFor={`register-${field.name}`}
+                className="block text-xs font-semibold text-foreground mb-1"
+              >
                 {field.label}
+                {field.name === 'phone' ? ' (không bắt buộc)' : ''}
               </label>
               <div className="relative">
                 <field.icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
+                  id={`register-${field.name}`}
                   type={field.type}
                   name={field.name}
+                  autoComplete={
+                    field.name === 'email'
+                      ? 'email'
+                      : field.name === 'fullName'
+                        ? 'name'
+                        : field.name === 'phone'
+                          ? 'tel'
+                          : 'new-password'
+                  }
                   value={formData[field.name as keyof typeof formData]}
                   onChange={handleChange}
                   placeholder={field.placeholder}
-                  required
+                  required={field.name !== 'phone'}
+                  minLength={
+                    field.name === 'password' ||
+                    field.name === 'confirmPassword'
+                      ? 10
+                      : undefined
+                  }
+                  maxLength={
+                    field.name === 'password' ||
+                    field.name === 'confirmPassword'
+                      ? 128
+                      : undefined
+                  }
                   className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-white/60 border border-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-white transition-all text-xs placeholder:text-muted-foreground/60"
                 />
                 {(field.name === 'password' ||
@@ -137,6 +198,10 @@ export default function RegisterPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={
+                        showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'
+                      }
+                      aria-pressed={showPassword}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {showPassword ? (

@@ -162,6 +162,9 @@ export interface AdminWorkflowContext {
   createdAt: string;
 }
 
+export type AdminWorkflowDemoAction =
+  | 'start_wait_callback'
+  | 'start_service_incident';
 export interface AdminWorkflowOverviewActivity {
   activityId: string;
   activeInstances: number;
@@ -420,6 +423,46 @@ export async function reviewAdminReturnRequest(
   return data;
 }
 
+export async function receiveAdminReturnRequest(
+  returnRequestId: string,
+  payload: {
+    items: Array<{
+      returnItemId: string;
+      disposition: 'restock' | 'damaged' | 'rejected';
+    }>;
+  },
+): Promise<ReturnRequest> {
+  const { data } = await apiClient.patch<ReturnRequest>(
+    `/orders/admin/return-requests/${returnRequestId}/receive`,
+    payload,
+  );
+  return data;
+}
+
+export async function completeAdminManualReturnRefund(
+  returnRequestId: string,
+  payload: {
+    amount: number;
+    transactionReference: string;
+    note?: string;
+    evidenceImages: File[];
+  },
+): Promise<ReturnRequest> {
+  const formData = new FormData();
+  formData.append('amount', String(payload.amount));
+  formData.append('transactionReference', payload.transactionReference);
+  if (payload.note) formData.append('note', payload.note);
+  payload.evidenceImages.forEach((file) =>
+    formData.append('evidenceImages', file),
+  );
+  const { data } = await apiClient.patch<ReturnRequest>(
+    `/orders/admin/return-requests/${returnRequestId}/complete-manual-refund`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return data;
+}
+
 type BackendAdminUser = Parameters<typeof mapUser>[0];
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
@@ -467,6 +510,18 @@ export async function getAdminWorkflowMonitor(params: {
   return data;
 }
 
+export async function runAdminWorkflowDemo(payload: {
+  action: AdminWorkflowDemoAction;
+  orderId?: string;
+  paymentId?: string;
+  faultTopic?: string;
+}): Promise<AdminWorkflowMonitorResponse> {
+  const { data } = await apiClient.post<AdminWorkflowMonitorResponse>(
+    '/payments/admin/workflow-demo',
+    payload,
+  );
+  return data;
+}
 export async function getAdminWorkflowOverview(): Promise<AdminWorkflowOverviewResponse> {
   const { data } = await apiClient.get<AdminWorkflowOverviewResponse>(
     '/payments/admin/workflow-overview',
@@ -477,6 +532,65 @@ export async function getAdminWorkflowOverview(): Promise<AdminWorkflowOverviewR
 export async function getAdminKafkaOverview(): Promise<AdminKafkaOverviewResponse> {
   const { data } = await apiClient.get<AdminKafkaOverviewResponse>(
     '/payments/admin/kafka-overview',
+  );
+  return data;
+}
+
+export interface KafkaDemoRunResult {
+  mode: 'sync' | 'async';
+  usesKafka: boolean;
+  callerBlockedMs?: number;
+  deliveredInline?: boolean;
+  published?: boolean;
+  eventId?: string;
+  topic?: string;
+  note: string;
+  recipient?: string;
+  message?: string;
+}
+
+export interface KafkaDemoStatus {
+  connected: boolean;
+  topic: string;
+  groupId: string;
+  syncDelayMs: number;
+  consumerDelayMs: number;
+  processedLog: Array<{
+    id: string;
+    channel: string;
+    recipient: string;
+    message: string;
+    publishedAt: string;
+    processedAt: string;
+    latencyMs: number;
+  }>;
+}
+
+export async function runKafkaDemoSync(payload: {
+  recipient?: string;
+  message?: string;
+}): Promise<KafkaDemoRunResult> {
+  const { data } = await apiClient.post<KafkaDemoRunResult>(
+    '/payments/admin/kafka-demo/sync',
+    payload,
+  );
+  return data;
+}
+
+export async function runKafkaDemoAsync(payload: {
+  recipient?: string;
+  message?: string;
+}): Promise<KafkaDemoRunResult> {
+  const { data } = await apiClient.post<KafkaDemoRunResult>(
+    '/payments/admin/kafka-demo/async',
+    payload,
+  );
+  return data;
+}
+
+export async function getKafkaDemoStatus(): Promise<KafkaDemoStatus> {
+  const { data } = await apiClient.get<KafkaDemoStatus>(
+    '/payments/admin/kafka-demo/status',
   );
   return data;
 }

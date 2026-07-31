@@ -20,7 +20,9 @@ import { CamundaClientService } from './camunda/camunda-client.service';
 import { StartRefundWorkflowDto } from './dto/start-refund-workflow.dto';
 import { PaymentWebhookSecurityService } from './payment-webhook-security.service';
 import { HeaderRolesGuard } from './auth/header-roles.guard';
-import { PaymentOutboxPublisher } from './kafka';
+import { KafkaDemoService, PaymentOutboxPublisher } from './kafka';
+import { InternalServiceGuard } from './auth/internal-service.guard';
+import { StartReturnRefundDto } from './dto/start-return-refund.dto';
 
 @Controller('payments')
 export class PaymentServiceController {
@@ -29,6 +31,7 @@ export class PaymentServiceController {
     private readonly camundaClientService: CamundaClientService,
     private readonly paymentWebhookSecurityService: PaymentWebhookSecurityService,
     private readonly paymentOutboxPublisher: PaymentOutboxPublisher,
+    private readonly kafkaDemoService: KafkaDemoService,
   ) {}
 
   @Post()
@@ -71,7 +74,19 @@ export class PaymentServiceController {
     return this.paymentServiceService.handleVnpayIpn(query);
   }
 
+  // SePay bank-transfer webhook. Authenticated by the `Authorization: Apikey ...`
+  // header (checked against SEPAY_WEBHOOK_API_KEY inside the service).
+  @Post('webhook/sepay')
+  handleSepayWebhook(
+    @Headers('authorization') authorization: string | undefined,
+    @Body()
+    body: Parameters<PaymentServiceService['handleSepayWebhook']>[0],
+  ): ReturnType<PaymentServiceService['handleSepayWebhook']> {
+    return this.paymentServiceService.handleSepayWebhook(body, authorization);
+  }
+
   @Post(':id/complete')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   completePayment(
     @Param('id') paymentId: string,
     @Body() body: { providerTransactionId?: string },
@@ -83,6 +98,7 @@ export class PaymentServiceController {
   }
 
   @Post(':id/fail')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   failPayment(@Param('id') paymentId: string) {
     return this.paymentServiceService.failPayment(paymentId);
   }
@@ -96,6 +112,7 @@ export class PaymentServiceController {
   }
 
   @Post('workflow/start')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   async startPaymentWorkflow(
     @Body()
     body: {
@@ -153,6 +170,7 @@ export class PaymentServiceController {
   }
 
   @Post('refunds/workflow/start')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   async startRefundWorkflow(
     @Headers('x-user-id') userId: string | undefined,
     @Body() dto: StartRefundWorkflowDto,
@@ -171,6 +189,12 @@ export class PaymentServiceController {
       message: 'Refund workflow started',
       data: result,
     };
+  }
+
+  @Post('internal/returns/refund')
+  @UseGuards(InternalServiceGuard)
+  startApprovedReturnRefund(@Body() dto: StartReturnRefundDto) {
+    return this.paymentServiceService.startApprovedReturnRefund(dto);
   }
 
   @Get('admin/refunds')
@@ -203,6 +227,48 @@ export class PaymentServiceController {
     return this.paymentOutboxPublisher.getAdminKafkaOverview();
   }
 
+  // --- Kafka vs non-Kafka demo (same action done two ways) -----------------
+  @Post('admin/kafka-demo/sync')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  runKafkaDemoSync(
+    @Body() body: { recipient?: string; message?: string },
+  ): ReturnType<KafkaDemoService['runSync']> {
+    return this.kafkaDemoService.runSync({
+      recipient: body.recipient?.trim() || 'khach-hang@balii.vn',
+      message: body.message?.trim() || 'Đơn hàng của bạn đã được xác nhận.',
+    });
+  }
+
+  @Post('admin/kafka-demo/async')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  runKafkaDemoAsync(
+    @Body() body: { recipient?: string; message?: string },
+  ): ReturnType<KafkaDemoService['runAsync']> {
+    return this.kafkaDemoService.runAsync({
+      recipient: body.recipient?.trim() || 'khach-hang@balii.vn',
+      message: body.message?.trim() || 'Đơn hàng của bạn đã được xác nhận.',
+    });
+  }
+
+  @Get('admin/kafka-demo/status')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  getKafkaDemoStatus(): ReturnType<KafkaDemoService['getStatus']> {
+    return this.kafkaDemoService.getStatus();
+  }
+
+  @Post('admin/workflow-demo')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  runAdminWorkflowDemo(
+    @Body()
+    body: {
+      action: 'start_wait_callback' | 'start_service_incident';
+      orderId?: string;
+      paymentId?: string;
+      faultTopic?: string;
+    },
+  ): ReturnType<PaymentServiceService['runAdminWorkflowDemo']> {
+    return this.paymentServiceService.runAdminWorkflowDemo(body);
+  }
   @Get('admin/workflows')
   @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   getAdminWorkflows(
@@ -259,6 +325,7 @@ export class PaymentServiceController {
   }
 
   @Post('outbox/publish')
+  @UseGuards(new HeaderRolesGuard(['SUPER_ADMIN']))
   async publishOutboxNow() {
     const result = await this.paymentServiceService.signalOutboxPublisher();
 

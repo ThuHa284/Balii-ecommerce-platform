@@ -11,6 +11,7 @@ import { Role } from '../entities/role.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import * as bcrypt from 'bcrypt';
+import { RedisService } from '@app/redis';
 @Injectable()
 export class UsersService {
   constructor(
@@ -18,6 +19,7 @@ export class UsersService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(Role)
     private readonly roleRepo: Repository<Role>,
+    private readonly redis: RedisService,
   ) {}
 
   async getProfile(userId: string) {
@@ -46,10 +48,11 @@ export class UsersService {
   }
 
   async findAll() {
-    return this.userRepo.find({
+    const users = await this.userRepo.find({
       relations: { role: true },
       order: { createdAt: 'DESC' },
     });
+    return users.map((user) => this.toSafeUser(user));
   }
 
   async updateUserRole(
@@ -95,11 +98,13 @@ export class UsersService {
 
     targetUser.roleId = nextRole.id;
     await this.userRepo.save(targetUser);
+    await this.revokeSessions(targetUser.id);
 
-    return this.userRepo.findOne({
+    const updatedUser = await this.userRepo.findOne({
       where: { id: targetUserId },
       relations: { role: true },
     });
+    return updatedUser ? this.toSafeUser(updatedUser) : null;
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto) {
@@ -129,9 +134,27 @@ export class UsersService {
     user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
 
     await this.userRepo.save(user);
+    await this.revokeSessions(user.id);
 
     return {
       message: 'Đổi mật khẩu thành công',
     };
+  }
+
+  private toSafeUser(user: User) {
+    const { passwordHash, ...safeUser } = user;
+    void passwordHash;
+    return safeUser;
+  }
+
+  private async revokeSessions(userId: string): Promise<void> {
+    await Promise.all([
+      this.redis.del(`refresh_token:${userId}`),
+      this.redis.set(
+        `tokens_valid_after:${userId}`,
+        String(Date.now()),
+        15 * 60,
+      ),
+    ]);
   }
 }

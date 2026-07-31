@@ -7,6 +7,7 @@ import { ChatbotServiceController } from './chatbot-service.controller';
 import { ChatbotServiceService } from './chatbot-service.service';
 import { EmbeddingService } from './embedding.service';
 import { GenerativeChatService } from './generative-chat.service';
+import { HybridRetrievalService } from './hybrid-retrieval.service';
 import { QdrantVectorStoreService } from './qdrant-vector-store.service';
 
 loadEnv();
@@ -22,6 +23,7 @@ loadEnv();
     CatalogKnowledgeService,
     EmbeddingService,
     GenerativeChatService,
+    HybridRetrievalService,
     QdrantVectorStoreService,
   ],
 })

@@ -20,6 +20,10 @@ function getCurrentUserHeaders() {
   };
 }
 
+function hasCurrentUser() {
+  return typeof window !== 'undefined' && Boolean(window.__BALII_USER_ID__);
+}
+
 async function imageUrlToFile(
   imageUrl: string,
   baseName: string,
@@ -246,7 +250,19 @@ export async function generateTryOn(
   };
 }
 
+export async function saveTryOnResult(
+  resultId: string,
+): Promise<TryOnHistoryRecord> {
+  const { data } = await apiClient.post<TryOnHistoryRecord>(
+    `/try-on/history/${encodeURIComponent(resultId)}/save`,
+  );
+  return data;
+}
 export async function getTryOnHistory(): Promise<TryOnHistoryRecord[]> {
+  if (!hasCurrentUser()) {
+    return [];
+  }
+
   const { data } = await apiClient.get<TryOnHistoryRecord[]>(
     '/try-on/history',
     {
@@ -258,6 +274,15 @@ export async function getTryOnHistory(): Promise<TryOnHistoryRecord[]> {
 }
 
 export async function getTryOnStats(): Promise<TryOnStats> {
+  if (!hasCurrentUser()) {
+    return {
+      total: 0,
+      completed: 0,
+      failed: 0,
+      needConfirmation: 0,
+    };
+  }
+
   const { data } = await apiClient.get<TryOnStats>('/try-on/stats', {
     headers: getCurrentUserHeaders(),
   });

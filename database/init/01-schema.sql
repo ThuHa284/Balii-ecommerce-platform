@@ -57,8 +57,12 @@ CREATE TABLE user_service.districts (
 CREATE TABLE user_service.wards (
     id SERIAL PRIMARY KEY,
     district_id INT NOT NULL REFERENCES user_service.districts(id),
-    name VARCHAR(100) NOT NULL
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(5) UNIQUE
 );
+
+CREATE INDEX idx_user_districts_province_id ON user_service.districts(province_id);
+CREATE INDEX idx_user_wards_district_id ON user_service.wards(district_id);
 
 CREATE TABLE user_service.user_addresses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -113,9 +117,9 @@ CREATE TABLE product_service.products (
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(280) UNIQUE NOT NULL,
     description TEXT,
-    base_price NUMERIC(12,2) NOT NULL,
-    original_price NUMERIC(12,2),
-    sale_price NUMERIC(12,2),
+    base_price NUMERIC(12,2) NOT NULL CHECK (base_price >= 0),
+    original_price NUMERIC(12,2) CHECK (original_price IS NULL OR original_price >= base_price),
+    sale_price NUMERIC(12,2) CHECK (sale_price IS NULL OR (sale_price >= 0 AND sale_price <= base_price)),
     sale_start_at TIMESTAMPTZ,
     sale_end_at TIMESTAMPTZ,
     material VARCHAR(100),
@@ -143,7 +147,7 @@ CREATE TABLE product_service.product_variants (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES product_service.products(id) ON DELETE CASCADE,
     sku VARCHAR(100) UNIQUE NOT NULL,
-    price NUMERIC(12,2),
+    price NUMERIC(12,2) CHECK (price IS NULL OR price >= 0),
     stock_quantity INT NOT NULL DEFAULT 0,
     reserved_quantity INT DEFAULT 0,
     weight_gram INT,
@@ -243,6 +247,13 @@ CREATE TABLE product_service.campaigns (
     discount_value NUMERIC(12,2),
     gift_name VARCHAR(255),
     gift_description TEXT,
+    minimum_purchase_quantity INT NOT NULL DEFAULT 1,
+    gift_variant_id UUID,
+    gift_quantity INT NOT NULL DEFAULT 0,
+    gift_unit_price NUMERIC(12,2) NOT NULL DEFAULT 0,
+    repeatable BOOLEAN NOT NULL DEFAULT TRUE,
+    max_applications INT CHECK (max_applications IS NULL OR max_applications > 0),
+    stackable_with_sale BOOLEAN NOT NULL DEFAULT FALSE,
     badge_text VARCHAR(120),
     priority_order INT NOT NULL DEFAULT 0,
     start_at TIMESTAMPTZ NOT NULL,
@@ -294,6 +305,9 @@ CREATE TABLE order_service.orders (
     total_amount NUMERIC(12,2) NOT NULL,
     note TEXT,
     shipping_method_id INT REFERENCES order_service.shipping_methods(id),
+    checkout_idempotency_key UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
+    inventory_state VARCHAR(20) NOT NULL DEFAULT 'reserved'
+        CHECK (inventory_state IN ('reserved', 'committed', 'released')),
     camunda_process_id VARCHAR(100),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -377,6 +391,7 @@ CREATE TABLE payment_service.payments (
     currency VARCHAR(5) DEFAULT 'VND',
     provider_txn_id VARCHAR(200),
     provider_ref VARCHAR(200),
+    is_simulated BOOLEAN NOT NULL DEFAULT FALSE,
     payment_url TEXT,
     paid_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
@@ -417,6 +432,8 @@ CREATE TABLE voucher_service.voucher_types (
 CREATE TABLE voucher_service.vouchers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     code VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(150),
+    description TEXT,
     type_id INT NOT NULL REFERENCES voucher_service.voucher_types(id),
     discount_value NUMERIC(12,2) NOT NULL,
     max_discount_amount NUMERIC(12,2),

@@ -5,6 +5,8 @@ import { VirtualTryonServiceService } from './virtual-tryon-service.service';
 describe('VirtualTryonServiceController', () => {
   let virtualTryonServiceController: VirtualTryonServiceController;
   const virtualTryonService = {
+    createTryOn: jest.fn(),
+    saveTryOnResult: jest.fn(),
     getStats: jest.fn(),
   };
 
@@ -26,6 +28,32 @@ describe('VirtualTryonServiceController', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+  describe('createTryOn', () => {
+    it('allows an anonymous request without forwarding a user id', async () => {
+      const result = { success: true, data: { id: 'job-1' } };
+      virtualTryonService.createTryOn.mockResolvedValue(result);
+
+      await expect(
+        virtualTryonServiceController.createTryOn({}, {}),
+      ).resolves.toBe(result);
+      expect(virtualTryonService.createTryOn).toHaveBeenCalledWith({}, {});
+    });
+  });
+
+  describe('saveTryOnResult', () => {
+    it('forwards the gateway-verified user id when saving', async () => {
+      const result = { id: 'history-1', userId: 'user-1' };
+      virtualTryonService.saveTryOnResult.mockResolvedValue(result);
+
+      await expect(
+        virtualTryonServiceController.saveTryOnResult('job-1', 'user-1'),
+      ).resolves.toBe(result);
+      expect(virtualTryonService.saveTryOnResult).toHaveBeenCalledWith(
+        'job-1',
+        'user-1',
+      );
+    });
   });
 
   describe('getStats', () => {

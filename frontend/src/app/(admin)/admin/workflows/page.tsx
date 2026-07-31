@@ -1,13 +1,23 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import { AlertTriangle, Loader2, Route, Search } from 'lucide-react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import {
+  AlertTriangle,
+  Loader2,
+  PauseCircle,
+  PlayCircle,
+  RefreshCw,
+  Route,
+  Search,
+  Wifi,
+} from 'lucide-react';
 import {
   AdminWorkflowMonitorResponse,
   AdminWorkflowSnapshot,
   AdminWorkflowContext,
   getAdminWorkflowContexts,
   getAdminWorkflowMonitor,
+  runAdminWorkflowDemo,
 } from '@/lib/api/admin.api';
 import {
   PAYMENT_METHOD_LABELS,
@@ -55,14 +65,18 @@ function stringifyVariable(value: unknown) {
   }
 }
 
+const WORKFLOW_POLL_INTERVAL_MS = 3000;
+
 function WorkflowCard({
   title,
   subtitle,
   workflow,
+  actionSlot,
 }: {
   title: string;
   subtitle: string;
   workflow: AdminWorkflowSnapshot;
+  actionSlot?: ReactNode;
 }) {
   return (
     <section className="glass-card p-5">
@@ -73,11 +87,14 @@ function WorkflowCard({
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${getWorkflowStateClasses(workflow.state)}`}
-        >
-          {workflow.state}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {actionSlot}
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${getWorkflowStateClasses(workflow.state)}`}
+          >
+            {workflow.state}
+          </span>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -298,6 +315,10 @@ export default function AdminWorkflowsPage() {
   );
   const [contexts, setContexts] = useState<AdminWorkflowContext[]>([]);
   const [contextsLoading, setContextsLoading] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [polling, setPolling] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [demoRunning, setDemoRunning] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -325,7 +346,10 @@ export default function AdminWorkflowsPage() {
         paymentId: initialPaymentId || undefined,
       })
         .then((data) => {
-          if (!cancelled) setResult(data);
+          if (!cancelled) {
+            setResult(data);
+            setLastUpdated(new Date().toISOString());
+          }
         })
         .catch((requestError: unknown) => {
           if (!cancelled) {
@@ -346,22 +370,96 @@ export default function AdminWorkflowsPage() {
     };
   }, []);
 
-  async function loadWorkflow(params: {
-    orderId?: string;
-    paymentId?: string;
-  }) {
+  async function loadWorkflow(
+    params: { orderId?: string; paymentId?: string },
+    options: { silent?: boolean } = {},
+  ) {
     try {
-      setLoading(true);
-      setError(null);
+      if (options.silent) {
+        setPolling(true);
+      } else {
+        setLoading(true);
+        setError(null);
+      }
       const data = await getAdminWorkflowMonitor(params);
       setResult(data);
+      setLastUpdated(new Date().toISOString());
     } catch (err) {
-      setResult(null);
+      if (!options.silent) {
+        setResult(null);
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Không thể tải workflow monitor.',
+        );
+      }
+    } finally {
+      if (options.silent) {
+        setPolling(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  }
+
+  const hasWorkflowResult = Boolean(result);
+  const workflowSearchOrderId = result?.search.orderId;
+  const workflowSearchPaymentId = result?.search.paymentId;
+
+  useEffect(() => {
+    if (!autoRefresh || !hasWorkflowResult) return;
+
+    const params = {
+      orderId: workflowSearchOrderId || undefined,
+      paymentId: workflowSearchPaymentId || undefined,
+    };
+    const timer = window.setInterval(() => {
+      void loadWorkflow(params, { silent: true });
+    }, WORKFLOW_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(timer);
+  }, [
+    autoRefresh,
+    hasWorkflowResult,
+    workflowSearchOrderId,
+    workflowSearchPaymentId,
+  ]);
+  async function handleRunDemoWorkflow(
+    action:
+      | 'start_wait_callback'
+      | 'start_service_incident' = 'start_wait_callback',
+    faultTopic?: string,
+  ) {
+    const selectedPaymentId = result?.payment.id || paymentId.trim();
+    const selectedOrderId = result?.payment.orderId || orderId.trim();
+
+    if (!selectedPaymentId && !selectedOrderId) {
       setError(
-        err instanceof Error ? err.message : 'Không thể tải workflow monitor.',
+        'Chọn một giao dịch gần đây hoặc nhập Order ID/Payment ID trước khi chạy demo.',
+      );
+      return;
+    }
+
+    try {
+      setDemoRunning(true);
+      setError(null);
+      const data = await runAdminWorkflowDemo({
+        action,
+        faultTopic,
+        orderId: selectedOrderId || undefined,
+        paymentId: selectedPaymentId || undefined,
+      });
+      setResult(data);
+      setOrderId(data.search.orderId);
+      setPaymentId(data.search.paymentId);
+      setLastUpdated(new Date().toISOString());
+      setAutoRefresh(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Không thể chạy demo workflow.',
       );
     } finally {
-      setLoading(false);
+      setDemoRunning(false);
     }
   }
 
@@ -406,7 +504,7 @@ export default function AdminWorkflowsPage() {
               className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
             />
             <span className="block text-xs text-muted-foreground">
-              Mã đơn hàng; dùng làm business key của payment workflow.
+              M? don h?ng; d?ng l?m business key c?a payment workflow.
             </span>
           </label>
 
@@ -422,7 +520,7 @@ export default function AdminWorkflowsPage() {
               className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
             />
             <span className="block text-xs text-muted-foreground">
-              Mã giao dịch thanh toán; tìm payment và các refund liên quan.
+              M? giao d?ch thanh to?n; t?m payment v? c?c refund li?n quan.
             </span>
           </label>
 
@@ -445,7 +543,7 @@ export default function AdminWorkflowsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/30 px-5 py-4">
           <div>
             <h2 className="font-heading text-lg font-semibold text-foreground">
-              Giao dịch gần đây
+              Giao d?ch g?n d?y
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Chọn một giao dịch để mở workflow, không cần sao chép UUID.
@@ -458,7 +556,7 @@ export default function AdminWorkflowsPage() {
 
         {contextsLoading ? (
           <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-            Đang tải giao dịch gần đây...
+            ?ang t?i giao d?ch g?n d?y...
           </div>
         ) : contexts.length === 0 ? (
           <div className="px-5 py-8 text-center text-sm text-muted-foreground">
@@ -469,7 +567,7 @@ export default function AdminWorkflowsPage() {
             <table className="w-full min-w-[860px]">
               <thead>
                 <tr className="border-b border-white/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-5 py-3">Mã đơn</th>
+                  <th className="px-5 py-3">M? don</th>
                   <th className="px-5 py-3">Khách hàng</th>
                   <th className="px-5 py-3">Thanh toán</th>
                   <th className="px-5 py-3">Trạng thái</th>
@@ -485,7 +583,7 @@ export default function AdminWorkflowsPage() {
                   >
                     <td className="px-5 py-3">
                       <p className="text-sm font-semibold text-foreground">
-                        {context.orderCode ?? 'Đơn chưa có mã hiển thị'}
+                        {context.orderCode ?? '?on chua c? m? hi?n th?'}
                       </p>
                       <p className="mt-1 max-w-48 truncate text-[11px] text-muted-foreground">
                         {context.orderId}
@@ -548,6 +646,52 @@ export default function AdminWorkflowsPage() {
 
       {result ? (
         <>
+          <section className="glass-card flex flex-wrap items-center justify-between gap-3 p-4">
+            <div className="flex items-center gap-3">
+              <span
+                className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                  autoRefresh
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {polling ? (
+                  <RefreshCw className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Wifi className="h-5 w-5" />
+                )}
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Theo dõi realtime bằng polling mỗi{' '}
+                  {WORKFLOW_POLL_INTERVAL_MS / 1000} gi?y
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {lastUpdated
+                    ? `Cập nhật lần cuối: ${formatDateTime(lastUpdated)}`
+                    : 'Chưa có lần cập nhật nào.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setAutoRefresh((current) => !current)}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  autoRefresh
+                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {autoRefresh ? (
+                  <PauseCircle className="h-4 w-4" />
+                ) : (
+                  <PlayCircle className="h-4 w-4" />
+                )}
+                {autoRefresh ? 'Tạm dừng realtime' : 'Bật realtime'}
+              </button>
+            </div>
+          </section>
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-4">
             <div className="glass-card p-4 xl:col-span-2">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -617,6 +761,64 @@ export default function AdminWorkflowsPage() {
             title="Payment Processing"
             subtitle={`Business key: ${result.paymentWorkflow.businessKey}`}
             workflow={result.paymentWorkflow}
+            actionSlot={
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleRunDemoWorkflow('start_wait_callback');
+                  }}
+                  disabled={demoRunning || loading}
+                  title="Khởi tạo một tiến trình mới và để nó dừng chờ callback từ cổng thanh toán (không có IPN)."
+                  className="inline-flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {demoRunning ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <PlayCircle className="h-4 w-4" />
+                  )}
+                  Demo: kẹt chờ callback
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleRunDemoWorkflow(
+                      'start_service_incident',
+                      'payment.create-or-reuse',
+                    );
+                  }}
+                  disabled={demoRunning || loading}
+                  title="Khởi tạo tiến trình và ép lỗi tại service task 'payment.create-or-reuse' để tạo incident (token kẹt đỏ tại bước tạo payment)."
+                  className="inline-flex items-center gap-2 rounded-xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {demoRunning ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4" />
+                  )}
+                  Demo: incident tại Create Payment
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleRunDemoWorkflow(
+                      'start_service_incident',
+                      'payment.validate-request',
+                    );
+                  }}
+                  disabled={demoRunning || loading}
+                  title="Khởi tạo tiến trình và ép lỗi tại service task 'payment.validate-request' để tạo incident ngay ở bước đầu."
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {demoRunning ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4" />
+                  )}
+                  Demo: incident tại Validate
+                </button>
+              </div>
+            }
           />
 
           <section className="space-y-4">

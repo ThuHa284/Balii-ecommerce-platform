@@ -208,7 +208,28 @@ export class CatalogKnowledgeService {
         p.slug,
         COALESCE(p.description, '') AS description,
         COALESCE(p.base_price, 0) AS "basePrice",
-        p.sale_price AS "salePrice",
+        CASE
+          WHEN ac.discount_type = 'PERCENT' THEN ROUND(GREATEST(
+            (CASE WHEN ac.stackable_with_sale THEN
+              COALESCE(CASE WHEN p.sale_price IS NOT NULL
+                AND (p.sale_start_at IS NULL OR p.sale_start_at <= NOW())
+                AND (p.sale_end_at IS NULL OR p.sale_end_at >= NOW())
+                THEN p.sale_price END, p.base_price)
+              ELSE p.base_price END) * (1 - COALESCE(ac.discount_value, 0) / 100.0), 0
+          ), 2)
+          WHEN ac.discount_type = 'AMOUNT' THEN ROUND(GREATEST(
+            (CASE WHEN ac.stackable_with_sale THEN
+              COALESCE(CASE WHEN p.sale_price IS NOT NULL
+                AND (p.sale_start_at IS NULL OR p.sale_start_at <= NOW())
+                AND (p.sale_end_at IS NULL OR p.sale_end_at >= NOW())
+                THEN p.sale_price END, p.base_price)
+              ELSE p.base_price END) - COALESCE(ac.discount_value, 0), 0
+          ), 2)
+          ELSE COALESCE(CASE WHEN p.sale_price IS NOT NULL
+            AND (p.sale_start_at IS NULL OR p.sale_start_at <= NOW())
+            AND (p.sale_end_at IS NULL OR p.sale_end_at >= NOW())
+            THEN p.sale_price END, p.base_price)
+        END AS "salePrice",
         COALESCE(p.material, '') AS material,
         COALESCE(p.target_gender, 'unisex') AS "targetGender",
         COALESCE(p.recommended_age_groups, ARRAY[]::text[]) AS "recommendedAgeGroups",
@@ -222,8 +243,16 @@ export class CatalogKnowledgeService {
                 'size', COALESCE(pv.size_label, ''),
                 'color', COALESCE(pv.color_name, ''),
                 'itemType', COALESCE(pv.item_type, ''),
-                'price', pv.price,
-                'stock', pv.stock_quantity,
+                'price', CASE
+                  WHEN ac.discount_type = 'PERCENT' THEN ROUND(GREATEST(
+                    COALESCE(pv.price, p.base_price) * (1 - COALESCE(ac.discount_value, 0) / 100.0), 0
+                  ), 2)
+                  WHEN ac.discount_type = 'AMOUNT' THEN ROUND(GREATEST(
+                    COALESCE(pv.price, p.base_price) - COALESCE(ac.discount_value, 0), 0
+                  ), 2)
+                  ELSE COALESCE(pv.price, p.base_price)
+                END,
+                'stock', GREATEST(pv.stock_quantity - pv.reserved_quantity, 0),
                 'attributeSummary', COALESCE(
                   (
                     SELECT STRING_AGG(av.value, ', ' ORDER BY a.name, av.display_order, av.value)
@@ -256,6 +285,20 @@ export class CatalogKnowledgeService {
           ''
         ) AS thumbnail
       FROM product_service.products p
+      LEFT JOIN LATERAL (
+        SELECT
+          campaign.discount_type,
+          campaign.discount_value,
+          campaign.stackable_with_sale
+        FROM product_service.campaigns campaign
+        WHERE campaign.is_active = TRUE
+          AND campaign.start_at <= NOW()
+          AND campaign.end_at >= NOW()
+          AND p.id = ANY(campaign.product_ids)
+          AND campaign.discount_type IN ('PERCENT', 'AMOUNT')
+        ORDER BY campaign.priority_order DESC, campaign.created_at DESC
+        LIMIT 1
+      ) ac ON TRUE
       WHERE p.is_active = TRUE
       ORDER BY p.updated_at DESC
     `);
