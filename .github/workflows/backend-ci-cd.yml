@@ -70,6 +70,22 @@ jobs:
             echo "Missing VPS authentication: configure VPS_PASSWORD or VPS_SSH_PRIVATE_KEY"
             exit 1
           }
+      - name: Inspect VPS storage before upload
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 163.61.110.43
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -u
+            df -h / /tmp /opt/balii-backend
+            df -i / /tmp /opt/balii-backend
+            du -sh /opt/balii-backend || true
+            docker system df || true
+            ls -ld /tmp /opt/balii-backend
+
       - name: Copy backend source to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -81,6 +97,7 @@ jobs:
           source: 'apps,libs,database,frontend,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,Dockerfile.migrations,docker-compose.prod.yml,.dockerignore'
           target: /opt/balii-backend
           overwrite: true
+          debug: true
       - name: Rebuild backend services
         uses: appleboy/ssh-action@v1.2.0
         with:
