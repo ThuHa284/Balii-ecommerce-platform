@@ -100,7 +100,10 @@ jobs:
               'frontend/src/app/(admin)/admin/settings/page.tsx' \
               'frontend/src/components/product/combo-selector.tsx' \
               'frontend/src/lib/combo-utils.ts'
-            docker compose --env-file .env.production.vps -f docker-compose.prod.yml up --build -d
+            if ! docker compose --env-file .env.production.vps -f docker-compose.prod.yml up --build -d; then
+              docker compose --env-file .env.production.vps -f docker-compose.prod.yml logs --no-color production-env-check
+              exit 1
+            fi
             docker compose --env-file .env.production.vps -f docker-compose.prod.yml exec -T postgres \
               sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
               < database/migrations/20260717-add-order-return-requests.sql
