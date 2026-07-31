@@ -4,9 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Campaign } from '../entities/campaign.entity';
+import { ProductVariant } from '../entities/product-variant.entity';
 import {
   CreateCampaignDto,
   CampaignDiscountType,
@@ -19,6 +20,7 @@ export class CampaignsService {
     @InjectRepository(Campaign)
     private readonly campaignRepo: Repository<Campaign>,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(dto: CreateCampaignDto) {
@@ -28,6 +30,7 @@ export class CampaignsService {
       dto.discountType,
       dto.discountValue,
     );
+    await this.validateGiftRule(dto);
 
     const campaign = this.campaignRepo.create({
       ...dto,
@@ -35,6 +38,13 @@ export class CampaignsService {
       discountValue: dto.discountValue ?? null,
       giftName: dto.giftName?.trim() || null,
       giftDescription: dto.giftDescription?.trim() || null,
+      minimumPurchaseQuantity: dto.minimumPurchaseQuantity ?? 1,
+      giftVariantId: dto.giftVariantId ?? null,
+      giftQuantity: dto.giftQuantity ?? 0,
+      giftUnitPrice: dto.giftUnitPrice ?? 0,
+      repeatable: dto.repeatable ?? true,
+      maxApplications: dto.maxApplications ?? null,
+      stackableWithSale: dto.stackableWithSale ?? false,
       badgeText: dto.badgeText?.trim() || null,
       priorityOrder: dto.priorityOrder ?? 0,
       isActive: dto.isActive ?? true,
@@ -43,11 +53,16 @@ export class CampaignsService {
     });
 
     const saved = await this.campaignRepo.save(campaign);
+    await this.cloudinaryService.syncOwnerAssets('campaign', String(saved.id), [
+      saved.imageUrl,
+      saved.bannerImageUrl,
+    ]);
     return this.toFrontendCampaign(saved);
   }
 
-  async findAll() {
+  async findAll(includeInactive = false) {
     const campaigns = await this.campaignRepo.find({
+      where: includeInactive ? {} : { isActive: true },
       order: {
         priorityOrder: 'DESC',
         createdAt: 'DESC',
@@ -73,8 +88,10 @@ export class CampaignsService {
       .map((campaign) => this.toFrontendCampaign(campaign));
   }
 
-  async findOne(id: string) {
-    const campaign = await this.campaignRepo.findOne({ where: { id } });
+  async findOne(id: string, includeInactive = false) {
+    const campaign = await this.campaignRepo.findOne({
+      where: includeInactive ? { id } : { id, isActive: true },
+    });
 
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
@@ -115,6 +132,13 @@ export class CampaignsService {
       nextDiscountType,
       nextDiscountValue,
     );
+    await this.validateGiftRule({
+      discountType: nextDiscountType,
+      giftVariantId: dto.giftVariantId ?? campaign.giftVariantId ?? undefined,
+      giftQuantity: dto.giftQuantity ?? campaign.giftQuantity ?? 0,
+      minimumPurchaseQuantity:
+        dto.minimumPurchaseQuantity ?? campaign.minimumPurchaseQuantity ?? 1,
+    });
 
     Object.assign(campaign, dto, {
       productIds: dto.productIds ?? campaign.productIds ?? [],
@@ -127,6 +151,10 @@ export class CampaignsService {
         dto.giftDescription !== undefined
           ? dto.giftDescription.trim() || null
           : campaign.giftDescription,
+      giftVariantId:
+        dto.giftVariantId !== undefined
+          ? dto.giftVariantId || null
+          : campaign.giftVariantId,
       badgeText:
         dto.badgeText !== undefined
           ? dto.badgeText.trim() || null
@@ -137,6 +165,10 @@ export class CampaignsService {
     });
 
     const saved = await this.campaignRepo.save(campaign);
+    await this.cloudinaryService.syncOwnerAssets('campaign', String(saved.id), [
+      saved.imageUrl,
+      saved.bannerImageUrl,
+    ]);
     return this.toFrontendCampaign(saved);
   }
 
@@ -148,6 +180,7 @@ export class CampaignsService {
     }
 
     await this.campaignRepo.delete(id);
+    await this.cloudinaryService.releaseOwnerAssets('campaign', id);
 
     return {
       success: true,
@@ -220,6 +253,13 @@ export class CampaignsService {
         campaign.discountValue != null ? Number(campaign.discountValue) : null,
       giftName: campaign.giftName ?? '',
       giftDescription: campaign.giftDescription ?? '',
+      minimumPurchaseQuantity: campaign.minimumPurchaseQuantity ?? 1,
+      giftVariantId: campaign.giftVariantId ?? null,
+      giftQuantity: campaign.giftQuantity ?? 0,
+      giftUnitPrice: Number(campaign.giftUnitPrice ?? 0),
+      repeatable: campaign.repeatable ?? true,
+      maxApplications: campaign.maxApplications ?? null,
+      stackableWithSale: campaign.stackableWithSale ?? false,
       badgeText: campaign.badgeText ?? '',
       priorityOrder: campaign.priorityOrder ?? 0,
       startAt: campaign.startAt,
@@ -229,5 +269,40 @@ export class CampaignsService {
       createdAt: campaign.createdAt,
       updatedAt: campaign.updatedAt,
     };
+  }
+
+  private async validateGiftRule(input: {
+    discountType: CampaignDiscountType;
+    giftVariantId?: string;
+    giftQuantity?: number;
+    minimumPurchaseQuantity?: number;
+  }) {
+    if (input.discountType !== CampaignDiscountType.GIFT) {
+      return;
+    }
+
+    if (
+      !input.giftVariantId ||
+      !input.giftQuantity ||
+      input.giftQuantity < 1 ||
+      !input.minimumPurchaseQuantity ||
+      input.minimumPurchaseQuantity < 1
+    ) {
+      throw new BadRequestException(
+        'Gift campaign requires a gift variant, purchase quantity and gift quantity',
+      );
+    }
+
+    const giftVariant = await this.dataSource
+      .getRepository(ProductVariant)
+      .findOne({
+        where: { id: input.giftVariantId, isActive: true },
+      });
+
+    if (!giftVariant) {
+      throw new BadRequestException(
+        'Gift variant does not exist or is inactive',
+      );
+    }
   }
 }

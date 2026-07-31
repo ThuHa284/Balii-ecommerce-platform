@@ -23,6 +23,7 @@ type CheckoutCartItem = {
 export type CheckoutCart = {
   ownerKey: string;
   items: CheckoutCartItem[];
+  promotionItems: CheckoutCartItem[];
   subtotal: number;
   discountAmount: number;
   shippingFee: number;
@@ -48,6 +49,11 @@ export class CartClientService {
           {
             headers: {
               'x-user-id': userId,
+              'x-internal-service-key':
+                process.env.INTERNAL_SERVICE_SECRET ||
+                (process.env.NODE_ENV === 'production'
+                  ? ''
+                  : 'balii-local-internal'),
               ...(sessionId ? { 'x-session-id': sessionId } : {}),
             },
           },
@@ -60,16 +66,30 @@ export class CartClientService {
     }
   }
 
-  async clearCart(userId: string, sessionId?: string): Promise<void> {
+  async clearCart(
+    userId: string,
+    sessionId: string | undefined,
+    expectedUpdatedAt: string,
+  ): Promise<boolean> {
     try {
-      await firstValueFrom(
-        this.httpService.delete(`${this.cartServiceUrl}/cart`, {
-          headers: {
-            'x-user-id': userId,
-            ...(sessionId ? { 'x-session-id': sessionId } : {}),
+      const response = await firstValueFrom(
+        this.httpService.delete<{ success: boolean }>(
+          `${this.cartServiceUrl}/cart`,
+          {
+            headers: {
+              'x-user-id': userId,
+              'x-internal-service-key':
+                process.env.INTERNAL_SERVICE_SECRET ||
+                (process.env.NODE_ENV === 'production'
+                  ? ''
+                  : 'balii-local-internal'),
+              ...(sessionId ? { 'x-session-id': sessionId } : {}),
+              'x-cart-version': expectedUpdatedAt,
+            },
           },
-        }),
+        ),
       );
+      return response.data.success;
     } catch {
       throw new BadGatewayException(
         'Unable to clear cart after order creation',

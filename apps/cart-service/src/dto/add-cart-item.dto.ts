@@ -1,5 +1,5 @@
 // dto/add-cart-item.dto.ts
-import { IsInt, IsUUID, Min } from 'class-validator';
+import { IsInt, IsUUID, Max, Min } from 'class-validator';
 
 export class AddCartItemDto {
   @IsUUID()
@@ -7,5 +7,6 @@ export class AddCartItemDto {
 
   @IsInt()
   @Min(1)
+  @Max(99)
   quantity!: number;
 }

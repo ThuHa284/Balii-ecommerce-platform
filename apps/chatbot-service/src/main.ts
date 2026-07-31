@@ -1,12 +1,13 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { loadEnv } from '@app/common';
+import { loadEnv, trustedServiceMiddleware } from '@app/common';
 import { ChatbotServiceModule } from './chatbot-service.module';
 
 loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(ChatbotServiceModule);
+  app.use(trustedServiceMiddleware);
 
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',

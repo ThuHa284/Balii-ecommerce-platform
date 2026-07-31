@@ -36,8 +36,36 @@ export type RetrievedDocument = KnowledgeDocument & {
   score?: number;
 };
 
+export type RetrievalMode = 'vector' | 'keyword' | 'hybrid' | 'none';
+
 export type KnowledgeSearchResult = {
   documents: RetrievedDocument[];
   suggestedProducts: ProductContext[];
-  retrievalMode: 'vector' | 'keyword';
+  retrievalMode: RetrievalMode;
+};
+
+/**
+ * Health/diagnostics snapshot of the vector retrieval arm. Surfaced through the
+ * chatbot health endpoint so a broken vector path (bad API key, Qdrant down,
+ * empty collection) is visible instead of failing silently to keyword-only.
+ */
+export type VectorDiagnostics = {
+  embeddingEnabled: boolean;
+  embeddingModel: string;
+  qdrantUrl: string;
+  collection: string;
+  collectionReady: boolean;
+  indexedPoints: number | null;
+  lastError: string | null;
+};
+
+/**
+ * Result of a hybrid retrieval, carrying which arms actually contributed so the
+ * caller (and the admin health view) can tell vector vs keyword vs fused.
+ */
+export type HybridSearchResult = KnowledgeSearchResult & {
+  arms: {
+    vector: boolean;
+    keyword: boolean;
+  };
 };

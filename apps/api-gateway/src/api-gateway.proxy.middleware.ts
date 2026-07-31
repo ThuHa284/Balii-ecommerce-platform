@@ -37,6 +37,11 @@ export class ApiGatewayProxyMiddleware implements NestMiddleware {
       return;
     }
 
+    if (this.isInternalOnlyRequest(req)) {
+      res.status(404).json({ message: 'Route not found' });
+      return;
+    }
+
     const target = this.gatewayRouteService.resolveTarget(req.path);
     if (!target) {
       next();
@@ -115,6 +120,26 @@ export class ApiGatewayProxyMiddleware implements NestMiddleware {
     proxyReq.end();
   }
 
+  private isInternalOnlyRequest(req: Request): boolean {
+    if (
+      req.method === 'PATCH' &&
+      /^\/orders\/[^/]+\/payment-status$/.test(req.path)
+    ) {
+      return true;
+    }
+
+    if (req.method === 'GET' && req.path === '/cart/internal/checkout') {
+      return true;
+    }
+
+    return (
+      req.method === 'POST' &&
+      ['/payments/workflow/start', '/payments/outbox/publish'].includes(
+        req.path,
+      )
+    );
+  }
+
   private getRequestTimeout(req: Request): number {
     if (
       req.method === 'POST' &&
@@ -125,7 +150,6 @@ export class ApiGatewayProxyMiddleware implements NestMiddleware {
 
     return GATEWAY_TIMEOUT_MS;
   }
-
   private buildHeaders(
     req: Request,
     targetUrl: URL,
@@ -164,6 +188,10 @@ export class ApiGatewayProxyMiddleware implements NestMiddleware {
     headers['x-forwarded-proto'] = req.protocol;
     headers['x-forwarded-for'] = req.ip ?? '';
     headers['x-request-id'] = this.getRequestId(req);
+    headers['x-gateway-service-key'] =
+      process.env.GATEWAY_SERVICE_SECRET ||
+      process.env.INTERNAL_SERVICE_SECRET ||
+      (process.env.NODE_ENV === 'production' ? '' : 'balii-local-internal');
     if (payload != null) {
       headers['content-length'] = Buffer.byteLength(payload).toString();
     }

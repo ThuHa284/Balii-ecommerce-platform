@@ -18,9 +18,11 @@ import { toast } from 'sonner';
 import InvoiceModal from '@/components/admin/invoice-modal';
 import {
   AdminOrder,
+  completeAdminManualReturnRefund,
   getAdminOrders,
   getAdminOrderReturnRequests,
   getAdminReturnRequests,
+  receiveAdminReturnRequest,
   reviewAdminReturnRequest,
   updateAdminOrderStatus,
 } from '@/lib/api/admin.api';
@@ -54,6 +56,16 @@ function getOrderItemCampaignLabel(item: AdminOrder['items'][number]) {
   return item.campaignName || '';
 }
 
+const RETURN_STATUS_LABELS: Record<ReturnRequest['status'], string> = {
+  pending: 'Chờ duyệt',
+  approved: 'Đã duyệt, chờ nhận hàng',
+  rejected: 'Đã từ chối',
+  refund_pending: 'Đang hoàn tiền',
+  refund_failed: 'Khởi tạo hoàn tiền lỗi',
+  manual_refund_pending: 'Chờ xác nhận hoàn tiền thủ công',
+  completed: 'Đã hoàn tất',
+};
+
 function OrderDetailModal({
   order,
   onClose,
@@ -71,6 +83,18 @@ function OrderDetailModal({
   );
   const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [returnDispositions, setReturnDispositions] = useState<
+    Record<string, 'restock' | 'damaged' | 'rejected'>
+  >({});
+  const [manualRefundReferences, setManualRefundReferences] = useState<
+    Record<string, string>
+  >({});
+  const [manualRefundNotes, setManualRefundNotes] = useState<
+    Record<string, string>
+  >({});
+  const [manualRefundEvidence, setManualRefundEvidence] = useState<
+    Record<string, File[]>
+  >({});
 
   useEffect(() => {
     let isActive = true;
@@ -94,6 +118,16 @@ function OrderDetailModal({
           setReviewNotes(
             Object.fromEntries(
               requests.map((request) => [request.id, request.adminNote ?? '']),
+            ),
+          );
+          setReturnDispositions(
+            Object.fromEntries(
+              requests.flatMap((request) =>
+                request.items.map((item) => [
+                  item.id,
+                  item.disposition ?? 'restock',
+                ]),
+              ),
             ),
           );
         }
@@ -162,6 +196,83 @@ function OrderDetailModal({
         error instanceof Error
           ? error.message
           : 'Không thể cập nhật yêu cầu trả hàng.',
+      );
+    } finally {
+      setReviewingRequestId(null);
+    }
+  }
+
+  async function handleReceiveReturnRequest(returnRequestId: string) {
+    const request = returnRequests.find((item) => item.id === returnRequestId);
+    if (!request || request.items.length === 0) {
+      toast.error('Yêu cầu trả hàng chưa có danh sách sản phẩm.');
+      return;
+    }
+    try {
+      setReviewingRequestId(returnRequestId);
+      const updated = await receiveAdminReturnRequest(returnRequestId, {
+        items: request.items.map((item) => ({
+          returnItemId: item.id,
+          disposition: returnDispositions[item.id] ?? 'restock',
+        })),
+      });
+      setReturnRequests((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      onReturnRequestReviewed(updated);
+      toast.success(
+        updated.status === 'refund_failed'
+          ? 'Hoàn tiền tự động chưa thành công. Có thể chuyển sang xác nhận thủ công.'
+          : updated.status === 'manual_refund_pending'
+            ? 'Đã nhập lại kho. Hãy hoàn tiền thủ công rồi xác nhận hoàn tất.'
+            : 'Đã nhận hàng, nhập lại kho và khởi tạo luồng hoàn tiền.',
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Không thể xác nhận đã nhận hàng hoàn.',
+      );
+    } finally {
+      setReviewingRequestId(null);
+    }
+  }
+
+  async function handleCompleteManualRefund(returnRequestId: string) {
+    const request = returnRequests.find((item) => item.id === returnRequestId);
+    const transactionReference =
+      manualRefundReferences[returnRequestId]?.trim() ?? '';
+    if (!request || request.approvedRefundAmount == null) {
+      toast.error('Chưa có số tiền hoàn đã được backend phê duyệt.');
+      return;
+    }
+    if (transactionReference.length < 3) {
+      toast.error('Vui lòng nhập mã giao dịch hoặc chứng từ hoàn tiền.');
+      return;
+    }
+    const evidenceImages = manualRefundEvidence[returnRequestId] ?? [];
+    if (!evidenceImages.length) {
+      toast.error('Vui lòng tải lên ít nhất một ảnh biên lai hoàn tiền.');
+      return;
+    }
+    try {
+      setReviewingRequestId(returnRequestId);
+      const updated = await completeAdminManualReturnRefund(returnRequestId, {
+        amount: request.approvedRefundAmount,
+        transactionReference,
+        note: manualRefundNotes[returnRequestId]?.trim() || undefined,
+        evidenceImages,
+      });
+      setReturnRequests((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      onReturnRequestReviewed(updated);
+      toast.success('Đã xác nhận hoàn tiền thủ công và hoàn tất trả hàng.');
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Không thể xác nhận hoàn tiền thủ công.',
       );
     } finally {
       setReviewingRequestId(null);
@@ -363,16 +474,15 @@ function OrderDetailModal({
                         className={`rounded-full px-3 py-1 text-xs font-medium ${
                           request.status === 'pending'
                             ? 'bg-amber-100 text-amber-700'
-                            : request.status === 'approved'
+                            : request.status === 'completed'
                               ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-rose-100 text-rose-700'
+                              : request.status === 'rejected' ||
+                                  request.status === 'refund_failed'
+                                ? 'bg-rose-100 text-rose-700'
+                                : 'bg-sky-100 text-sky-700'
                         }`}
                       >
-                        {request.status === 'pending'
-                          ? 'Chờ duyệt'
-                          : request.status === 'approved'
-                            ? 'Đã duyệt'
-                            : 'Đã từ chối'}
+                        {RETURN_STATUS_LABELS[request.status]}
                       </span>
                     </div>
 
@@ -389,6 +499,64 @@ function OrderDetailModal({
                               fill
                               className="object-cover"
                             />
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {request.items.length > 0 ? (
+                      <div className="mt-4 space-y-2 rounded-xl border border-slate-200 bg-white/70 p-3">
+                        <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                          <span>Sản phẩm khách yêu cầu trả</span>
+                          <span>
+                            Dự kiến hoàn{' '}
+                            {formatCurrency(request.requestedRefundAmount)}
+                          </span>
+                        </div>
+                        {request.items.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2"
+                          >
+                            <div className="min-w-0 text-xs">
+                              <p className="truncate font-medium text-slate-800">
+                                {item.productName}
+                              </p>
+                              <p className="text-slate-500">
+                                SL trả: {item.requestedQuantity} · {item.sku}
+                              </p>
+                            </div>
+                            {request.status === 'approved' ? (
+                              <select
+                                value={returnDispositions[item.id] ?? 'restock'}
+                                onChange={(event) =>
+                                  setReturnDispositions((current) => ({
+                                    ...current,
+                                    [item.id]: event.target.value as
+                                      | 'restock'
+                                      | 'damaged'
+                                      | 'rejected',
+                                  }))
+                                }
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                              >
+                                <option value="restock">Nhập lại kho</option>
+                                <option value="damaged">
+                                  Hàng lỗi/không nhập kho
+                                </option>
+                                <option value="rejected">
+                                  Từ chối nhận món này
+                                </option>
+                              </select>
+                            ) : item.disposition ? (
+                              <span className="text-xs font-medium text-slate-600">
+                                {item.disposition === 'restock'
+                                  ? 'Đã nhập kho'
+                                  : item.disposition === 'damaged'
+                                    ? 'Hàng lỗi'
+                                    : 'Đã từ chối'}
+                              </span>
+                            ) : null}
                           </div>
                         ))}
                       </div>
@@ -448,6 +616,102 @@ function OrderDetailModal({
                           </button>
                         </div>
                       </div>
+                    ) : null}
+
+                    {request.status === 'approved' ||
+                    request.status === 'refund_failed' ? (
+                      <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3">
+                        <p className="mb-3 text-xs text-sky-800">
+                          Chỉ xác nhận khi kho đã thực sự nhận lại và kiểm tra
+                          hàng. Thao tác này nhập kho đúng một lần rồi khởi tạo
+                          hoàn tiền.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleReceiveReturnRequest(request.id)
+                          }
+                          disabled={reviewingRequestId === request.id}
+                          className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                        >
+                          <Package className="h-4 w-4" />
+                          {request.status === 'refund_failed'
+                            ? 'Chuyển sang hoàn tiền thủ công'
+                            : 'Đã nhận hàng và nhập kho'}
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {request.status === 'manual_refund_pending' ? (
+                      <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-3">
+                        <p className="mb-3 text-xs text-violet-800">
+                          Hệ thống đang dùng chế độ hoàn tiền thủ công (COD hoặc
+                          cổng hoàn tiền tự động chưa được cấu hình). Chỉ bấm
+                          hoàn tất sau khi khách đã thực sự nhận lại tiền.
+                        </p>
+                        <p className="mb-3 text-sm font-semibold text-violet-900">
+                          Số tiền phải hoàn:{' '}
+                          {formatCurrency(request.approvedRefundAmount ?? 0)}
+                        </p>
+                        <input
+                          value={manualRefundReferences[request.id] ?? ''}
+                          onChange={(event) =>
+                            setManualRefundReferences((current) => ({
+                              ...current,
+                              [request.id]: event.target.value,
+                            }))
+                          }
+                          placeholder="Mã giao dịch/chứng từ hoàn tiền (bắt buộc)"
+                          className="mb-2 w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm"
+                        />
+                        <textarea
+                          value={manualRefundNotes[request.id] ?? ''}
+                          onChange={(event) =>
+                            setManualRefundNotes((current) => ({
+                              ...current,
+                              [request.id]: event.target.value,
+                            }))
+                          }
+                          rows={2}
+                          placeholder="Ghi chú đối soát (không bắt buộc)"
+                          className="mb-3 w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm"
+                        />
+                        <label className="mb-3 block text-xs font-medium text-violet-900">
+                          Ảnh biên lai hoàn tiền (bắt buộc, tối đa 3 ảnh)
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            multiple
+                            onChange={(event) =>
+                              setManualRefundEvidence((current) => ({
+                                ...current,
+                                [request.id]: Array.from(
+                                  event.target.files ?? [],
+                                ).slice(0, 3),
+                              }))
+                            }
+                            className="mt-1 block w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleCompleteManualRefund(request.id)
+                          }
+                          disabled={reviewingRequestId === request.id}
+                          className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          Xác nhận đã hoàn tiền thủ công
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {request.restockedAt ? (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        Đã nhập lại kho lúc{' '}
+                        {formatDateTime(request.restockedAt)}
+                      </p>
                     ) : null}
 
                     {request.adminNote ? (

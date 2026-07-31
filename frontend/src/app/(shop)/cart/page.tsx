@@ -5,7 +5,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, Minus, Plus, ShoppingBag, Truck, X } from 'lucide-react';
 import { CartPromoSuggestions } from '@/components/product/promo-notification';
-import { isEligibleForFreeShipping } from '@/lib/combo-utils';
 import { formatCurrency } from '@/lib/utils';
 import { useCartStore } from '@/store/cart.store';
 
@@ -29,17 +28,24 @@ function getCampaignLabel(item: {
 }
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, hydrateCart } = useCartStore();
+  const {
+    items,
+    promotionItems,
+    serverSubtotal,
+    serverShippingFee,
+    serverTotal,
+    removeItem,
+    updateQuantity,
+    hydrateCart,
+  } = useCartStore();
 
   useEffect(() => {
     void hydrateCart();
   }, [hydrateCart]);
 
-  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const freeShip = isEligibleForFreeShipping(totalItems, subtotal);
-  const shippingFee = freeShip ? 0 : 30000;
-  const total = subtotal + shippingFee;
+  const subtotal = serverSubtotal;
+  const shippingFee = serverShippingFee;
+  const total = serverTotal;
 
   if (items.length === 0) {
     return (
@@ -155,6 +161,29 @@ export default function CartPage() {
             <div className="mb-6">
               <CartPromoSuggestions />
             </div>
+
+            {promotionItems.length > 0 ? (
+              <div className="mt-4 space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                <p className="text-sm font-semibold text-emerald-800">
+                  Quà tặng/ưu đãi đang áp dụng
+                </p>
+                {promotionItems.map((item) => (
+                  <div
+                    key={`promotion-${item.id}`}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <span className="text-emerald-900">
+                      {item.productName} × {item.quantity}
+                    </span>
+                    <span className="font-semibold text-emerald-800">
+                      {item.totalPrice > 0
+                        ? formatCurrency(item.totalPrice)
+                        : 'Tặng miễn phí'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             <div className="mb-6 space-y-3">
               <div className="flex justify-between text-sm">

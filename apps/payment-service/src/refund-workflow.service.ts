@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { OrderClientService } from './clients/order-client.service';
 
 @Injectable()
@@ -76,8 +79,11 @@ export class RefundWorkflowService {
     const paymentAmount = Number(payment.paymentAmount);
     const reservedRefundAmount = Number(payment.reservedRefundAmount || 0);
     const refundableAmount = Math.max(paymentAmount - reservedRefundAmount, 0);
+    const refundablePaymentStatus = ['paid', 'partially_refunded'].includes(
+      payment.status,
+    );
     const refundAllowed =
-      payment.status === 'paid' && Number(input.amount) <= refundableAmount;
+      refundablePaymentStatus && Number(input.amount) <= refundableAmount;
 
     return {
       refundAllowed,
@@ -87,12 +93,11 @@ export class RefundWorkflowService {
       method: payment.method,
       paymentStatus: payment.status,
       refundableAmount,
-      reason:
-        payment.status !== 'paid'
-          ? 'Only paid payments can be refunded'
-          : Number(input.amount) > refundableAmount
-            ? 'Refund amount exceeds refundable balance'
-            : null,
+      reason: !refundablePaymentStatus
+        ? 'Only paid payments can be refunded'
+        : Number(input.amount) > refundableAmount
+          ? 'Refund amount exceeds refundable balance'
+          : null,
     };
   }
 
@@ -164,6 +169,7 @@ export class RefundWorkflowService {
     refundAllowed: boolean;
     amount: number;
     refundableAmount: number;
+    approvedReturnRequest?: boolean;
   }) {
     if (!input.orderId) {
       throw new BadRequestException('Missing orderId');
@@ -173,14 +179,24 @@ export class RefundWorkflowService {
       throw new BadRequestException('Missing userId');
     }
 
-    if (input.paymentStatus !== 'paid' || !input.refundAllowed) {
+    const refundablePaymentStatus = ['paid', 'partially_refunded'].includes(
+      input.paymentStatus,
+    );
+    if (!refundablePaymentStatus || !input.refundAllowed) {
       return {
         refundRoute: 'REJECT',
         orderStatus: null,
-        routeReason:
-          input.paymentStatus !== 'paid'
-            ? 'Payment is not eligible for refund'
-            : 'Refund amount exceeds refundable balance',
+        routeReason: !refundablePaymentStatus
+          ? 'Payment is not eligible for refund'
+          : 'Refund amount exceeds refundable balance',
+      };
+    }
+
+    if (input.approvedReturnRequest === true) {
+      return {
+        refundRoute: 'AUTO_REFUND',
+        orderStatus: 'return_received',
+        routeReason: null,
       };
     }
 
@@ -272,61 +288,108 @@ export class RefundWorkflowService {
     reason: string;
     idempotencyKey?: string;
   }) {
-    // Reuse bản ghi refund cũ nếu cùng yêu cầu để workflow có thể retry an toàn.
-    const existing = await this.checkRefundIdempotency({
-      paymentId: input.paymentId,
-      amount: input.amount,
-      idempotencyKey: input.idempotencyKey,
-    });
-
-    if (existing.exists && existing.refundId) {
-      return {
-        refundId: existing.refundId,
-        providerRefundId: existing.providerRefundId,
-        reused: true,
-      };
+    if (!input.paymentId || Number(input.amount) <= 0) {
+      throw new BadRequestException('Invalid refund request');
+    }
+    if (!input.reason?.trim()) {
+      throw new BadRequestException('Missing refund reason');
     }
 
-    const pendingStatusId = await this.getPaymentStatusId('pending');
-    const providerRefundId = `RF_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    return this.dataSource.transaction(async (manager) => {
+      const paymentRows = await manager.query(
+        `
+        SELECT p.amount, ps.code AS status
+        FROM payment_service.payments p
+        JOIN payment_service.payment_statuses ps ON ps.id = p.status_id
+        WHERE p.id = $1
+        FOR UPDATE OF p
+        `,
+        [input.paymentId],
+      );
+      if (!paymentRows.length) {
+        throw new NotFoundException('Payment not found');
+      }
 
-    const rows = await this.dataSource.query(
-      `
-      INSERT INTO payment_service.refunds (
-        payment_id,
-        amount,
-        status_id,
-        reason,
-        provider_refund_id,
-        idempotency_key,
-        metadata,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        $1, $2, $3, $4, $5, $6, $7::jsonb, NOW(), NOW()
-      )
-      RETURNING id, provider_refund_id AS "providerRefundId"
-      `,
-      [
-        input.paymentId,
-        input.amount,
-        pendingStatusId,
-        input.reason,
-        providerRefundId,
-        input.idempotencyKey ?? null,
-        JSON.stringify({
-          retryCount: 0,
-          gatewayStatus: 'REQUESTED',
-        }),
-      ],
-    );
+      const existingRows = await manager.query(
+        `
+        SELECT r.id, r.provider_refund_id AS "providerRefundId"
+        FROM payment_service.refunds r
+        JOIN payment_service.payment_statuses ps ON ps.id = r.status_id
+        WHERE r.payment_id = $1
+          AND (
+            ($2::varchar IS NOT NULL AND r.idempotency_key = $2)
+            OR ($2::varchar IS NULL AND r.amount = $3 AND ps.code IN ('pending', 'refunded'))
+          )
+        ORDER BY r.created_at DESC
+        LIMIT 1
+        `,
+        [input.paymentId, input.idempotencyKey ?? null, input.amount],
+      );
+      if (existingRows.length) {
+        return {
+          refundId: String(existingRows[0].id),
+          providerRefundId:
+            (existingRows[0].providerRefundId as string | null) ?? null,
+          reused: true,
+        };
+      }
 
-    return {
-      refundId: rows[0].id as string,
-      providerRefundId: rows[0].providerRefundId as string,
-      reused: false,
-    };
+      const paymentStatus = String(paymentRows[0].status);
+      if (!['paid', 'partially_refunded'].includes(paymentStatus)) {
+        throw new BadRequestException('Only paid payments can be refunded');
+      }
+
+      const reservedRows = await manager.query(
+        `
+        SELECT COALESCE(SUM(r.amount), 0) AS total
+        FROM payment_service.refunds r
+        JOIN payment_service.payment_statuses ps ON ps.id = r.status_id
+        WHERE r.payment_id = $1
+          AND ps.code IN ('pending', 'refunded')
+        `,
+        [input.paymentId],
+      );
+      const paymentAmount = Number(paymentRows[0].amount);
+      const reservedAmount = Number(reservedRows[0]?.total ?? 0);
+      if (reservedAmount + Number(input.amount) > paymentAmount) {
+        throw new BadRequestException(
+          'Refund amount exceeds refundable balance',
+        );
+      }
+
+      const pendingRows = await manager.query(
+        `SELECT id FROM payment_service.payment_statuses WHERE code = 'pending' LIMIT 1`,
+      );
+      if (!pendingRows.length) {
+        throw new NotFoundException('Payment status pending not found');
+      }
+      const providerRefundId = `RF_${randomUUID().replace(/-/g, '').toUpperCase()}`;
+      const rows = await manager.query(
+        `
+        INSERT INTO payment_service.refunds (
+          payment_id, amount, status_id, reason, provider_refund_id,
+          idempotency_key, metadata, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW(), NOW())
+        RETURNING id, provider_refund_id AS "providerRefundId"
+        `,
+        [
+          input.paymentId,
+          input.amount,
+          Number(pendingRows[0].id),
+          input.reason.trim(),
+          providerRefundId,
+          input.idempotencyKey ?? null,
+          JSON.stringify({ retryCount: 0, gatewayStatus: 'REQUESTED' }),
+        ],
+      );
+
+      return {
+        refundId: rows[0].id as string,
+        providerRefundId: rows[0].providerRefundId as string,
+        reused: false,
+      };
+    });
   }
 
   async updateRefundRejected(input: {

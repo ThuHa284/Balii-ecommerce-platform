@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Library,
   LogOut,
+  Menu,
   Megaphone,
   Network,
   Package,
@@ -16,6 +17,8 @@ import {
   ShoppingCart,
   Ticket,
   Users,
+  Warehouse,
+  X,
 } from 'lucide-react';
 
 import { hasRoleAccess } from '@/lib/api/admin.utils';
@@ -34,6 +37,7 @@ type AdminLink = {
 const adminLinks: AdminLink[] = [
   { href: '/admin/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Sản phẩm', icon: Package },
+  { href: '/admin/inventory', label: 'Đối soát tồn kho', icon: Warehouse },
   { href: '/admin/categories', label: 'Danh mục', icon: Grid2x2 },
   { href: '/admin/collections', label: 'Bộ sưu tập', icon: Library },
   { href: '/admin/campaigns', label: 'Chiến dịch', icon: Megaphone },
@@ -60,6 +64,7 @@ export default function AdminSidebar() {
   const logout = useAuthStore((state) => state.logout);
   const userRole = useAuthStore((state) => state.user?.role ?? null);
   const [pendingReturnCount, setPendingReturnCount] = useState(0);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const visibleLinks = adminLinks.filter((link) =>
     hasRoleAccess(userRole, link.roles),
   );
@@ -98,14 +103,33 @@ export default function AdminSidebar() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isMobileOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMobileOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMobileOpen]);
+
   const handleLogout = async () => {
     await logout();
     router.push('/login');
   };
 
-  return (
-    <aside className="hidden min-h-screen w-64 rounded-none border-b-0 border-l-0 border-t-0 glass-card p-6 lg:block">
-      <Link href="/admin/dashboard" className="mb-6 flex items-center gap-2">
+  const navigationContent = (onNavigate?: () => void) => (
+    <>
+      <Link
+        href="/admin/dashboard"
+        className="mb-6 flex items-center gap-2"
+        onClick={onNavigate}
+      >
         <span className="font-heading text-2xl font-bold text-gradient">
           Balii
         </span>
@@ -118,9 +142,10 @@ export default function AdminSidebar() {
 
       <div className="mb-6">
         <button
-          onClick={() =>
-            window.dispatchEvent(new CustomEvent('open-command-palette'))
-          }
+          onClick={() => {
+            onNavigate?.();
+            window.dispatchEvent(new CustomEvent('open-command-palette'));
+          }}
           className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-slate-200/65 bg-white/40 px-3 py-2 text-xs font-semibold text-slate-500 shadow-sm transition-all hover:bg-white hover:text-violet-600"
         >
           <span className="flex items-center gap-1.5">Tìm nhanh...</span>
@@ -130,7 +155,7 @@ export default function AdminSidebar() {
         </button>
       </div>
 
-      <nav className="space-y-1">
+      <nav className="space-y-1" aria-label="Điều hướng quản trị">
         {visibleLinks.map((link) => {
           const isActive =
             pathname === link.href || pathname?.startsWith(link.href + '/');
@@ -139,6 +164,7 @@ export default function AdminSidebar() {
             <Link
               key={link.href}
               href={link.href}
+              onClick={onNavigate}
               className={cn(
                 'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all',
                 isActive
@@ -168,13 +194,73 @@ export default function AdminSidebar() {
 
       <div className="mt-8 mt-auto space-y-1 border-t border-white/30 pt-8">
         <button
-          onClick={() => void handleLogout()}
+          onClick={() => {
+            onNavigate?.();
+            void handleLogout();
+          }}
           className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-500 transition-all hover:bg-red-50"
         >
           <LogOut className="h-5 w-5" />
           Đăng xuất
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/50 bg-white/85 px-4 shadow-sm backdrop-blur-xl lg:hidden">
+        <Link
+          href="/admin/dashboard"
+          className="font-heading text-xl font-bold text-gradient"
+        >
+          Balii Admin
+        </Link>
+        <button
+          type="button"
+          onClick={() => setIsMobileOpen(true)}
+          className="rounded-xl border border-violet-100 bg-white/70 p-2 text-slate-700"
+          aria-label="Mở menu quản trị"
+          aria-expanded={isMobileOpen}
+          aria-controls="admin-mobile-navigation"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </header>
+
+      <div
+        className={cn(
+          'fixed inset-0 z-50 bg-black/35 backdrop-blur-sm transition-opacity lg:hidden',
+          isMobileOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
+        )}
+        onClick={() => setIsMobileOpen(false)}
+        aria-hidden="true"
+      />
+      <aside
+        id="admin-mobile-navigation"
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex w-[min(20rem,88vw)] flex-col overflow-y-auto rounded-none border-y-0 border-l-0 p-6 transition-transform glass-card lg:hidden',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu quản trị"
+        aria-hidden={!isMobileOpen}
+      >
+        <button
+          type="button"
+          onClick={() => setIsMobileOpen(false)}
+          className="absolute right-4 top-4 rounded-lg p-2 text-slate-600 hover:bg-white/60"
+          aria-label="Đóng menu quản trị"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        {navigationContent(() => setIsMobileOpen(false))}
+      </aside>
+
+      <aside className="hidden min-h-screen w-64 flex-col rounded-none border-b-0 border-l-0 border-t-0 p-6 glass-card lg:flex">
+        {navigationContent()}
+      </aside>
+    </>
   );
 }

@@ -22,11 +22,17 @@ export class CollectionsService {
     });
 
     const saved = await this.collectionRepo.save(collection);
+    await this.cloudinaryService.syncOwnerAssets(
+      'collection',
+      String(saved.id),
+      [saved.imageUrl, saved.bannerImageUrl],
+    );
     return this.toFrontendCollection(saved);
   }
 
-  async findAll() {
+  async findAll(includeInactive = false) {
     const collections = await this.collectionRepo.find({
+      where: includeInactive ? {} : { isActive: true },
       order: {
         createdAt: 'DESC',
       },
@@ -37,8 +43,10 @@ export class CollectionsService {
     );
   }
 
-  async findOne(id: string) {
-    const collection = await this.collectionRepo.findOne({ where: { id } });
+  async findOne(id: string, includeInactive = false) {
+    const collection = await this.collectionRepo.findOne({
+      where: includeInactive ? { id } : { id, isActive: true },
+    });
 
     if (!collection) {
       throw new NotFoundException('Collection not found');
@@ -72,6 +80,11 @@ export class CollectionsService {
     });
 
     const saved = await this.collectionRepo.save(collection);
+    await this.cloudinaryService.syncOwnerAssets(
+      'collection',
+      String(saved.id),
+      [saved.imageUrl, saved.bannerImageUrl],
+    );
     return this.toFrontendCollection(saved);
   }
 
@@ -83,6 +96,7 @@ export class CollectionsService {
     }
 
     await this.collectionRepo.delete(id);
+    await this.cloudinaryService.releaseOwnerAssets('collection', id);
 
     return {
       success: true,

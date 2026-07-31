@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ChatbotServiceService } from './chatbot-service.service';
 import { ChatRequestDto } from './dto/chat-request.dto';
+import { HeaderRolesGuard } from './auth/header-roles.guard';
 
 @Controller('chatbot')
 export class ChatbotServiceController {
@@ -8,13 +9,13 @@ export class ChatbotServiceController {
 
   @Get('health')
   health() {
-    return {
-      success: true,
-      message: 'Chatbot service is healthy',
-      data: {
-        status: 'ok',
-      },
-    };
+    return this.chatbotService.getHealth();
+  }
+
+  @Get('diagnostics')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  diagnostics() {
+    return this.chatbotService.getDiagnostics();
   }
 
   @Post('chat')
@@ -28,6 +29,7 @@ export class ChatbotServiceController {
   }
 
   @Post('reindex')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   reindex() {
     return this.chatbotService.reindex();
   }

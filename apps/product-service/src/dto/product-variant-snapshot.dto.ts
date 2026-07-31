@@ -6,6 +6,8 @@ export class ProductVariantSnapshotDto {
   variantLabel!: string;
   thumbnailUrl?: string;
   unitPrice!: number;
+  regularUnitPrice!: number;
+  isOnSale!: boolean;
   stockQuantity!: number;
   reservedQuantity!: number;
   isActive!: boolean;

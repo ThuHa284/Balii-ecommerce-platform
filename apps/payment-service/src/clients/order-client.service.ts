@@ -30,6 +30,11 @@ export class OrderClientService {
           {
             headers: {
               'x-user-id': userId,
+              'x-internal-service-key':
+                process.env.INTERNAL_SERVICE_SECRET ||
+                (process.env.NODE_ENV === 'production'
+                  ? ''
+                  : 'balii-local-internal'),
             },
           },
         ),
@@ -58,12 +63,49 @@ export class OrderClientService {
             paymentStatus,
             status,
           },
+          {
+            headers: {
+              'x-internal-service-key':
+                process.env.INTERNAL_SERVICE_SECRET ||
+                (process.env.NODE_ENV === 'production'
+                  ? ''
+                  : 'balii-local-internal'),
+            },
+          },
         ),
       );
 
       return response.data;
     } catch {
       throw new BadGatewayException('Unable to update order payment status');
+    }
+  }
+
+  async updateReturnRefundResult(
+    returnRequestId: string,
+    result: 'completed' | 'failed',
+  ): Promise<Record<string, unknown>> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.patch<Record<string, unknown>>(
+          `${this.orderServiceUrl}/orders/internal/return-requests/${returnRequestId}/refund-result`,
+          { result },
+          {
+            headers: {
+              'x-internal-service-key':
+                process.env.INTERNAL_SERVICE_SECRET ||
+                (process.env.NODE_ENV === 'production'
+                  ? ''
+                  : 'balii-local-internal'),
+            },
+          },
+        ),
+      );
+      return response.data;
+    } catch {
+      throw new BadGatewayException(
+        'Unable to update return request refund result',
+      );
     }
   }
 }

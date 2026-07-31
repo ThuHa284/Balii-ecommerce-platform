@@ -5,7 +5,7 @@ import { useCartStore } from '@/store/cart.store';
 import { useWishlistStore } from '@/store/wishlist.store';
 import { X, ShoppingBag, Heart, Check } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -19,6 +19,7 @@ export default function QuickViewModal() {
   const [quantity, setQuantity] = useState(1);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!selectedProduct) {
@@ -39,6 +40,46 @@ export default function QuickViewModal() {
 
     return () => window.clearTimeout(timer);
   }, [selectedProduct]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    modalRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeQuickView();
+        return;
+      }
+      if (event.key !== 'Tab' || !modalRef.current) return;
+
+      const focusable = Array.from(
+        modalRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [closeQuickView, isOpen]);
 
   if (!isOpen || !selectedProduct) {
     return null;
@@ -146,12 +187,21 @@ export default function QuickViewModal() {
       <div
         className="fixed inset-0 z-50 animate-fade-in bg-black/40 backdrop-blur-md transition-opacity duration-300"
         onClick={closeQuickView}
+        aria-hidden="true"
       />
 
-      <div className="fixed inset-4 z-50 flex w-auto max-w-4xl animate-scale-up flex-col overflow-hidden rounded-2xl border border-white/40 shadow-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-11/12 sm:-translate-x-1/2 sm:-translate-y-1/2 md:w-full md:flex-row glass-card max-h-[90vh]">
+      <div
+        ref={modalRef}
+        className="fixed inset-4 z-50 flex w-auto max-w-4xl animate-scale-up flex-col overflow-hidden rounded-2xl border border-white/40 shadow-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-11/12 sm:-translate-x-1/2 sm:-translate-y-1/2 md:w-full md:flex-row glass-card max-h-[90vh]"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Xem nhanh ${selectedProduct.name}`}
+        tabIndex={-1}
+      >
         <button
           onClick={closeQuickView}
           className="absolute right-4 top-4 z-20 rounded-full bg-white/60 p-2 text-slate-800 shadow-md transition-colors hover:bg-white hover:text-black"
+          aria-label="Đóng xem nhanh sản phẩm"
         >
           <X className="h-5 w-5" />
         </button>
@@ -262,6 +312,8 @@ export default function QuickViewModal() {
                     }`}
                     style={{ backgroundColor: colorCode || '#ccc' }}
                     title={colorName}
+                    aria-label={`Chọn màu ${colorName}`}
+                    aria-pressed={selectedColor === colorName}
                   >
                     {selectedColor === colorName && (
                       <Check className="h-4 w-4 text-white drop-shadow mix-blend-difference" />
@@ -288,6 +340,7 @@ export default function QuickViewModal() {
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 className="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-slate-600 hover:bg-slate-100 hover:text-black"
+                aria-label="Giảm số lượng"
               >
                 -
               </button>
@@ -297,6 +350,7 @@ export default function QuickViewModal() {
               <button
                 onClick={() => setQuantity(quantity + 1)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg font-bold text-slate-600 hover:bg-slate-100 hover:text-black"
+                aria-label="Tăng số lượng"
               >
                 +
               </button>
@@ -320,6 +374,12 @@ export default function QuickViewModal() {
                   ? 'border-rose-200 bg-rose-50 text-rose-500 shadow-sm'
                   : 'border-slate-200 bg-white/60 text-slate-600 hover:bg-white hover:text-rose-500'
               }`}
+              aria-label={
+                isFavorite
+                  ? 'Xóa khỏi danh sách yêu thích'
+                  : 'Thêm vào danh sách yêu thích'
+              }
+              aria-pressed={isFavorite}
             >
               <Heart
                 className={`h-5 w-5 ${isFavorite ? 'fill-rose-500' : ''}`}

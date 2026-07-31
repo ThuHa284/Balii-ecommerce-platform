@@ -1,12 +1,17 @@
 import { NestFactory } from '@nestjs/core';
 import { CartServiceModule } from './cart-service.module';
 import { ValidationPipe } from '@nestjs/common';
-import { loadEnv } from '@app/common';
+import {
+  getInternalCorsOrigins,
+  loadEnv,
+  trustedServiceMiddleware,
+} from '@app/common';
 
 loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(CartServiceModule);
+  app.use(trustedServiceMiddleware);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -15,7 +20,7 @@ async function bootstrap() {
     }),
   );
 
-  app.enableCors();
+  app.enableCors({ origin: getInternalCorsOrigins(), credentials: true });
 
   await app.listen(process.env.CART_SERVICE_PORT ?? 3005);
   console.log(

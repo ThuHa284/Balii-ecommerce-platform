@@ -42,6 +42,7 @@ import { deduplicateResults } from './utils/deduplicate-results';
 import { sha256 } from './utils/hash.util';
 import { CloudinaryService } from './cloudinary.service';
 import { RedisService } from '@app/redis';
+import { validateUploadedImage } from '@app/common';
 
 type AdminRequestContext = {
   request: Request;
@@ -335,54 +336,75 @@ export class MarketAnalysisServiceService {
     }
 
     let imageUrl = dto.imageUrl?.trim();
+    let temporaryPublicId: string | null = null;
     if (imageFile) {
-      imageUrl = await this.uploadImageAndGetUrl(imageFile);
+      validateUploadedImage(imageFile, {
+        maxBytes: 5 * 1024 * 1024,
+        fieldName: 'ảnh tìm kiếm',
+      });
+      const uploaded = await this.uploadTemporarySearchImage(imageFile);
+      imageUrl = uploaded.url;
+      temporaryPublicId = uploaded.publicId;
     }
 
-    if (!imageUrl || !this.isValidHttpUrl(imageUrl)) {
-      throw new BadRequestException('imageUrl phải là URL hợp lệ');
-    }
+    try {
+      if (!imageUrl || !this.isValidHttpUrl(imageUrl)) {
+        throw new BadRequestException('imageUrl phải là URL hợp lệ');
+      }
 
-    const requestedKeyword = this.normalizeKeyword(dto.keyword);
-    const cacheKey = `serpapi:image:${sha256(imageUrl)}:${sha256(requestedKeyword ?? '')}`;
-    const cachedPayload = await this.getCachedPayload(cacheKey);
+      const requestedKeyword = this.normalizeKeyword(dto.keyword);
+      const cacheKey = `serpapi:image:${sha256(imageUrl)}:${sha256(requestedKeyword ?? '')}`;
+      const cachedPayload = await this.getCachedPayload(cacheKey);
 
-    if (cachedPayload) {
-      return this.buildResponseFromPayload(
-        cachedPayload,
-        dto.limit,
-        dto.saveResults,
-      );
-    }
+      if (cachedPayload) {
+        return this.buildResponseFromPayload(
+          cachedPayload,
+          dto.limit,
+          dto.saveResults,
+        );
+      }
 
-    const lensResponse = await this.serpApiAdapter.searchByLens(imageUrl);
-    const lensResults = this.extractLensResults(lensResponse);
-    const keyword = this.buildKeyword(requestedKeyword, lensResults);
+      const lensResponse = await this.serpApiAdapter.searchByLens(imageUrl);
+      const lensResults = this.extractLensResults(lensResponse);
+      const keyword = this.buildKeyword(requestedKeyword, lensResults);
 
-    const shoppingResponse = keyword
-      ? await this.serpApiAdapter.searchByShopping(keyword)
-      : undefined;
-    const shoppingResults = this.extractShoppingResults(shoppingResponse);
-
-    const shouldSearchImages =
-      lensResults.length + shoppingResults.length < Math.min(dto.limit, 10);
-
-    const imagesResponse =
-      keyword && shouldSearchImages
-        ? await this.serpApiAdapter.searchByImages(keyword)
+      const shoppingResponse = keyword
+        ? await this.serpApiAdapter.searchByShopping(keyword)
         : undefined;
+      const shoppingResults = this.extractShoppingResults(shoppingResponse);
 
-    const payload: SearchCachePayload = {
-      keyword,
-      imageUrl,
-      lensResponse,
-      shoppingResponse,
-      imagesResponse,
-    };
+      const shouldSearchImages =
+        lensResults.length + shoppingResults.length < Math.min(dto.limit, 10);
 
-    await this.setCachedPayload(cacheKey, payload);
+      const imagesResponse =
+        keyword && shouldSearchImages
+          ? await this.serpApiAdapter.searchByImages(keyword)
+          : undefined;
 
-    return this.buildResponseFromPayload(payload, dto.limit, dto.saveResults);
+      const payload: SearchCachePayload = {
+        keyword,
+        imageUrl,
+        lensResponse,
+        shoppingResponse,
+        imagesResponse,
+      };
+
+      await this.setCachedPayload(cacheKey, payload);
+
+      return this.buildResponseFromPayload(payload, dto.limit, dto.saveResults);
+    } finally {
+      if (temporaryPublicId) {
+        try {
+          await this.cloudinaryService.deleteImage(temporaryPublicId);
+        } catch (error) {
+          this.logger.warn(
+            `Không thể dọn ảnh tìm kiếm tạm ${temporaryPublicId}: ${
+              error instanceof Error ? error.message : 'unknown error'
+            }`,
+          );
+        }
+      }
+    }
   }
 
   async searchProductsByKeyword(
@@ -426,16 +448,14 @@ export class MarketAnalysisServiceService {
     return this.buildResponseFromPayload(payload, dto.limit, dto.saveResults);
   }
 
-  private async uploadImageAndGetUrl(
+  private async uploadTemporarySearchImage(
     imageFile: Express.Multer.File,
-  ): Promise<string> {
-    const uploaded = await this.cloudinaryService.uploadBuffer(
+  ): Promise<{ url: string; publicId: string }> {
+    return this.cloudinaryService.uploadBuffer(
       imageFile.buffer,
       'balii/market-analysis',
       `search-${Date.now()}`,
     );
-
-    return uploaded.url;
   }
 
   private extractLensResults(
@@ -671,9 +691,9 @@ export class MarketAnalysisServiceService {
       if (count === 1) {
         await this.redisService.expire(key, 3600);
       }
-    } catch (error) {
+    } catch {
       this.logger.warn(`Redis rate limit fallback for ${identifier}`);
-      count = await this.incrementFallbackCounter(key, 3600);
+      count = this.incrementFallbackCounter(key, 3600);
     }
 
     if ((count ?? 0) > limit) {
@@ -703,7 +723,7 @@ export class MarketAnalysisServiceService {
       }
 
       return JSON.parse(value) as SearchCachePayload;
-    } catch (error) {
+    } catch {
       this.logger.warn(`Redis cache read failed for ${key}`);
       return this.getFallbackCacheValue(key);
     }
@@ -720,7 +740,7 @@ export class MarketAnalysisServiceService {
 
     try {
       await this.redisService.set(key, serialized, ttl);
-    } catch (error) {
+    } catch {
       this.logger.warn(`Redis cache write failed for ${key}`);
       this.fallbackCache.set(key, {
         value: serialized,
@@ -743,10 +763,7 @@ export class MarketAnalysisServiceService {
     return JSON.parse(cached.value) as SearchCachePayload;
   }
 
-  private async incrementFallbackCounter(
-    key: string,
-    ttlSeconds: number,
-  ): Promise<number> {
+  private incrementFallbackCounter(key: string, ttlSeconds: number): number {
     const cached = this.fallbackCache.get(key);
     const now = Date.now();
 

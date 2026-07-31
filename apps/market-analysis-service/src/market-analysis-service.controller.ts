@@ -1,12 +1,11 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { MarketAnalysisServiceService } from './market-analysis-service.service';
 import { Query } from '@nestjs/common';
+import { HeaderRolesGuard } from './auth/header-roles.guard';
 
 @Controller('market-analysis')
+@UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
 export class MarketAnalysisServiceController {
-  getHello(): any {
-    throw new Error('Method not implemented.');
-  }
   constructor(
     private readonly marketAnalysisService: MarketAnalysisServiceService,
   ) {}
@@ -16,7 +15,8 @@ export class MarketAnalysisServiceController {
     return this.marketAnalysisService.createMockProduct();
   }
 
-  @Get('products')
+  // Giữ method cho các caller nội bộ cũ; HTTP chỉ dùng endpoint products có
+  // filter bên dưới để tránh khai báo hai route GET trùng nhau.
   findAll() {
     return this.marketAnalysisService.findAll();
   }

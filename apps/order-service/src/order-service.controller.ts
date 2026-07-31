@@ -18,6 +18,9 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { HeaderRolesGuard } from './auth/header-roles.guard';
 import { CreateReturnRequestDto } from './dto/create-return-request.dto';
 import { ReviewReturnRequestDto } from './dto/review-return-request.dto';
+import { InternalServiceGuard } from './auth/internal-service.guard';
+import { ReceiveReturnRequestDto } from './dto/receive-return-request.dto';
+import { CompleteManualRefundDto } from './dto/complete-manual-refund.dto';
 
 @Controller('orders')
 export class OrderServiceController {
@@ -116,6 +119,7 @@ export class OrderServiceController {
   }
 
   @Patch(':id/payment-status')
+  @UseGuards(InternalServiceGuard)
   updatePaymentStatus(
     @Param('id') orderId: string,
     @Body()
@@ -154,6 +158,18 @@ export class OrderServiceController {
     );
   }
 
+  @Patch('internal/return-requests/:id/refund-result')
+  @UseGuards(InternalServiceGuard)
+  updateReturnRefundResult(
+    @Param('id') returnRequestId: string,
+    @Body() body: { result: 'completed' | 'failed' },
+  ) {
+    return this.orderServiceService.updateReturnRefundResult(
+      returnRequestId,
+      body.result,
+    );
+  }
+
   @Patch('admin/return-requests/:id')
   @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   reviewReturnRequest(
@@ -165,6 +181,41 @@ export class OrderServiceController {
       returnRequestId,
       reviewedBy,
       dto,
+    );
+  }
+
+  @Patch('admin/return-requests/:id/receive')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  receiveReturnRequest(
+    @Headers('x-user-id') receivedBy: string | undefined,
+    @Param('id') returnRequestId: string,
+    @Body() dto: ReceiveReturnRequestDto,
+  ) {
+    return this.orderServiceService.receiveReturnRequest(
+      returnRequestId,
+      receivedBy,
+      dto,
+    );
+  }
+
+  @Patch('admin/return-requests/:id/complete-manual-refund')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  @UseInterceptors(
+    FilesInterceptor('evidenceImages', 3, {
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  completeManualReturnRefund(
+    @Headers('x-user-id') completedBy: string | undefined,
+    @Param('id') returnRequestId: string,
+    @Body() dto: CompleteManualRefundDto,
+    @UploadedFiles() evidenceImages: Express.Multer.File[] = [],
+  ) {
+    return this.orderServiceService.completeManualReturnRefund(
+      returnRequestId,
+      completedBy,
+      dto,
+      evidenceImages,
     );
   }
 }

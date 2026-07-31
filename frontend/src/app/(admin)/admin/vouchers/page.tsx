@@ -17,10 +17,7 @@ import {
   ToggleRight,
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import {
-  VOUCHER_STATUS_LABELS,
-  VOUCHER_STATUS_COLORS,
-} from '@/lib/constants';
+import { VOUCHER_STATUS_LABELS, VOUCHER_STATUS_COLORS } from '@/lib/constants';
 import {
   getAdminVouchers,
   createVoucher,
@@ -54,6 +51,7 @@ const EMPTY_FORM: CreateVoucherData = {
   minOrderValue: 0,
   maxDiscount: null,
   usageLimit: 100,
+  userLimitPerUser: 1,
   startDate: new Date().toISOString().split('T')[0],
   endDate: '',
   isActive: true,
@@ -103,6 +101,7 @@ export default function AdminVouchersPage() {
       minOrderValue: voucher.minOrderValue,
       maxDiscount: voucher.maxDiscount,
       usageLimit: voucher.usageLimit,
+      userLimitPerUser: voucher.userLimitPerUser,
       startDate: voucher.startDate.split('T')[0],
       endDate: voucher.endDate.split('T')[0],
       isActive: voucher.isActive,
@@ -382,7 +381,7 @@ export default function AdminVouchersPage() {
               </div>
 
               {/* Name + Description */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">
                     Tên voucher
@@ -407,6 +406,25 @@ export default function AdminVouchersPage() {
                       setForm({ ...form, description: e.target.value })
                     }
                     placeholder="VD: Giảm 20% cho đơn đầu tiên"
+                    className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Lượt tối đa mỗi khách
+                  </label>
+                  <input
+                    type="number"
+                    value={form.userLimitPerUser || ''}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        userLimitPerUser: Number(e.target.value),
+                      })
+                    }
+                    placeholder="VD: 1"
+                    required
+                    min={1}
                     className="w-full px-4 py-3 rounded-xl bg-white/60 border border-white/50 focus:outline-none focus:ring-2 focus:ring-violet-300 text-sm"
                   />
                 </div>

@@ -15,7 +15,9 @@ export default function AdminLayout({
     >
       <div className="flex min-h-screen">
         <AdminSidebar />
-        <main className="flex-1 p-6 lg:p-8 overflow-auto">{children}</main>
+        <main className="flex-1 p-6 pt-20 lg:p-8 overflow-auto">
+          {children}
+        </main>
       </div>
       <CommandPalette />
     </AuthGuard>

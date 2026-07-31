@@ -238,7 +238,44 @@ export class CamundaClientService implements OnModuleInit {
     amount: number;
     method: string;
     idempotencyKey?: string;
+    /**
+     * Demo-only: name of an external-task topic at which the worker should
+     * inject a fault so the process gets stuck with an incident on that
+     * service task. Used by the admin workflow demo, never set in real flows.
+     */
+    demoFaultTopic?: string;
   }) {
+    const variables: Record<string, { value: unknown; type: string }> = {
+      orderId: {
+        value: input.orderId,
+        type: 'String',
+      },
+      userId: {
+        value: input.userId,
+        type: 'String',
+      },
+      amount: {
+        value: Number(input.amount),
+        type: 'Double',
+      },
+      method: {
+        value: input.method,
+        type: 'String',
+      },
+      idempotencyKey: {
+        value:
+          input.idempotencyKey || `checkout_${input.orderId}_${input.method}`,
+        type: 'String',
+      },
+    };
+
+    if (input.demoFaultTopic) {
+      variables.demoFaultTopic = {
+        value: input.demoFaultTopic,
+        type: 'String',
+      };
+    }
+
     const response = await fetch(
       `${this.baseUrl}/process-definition/key/Process_Payment_Processing/start`,
       {
@@ -248,30 +285,7 @@ export class CamundaClientService implements OnModuleInit {
         },
         body: JSON.stringify({
           businessKey: input.orderId,
-          variables: {
-            orderId: {
-              value: input.orderId,
-              type: 'String',
-            },
-            userId: {
-              value: input.userId,
-              type: 'String',
-            },
-            amount: {
-              value: Number(input.amount),
-              type: 'Double',
-            },
-            method: {
-              value: input.method,
-              type: 'String',
-            },
-            idempotencyKey: {
-              value:
-                input.idempotencyKey ||
-                `checkout_${input.orderId}_${input.method}`,
-              type: 'String',
-            },
-          },
+          variables,
         }),
       },
     );
@@ -332,6 +346,7 @@ export class CamundaClientService implements OnModuleInit {
     amount: number;
     reason: string;
     idempotencyKey?: string;
+    approvedReturnRequest?: boolean;
   }) {
     const response = await fetch(
       `${this.baseUrl}/process-definition/key/Process_Refund_Workflow/start`,
@@ -368,6 +383,10 @@ export class CamundaClientService implements OnModuleInit {
                 input.idempotencyKey ||
                 `refund_${input.paymentId}_${Number(input.amount)}`,
               type: 'String',
+            },
+            approvedReturnRequest: {
+              value: input.approvedReturnRequest === true,
+              type: 'Boolean',
             },
           },
         }),

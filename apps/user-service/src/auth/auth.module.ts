@@ -14,6 +14,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { EmailVerification } from '../entities/email-verification.entity';
 import { UsersModule } from '../users/users.module';
 import { PasswordReset } from '../entities/password-reset.entity';
+import { getSecuritySecret } from '@app/common';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { PasswordReset } from '../entities/password-reset.entity';
     PassportModule,
 
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'secret',
+      secret: getSecuritySecret('JWT_SECRET', 'secret'),
       signOptions: {
         expiresIn: '15m',
       },

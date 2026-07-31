@@ -105,6 +105,13 @@ export default function AdminCampaignsPage() {
   const [discountValue, setDiscountValue] = useState('');
   const [giftName, setGiftName] = useState('');
   const [giftDescription, setGiftDescription] = useState('');
+  const [minimumPurchaseQuantity, setMinimumPurchaseQuantity] = useState('1');
+  const [giftVariantId, setGiftVariantId] = useState('');
+  const [giftQuantity, setGiftQuantity] = useState('1');
+  const [giftUnitPrice, setGiftUnitPrice] = useState('0');
+  const [repeatable, setRepeatable] = useState(true);
+  const [maxApplications, setMaxApplications] = useState('');
+  const [stackableWithSale, setStackableWithSale] = useState(false);
   const [badgeText, setBadgeText] = useState('');
   const [priorityOrder, setPriorityOrder] = useState('0');
   const [startAt, setStartAt] = useState('');
@@ -165,6 +172,13 @@ export default function AdminCampaignsPage() {
     setDiscountValue('');
     setGiftName('');
     setGiftDescription('');
+    setMinimumPurchaseQuantity('1');
+    setGiftVariantId('');
+    setGiftQuantity('1');
+    setGiftUnitPrice('0');
+    setRepeatable(true);
+    setMaxApplications('');
+    setStackableWithSale(false);
     setBadgeText('');
     setPriorityOrder('0');
     setStartAt('');
@@ -194,6 +208,15 @@ export default function AdminCampaignsPage() {
     );
     setGiftName(campaign.giftName);
     setGiftDescription(campaign.giftDescription);
+    setMinimumPurchaseQuantity(String(campaign.minimumPurchaseQuantity));
+    setGiftVariantId(campaign.giftVariantId ?? '');
+    setGiftQuantity(String(campaign.giftQuantity));
+    setGiftUnitPrice(String(campaign.giftUnitPrice));
+    setRepeatable(campaign.repeatable);
+    setMaxApplications(
+      campaign.maxApplications != null ? String(campaign.maxApplications) : '',
+    );
+    setStackableWithSale(campaign.stackableWithSale);
     setBadgeText(campaign.badgeText);
     setPriorityOrder(String(campaign.priorityOrder ?? 0));
     setStartAt(toDateTimeLocalInput(campaign.startAt));
@@ -244,8 +267,8 @@ export default function AdminCampaignsPage() {
       return;
     }
 
-    if (discountType === 'GIFT' && !giftName.trim()) {
-      toast.error('Vui lòng nhập tên quà tặng/phụ kiện.');
+    if (discountType === 'GIFT' && (!giftName.trim() || !giftVariantId)) {
+      toast.error('Vui lòng chọn biến thể quà tặng và nhập tên quà.');
       return;
     }
 
@@ -271,6 +294,16 @@ export default function AdminCampaignsPage() {
           discountType === 'GIFT' ? null : Number(discountValue.trim()),
         giftName: giftName.trim(),
         giftDescription: giftDescription.trim(),
+        minimumPurchaseQuantity: Number(minimumPurchaseQuantity || 1),
+        giftVariantId: discountType === 'GIFT' ? giftVariantId : undefined,
+        giftQuantity: discountType === 'GIFT' ? Number(giftQuantity || 1) : 0,
+        giftUnitPrice: discountType === 'GIFT' ? Number(giftUnitPrice || 0) : 0,
+        repeatable: discountType === 'GIFT' ? repeatable : false,
+        maxApplications:
+          discountType === 'GIFT' && maxApplications
+            ? Number(maxApplications)
+            : null,
+        stackableWithSale,
         badgeText: badgeText.trim(),
         priorityOrder: Number(priorityOrder || 0),
         startAt: normalizeDateTimeInput(startAt),
@@ -768,8 +801,121 @@ export default function AdminCampaignsPage() {
                           className="w-full resize-none rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                         />
                       </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium">
+                          Biến thể quà tặng{' '}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          required
+                          value={giftVariantId}
+                          onChange={(event) =>
+                            setGiftVariantId(event.target.value)
+                          }
+                          className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                        >
+                          <option value="">
+                            Chọn sản phẩm, màu và kích thước
+                          </option>
+                          {products.flatMap((product) =>
+                            product.variants.map((variant) => (
+                              <option key={variant.id} value={variant.id}>
+                                {product.name} — {variant.color} /{' '}
+                                {variant.size} ({variant.sku})
+                              </option>
+                            )),
+                          )}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium">
+                            Mua tối thiểu
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={minimumPurchaseQuantity}
+                            onChange={(event) =>
+                              setMinimumPurchaseQuantity(event.target.value)
+                            }
+                            className="w-full rounded-xl border border-white/50 bg-white/60 px-3 py-2.5 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium">
+                            Số quà
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={giftQuantity}
+                            onChange={(event) =>
+                              setGiftQuantity(event.target.value)
+                            }
+                            className="w-full rounded-xl border border-white/50 bg-white/60 px-3 py-2.5 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium">
+                            Giá mỗi quà
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={giftUnitPrice}
+                            onChange={(event) =>
+                              setGiftUnitPrice(event.target.value)
+                            }
+                            className="w-full rounded-xl border border-white/50 bg-white/60 px-3 py-2.5 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="flex items-center gap-3 rounded-2xl border border-white/40 bg-white/40 px-4 py-3 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={repeatable}
+                            onChange={(event) =>
+                              setRepeatable(event.target.checked)
+                            }
+                            className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                          />
+                          Lặp quà theo bội số mua tối thiểu
+                        </label>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium">
+                            Số lần áp dụng tối đa
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={maxApplications}
+                            onChange={(event) =>
+                              setMaxApplications(event.target.value)
+                            }
+                            placeholder="Không giới hạn"
+                            disabled={!repeatable}
+                            className="w-full rounded-xl border border-white/50 bg-white/60 px-3 py-2.5 text-sm disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
                     </>
                   )}
+
+                  {discountType !== 'GIFT' ? (
+                    <label className="flex items-center gap-3 rounded-2xl border border-white/40 bg-white/40 px-4 py-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={stackableWithSale}
+                        onChange={(event) =>
+                          setStackableWithSale(event.target.checked)
+                        }
+                        className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                      />
+                      Cho phép cộng dồn với giá sale của sản phẩm
+                    </label>
+                  ) : null}
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>

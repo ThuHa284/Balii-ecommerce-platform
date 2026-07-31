@@ -1,12 +1,17 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { loadEnv } from '@app/common';
+import {
+  getInternalCorsOrigins,
+  loadEnv,
+  trustedServiceMiddleware,
+} from '@app/common';
 import { VirtualTryonServiceModule } from './virtual-tryon-service.module';
 
 loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(VirtualTryonServiceModule);
+  app.use(trustedServiceMiddleware);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -15,7 +20,7 @@ async function bootstrap() {
     }),
   );
 
-  app.enableCors();
+  app.enableCors({ origin: getInternalCorsOrigins(), credentials: true });
 
   const port = process.env.TRYON_SERVICE_PORT || 3010;
   await app.listen(port);

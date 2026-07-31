@@ -13,7 +13,11 @@ const MARKETPLACE_LINKS = [
     label: 'Shopee',
     bgClass: 'bg-orange-500 hover:bg-orange-600 shadow-orange-300/30',
     logo: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-white">
+      <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="w-5 h-5 text-white"
+      >
         <path d="M12 2C9.243 2 7 4.243 7 7h2c0-1.654 1.346-3 3-3s3 1.346 3 3h2c0-2.757-2.243-5-5-5zM4 7l-1 17h18L20 7H4zm8 12c-3.038 0-5.5-2.239-5.5-5h2c0 1.654 1.57 3 3.5 3s3.5-1.346 3.5-3h2c0 2.761-2.462 5-5.5 5z" />
       </svg>
     ),
@@ -23,7 +27,11 @@ const MARKETPLACE_LINKS = [
     label: 'TikTok Shop',
     bgClass: 'bg-slate-900 hover:bg-black shadow-slate-400/20',
     logo: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-white">
+      <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="w-5 h-5 text-white"
+      >
         <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.51a6.27 6.27 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V9.05a8.23 8.23 0 004.76 1.52V7.13a4.85 4.85 0 01-1-.44z" />
       </svg>
     ),
@@ -84,7 +92,7 @@ export default function ChatWidget() {
   return (
     <>
       {/* Floating widget stack — bottom right */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col-reverse items-center gap-3">
+      <div className="fixed bottom-20 right-4 z-40 flex flex-col-reverse items-center gap-3 sm:bottom-6 sm:right-6">
         {/* Chatbot toggle — primary, always at bottom */}
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -110,7 +118,7 @@ export default function ChatWidget() {
             target="_blank"
             rel="noopener noreferrer"
             className={cn(
-              'flex items-center justify-center w-12 h-12 rounded-full shadow-xl transition-all duration-300 hover:scale-110 active:scale-95',
+              'hidden items-center justify-center w-12 h-12 rounded-full shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 sm:flex',
               item.bgClass,
             )}
             aria-label={item.label}
@@ -124,7 +132,7 @@ export default function ChatWidget() {
       {/* Chat panel */}
       <div
         className={cn(
-          'fixed bottom-24 right-6 z-40 max-h-[500px] w-[360px] overflow-hidden glass-card transition-all duration-300',
+          'fixed bottom-40 left-4 right-4 z-40 max-h-[min(500px,calc(100vh-11rem))] w-auto overflow-hidden glass-card transition-all duration-300 sm:bottom-24 sm:left-auto sm:right-6 sm:w-[360px]',
           isOpen
             ? 'translate-y-0 scale-100 opacity-100'
             : 'pointer-events-none translate-y-4 scale-95 opacity-0',

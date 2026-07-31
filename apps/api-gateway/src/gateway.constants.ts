@@ -16,6 +16,7 @@ export const ROUTE_TARGETS: RouteTarget[] = [
   { prefix: '/orders', targetEnv: 'ORDER_SERVICE_URL' },
   { prefix: '/payments', targetEnv: 'PAYMENT_SERVICE_URL' },
   { prefix: '/vouchers', targetEnv: 'VOUCHER_SERVICE_URL' },
+  { prefix: '/admin/inventory-movements', targetEnv: 'PRODUCT_SERVICE_URL' },
   { prefix: '/admin/vouchers', targetEnv: 'VOUCHER_SERVICE_URL' },
   {
     prefix: '/admin/market-analysis',

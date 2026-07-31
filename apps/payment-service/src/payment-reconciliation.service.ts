@@ -25,7 +25,7 @@ export class PaymentReconciliationService {
    * giảm khả năng hai tiến trình cùng thao tác trên một payment khi chưa có hàng đợi riêng.
    */
   async findPendingPaymentsForReconciliation() {
-    const rows = await this.dataSource.query(
+    const rows = await this.dataSource.query<ReconciliationPaymentRow[]>(
       `
       SELECT
         p.id,
@@ -56,7 +56,7 @@ export class PaymentReconciliationService {
       };
     }
 
-    const payment = rows[0] as ReconciliationPaymentRow;
+    const payment = rows[0];
 
     return {
       hasPendingPayments: true,
@@ -79,7 +79,7 @@ export class PaymentReconciliationService {
     providerTxnId?: string;
   }) {
     // Bản local/dev suy luận kết quả từ metadata hoặc prefix mã giao dịch thay cho API provider thật.
-    const rows = await this.dataSource.query(
+    const rows = await this.dataSource.query<ReconciliationPaymentRow[]>(
       `
       SELECT
         p.id,
@@ -105,7 +105,7 @@ export class PaymentReconciliationService {
       throw new NotFoundException('Payment not found');
     }
 
-    const payment = rows[0] as ReconciliationPaymentRow;
+    const payment = rows[0];
     const metadata = payment.metadata ?? {};
     const metadataGatewayResult = this.readMetadataString(
       metadata,
@@ -150,7 +150,9 @@ export class PaymentReconciliationService {
 
   async increaseReconciliationAttempt(input: { paymentId: string }) {
     // Đếm số lần đối soát trong metadata để BPMN có thể dừng retry khi vượt ngưỡng cấu hình.
-    const rows = await this.dataSource.query(
+    const rows = await this.dataSource.query<
+      Array<{ reconciliationAttempt: number | string }>
+    >(
       `
       UPDATE payment_service.payments
       SET metadata = jsonb_set(

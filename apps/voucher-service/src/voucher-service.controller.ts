@@ -13,7 +13,6 @@ import {
 } from '@nestjs/common';
 import { HeaderRolesGuard } from './auth/header-roles.guard';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
-import { RedeemVoucherDto } from './dto/redeem-voucher.dto';
 import { UpdateVoucherDto } from './dto/update-voucher.dto';
 import { ValidateVoucherDto } from './dto/validate-voucher.dto';
 import { VoucherServiceService } from './voucher-service.service';
@@ -48,11 +47,6 @@ export class VoucherServiceController {
     @Headers('x-user-id') userId?: string,
   ) {
     return this.voucherService.validateVoucher(dto, userId);
-  }
-
-  @Post('vouchers/redeem')
-  redeem(@Body() dto: RedeemVoucherDto, @Headers('x-user-id') userId?: string) {
-    return this.voucherService.redeemVoucher(userId, dto);
   }
 
   @Get('vouchers/me')

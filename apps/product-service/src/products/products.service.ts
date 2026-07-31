@@ -35,6 +35,7 @@ export class ProductsService {
         c.discount_value,
         c.gift_name,
         c.gift_description,
+        c.stackable_with_sale,
         c.badge_text,
         c.priority_order,
         c.start_at,
@@ -55,14 +56,33 @@ export class ProductsService {
     private readonly dataSource: DataSource,
   ) {}
 
-  private buildCampaignAdjustedPriceSql(basePriceSql: string) {
+  private buildCampaignAdjustedPriceSql(
+    basePriceSql: string,
+    regularPriceSql = basePriceSql,
+  ) {
+    const percentPriceSql = `GREATEST(${regularPriceSql} * (1 - COALESCE(ac.discount_value, 0) / 100.0), 0)`;
+    const amountPriceSql = `GREATEST(${regularPriceSql} - COALESCE(ac.discount_value, 0), 0)`;
     return `
       CASE
         WHEN ac.id IS NULL THEN ${basePriceSql}
         WHEN ac.discount_type = 'PERCENT'
-          THEN ROUND(GREATEST(${basePriceSql} * (1 - COALESCE(ac.discount_value, 0) / 100.0), 0), 2)
+          THEN ROUND(
+            CASE
+              WHEN ac.stackable_with_sale = TRUE
+                THEN GREATEST(${basePriceSql} * (1 - COALESCE(ac.discount_value, 0) / 100.0), 0)
+              ELSE LEAST(${basePriceSql}, ${percentPriceSql})
+            END,
+            2
+          )
         WHEN ac.discount_type = 'AMOUNT'
-          THEN ROUND(GREATEST(${basePriceSql} - COALESCE(ac.discount_value, 0), 0), 2)
+          THEN ROUND(
+            CASE
+              WHEN ac.stackable_with_sale = TRUE
+                THEN GREATEST(${basePriceSql} - COALESCE(ac.discount_value, 0), 0)
+              ELSE LEAST(${basePriceSql}, ${amountPriceSql})
+            END,
+            2
+          )
         ELSE ${basePriceSql}
       END
     `;
@@ -86,8 +106,10 @@ export class ProductsService {
     return this.getProductsForFrontend(keyword);
   }
 
-  async findOne(id: string) {
-    const product = await this.productRepo.findOne({ where: { id } });
+  async findOne(id: string, includeInactive = false) {
+    const product = await this.productRepo.findOne({
+      where: includeInactive ? { id } : { id, isActive: true },
+    });
 
     if (!product) {
       throw new NotFoundException('Product not found');
@@ -108,8 +130,13 @@ export class ProductsService {
   }
 
   async update(id: string, dto: UpdateProductDto) {
-    const product = await this.findOne(id);
+    const product = await this.findOne(id, true);
     const saleWindow = {
+      basePrice: dto.basePrice ?? Number(product.basePrice),
+      originalPrice:
+        dto.originalPrice !== undefined
+          ? dto.originalPrice
+          : (product.originalPrice ?? null),
       salePrice:
         dto.salePrice !== undefined
           ? dto.salePrice
@@ -147,7 +174,7 @@ export class ProductsService {
   }
 
   async remove(id: string) {
-    const product = await this.findOne(id);
+    const product = await this.findOne(id, true);
 
     product.isActive = false;
     product.updatedAt = new Date();
@@ -162,8 +189,10 @@ export class ProductsService {
 
   async getVariantSnapshot(variantId: string) {
     const variantBasePriceSql = `COALESCE(${this.activeSalePriceSql}, pv.price, p.base_price)`;
-    const variantEffectivePriceSql =
-      this.buildCampaignAdjustedPriceSql(variantBasePriceSql);
+    const variantEffectivePriceSql = this.buildCampaignAdjustedPriceSql(
+      variantBasePriceSql,
+      'COALESCE(pv.price, p.base_price)',
+    );
 
     const result = await this.dataSource.query(
       `
@@ -176,6 +205,13 @@ export class ProductsService {
       COALESCE(pv.size_label, '') AS "variantSize",
       COALESCE(pv.color_name, '') AS "variantColor",
       ${variantEffectivePriceSql} AS "unitPrice",
+      COALESCE(pv.price, p.base_price) AS "regularUnitPrice",
+      CASE
+        WHEN ${this.activeSalePriceSql} IS NOT NULL
+          AND ${this.activeSalePriceSql} < COALESCE(pv.price, p.base_price)
+        THEN TRUE
+        ELSE FALSE
+      END AS "isOnSale",
       pv.stock_quantity AS "stockQuantity",
       pv.reserved_quantity AS "reservedQuantity",
       pv.is_active AS "variantActive",
@@ -225,7 +261,7 @@ export class ProductsService {
     WHERE pv.id = $1
     GROUP BY pv.id, p.id, p.name, p.slug, pv.sku, pv.price, p.sale_price, p.sale_start_at, p.sale_end_at, p.base_price,
              pv.stock_quantity, pv.reserved_quantity,
-             pv.is_active, p.is_active, ac.id, ac.name, ac.discount_type, ac.discount_value, ac.badge_text
+             pv.is_active, p.is_active, ac.id, ac.name, ac.discount_type, ac.discount_value, ac.badge_text, ac.stackable_with_sale
     `,
       [variantId],
     );
@@ -247,6 +283,8 @@ export class ProductsService {
       variantColor: row.variantColor || '',
       thumbnailUrl: row.thumbnailUrl || '',
       unitPrice: Number(row.unitPrice),
+      regularUnitPrice: Number(row.regularUnitPrice),
+      isOnSale: row.isOnSale === true,
       campaignId: row.campaignId ?? null,
       campaignName: row.campaignName ?? null,
       campaignDiscountType: row.campaignDiscountType ?? null,
@@ -264,9 +302,11 @@ export class ProductsService {
   private async getProductsForFrontend(keyword?: string, exactSlug = false) {
     const effectiveProductPriceSql = this.buildCampaignAdjustedPriceSql(
       `COALESCE(${this.activeSalePriceSql}, p.base_price)`,
+      'p.base_price',
     );
     const effectiveVariantPriceSql = this.buildCampaignAdjustedPriceSql(
       `COALESCE(${this.activeSalePriceSql}, pv.price, p.base_price)`,
+      'COALESCE(pv.price, p.base_price)',
     );
 
     const queryParams: string[] = [];
@@ -342,7 +382,7 @@ export class ProductsService {
                 'sku', pv.sku,
                 'price', COALESCE(pv.price, p.base_price),
                 'salePrice', ${effectiveVariantPriceSql},
-                'stock', pv.stock_quantity,
+                'stock', GREATEST(pv.stock_quantity - pv.reserved_quantity, 0),
                 'images', COALESCE(
                   (
                     SELECT json_agg(vi.url ORDER BY vi.sort_order ASC)
@@ -446,6 +486,7 @@ export class ProductsService {
   async recommendProducts(gender?: string, ageGroup?: string) {
     const effectiveProductPriceSql = this.buildCampaignAdjustedPriceSql(
       `COALESCE(${this.activeSalePriceSql}, p.base_price)`,
+      'p.base_price',
     );
 
     const params: string[] = [];
@@ -526,10 +567,18 @@ export class ProductsService {
   }
 
   private validateSaleWindow(input: {
+    basePrice?: number | null;
+    originalPrice?: number | null;
     salePrice?: number | null;
     saleStartAt?: string | null;
     saleEndAt?: string | null;
   }) {
+    if (input.basePrice != null && Number(input.basePrice) < 0) {
+      throw new BadRequestException('Base price must not be negative');
+    }
+    if (input.originalPrice != null && Number(input.originalPrice) < 0) {
+      throw new BadRequestException('Original price must not be negative');
+    }
     if (
       input.salePrice != null &&
       Number.isFinite(input.salePrice) &&
@@ -537,6 +586,23 @@ export class ProductsService {
     ) {
       throw new BadRequestException(
         'Sale price must be greater than or equal to 0',
+      );
+    }
+
+    if (
+      input.salePrice != null &&
+      input.basePrice != null &&
+      Number(input.salePrice) > Number(input.basePrice)
+    ) {
+      throw new BadRequestException('Sale price must not exceed base price');
+    }
+    if (
+      input.originalPrice != null &&
+      input.basePrice != null &&
+      Number(input.originalPrice) < Number(input.basePrice)
+    ) {
+      throw new BadRequestException(
+        'Original price must be greater than or equal to base price',
       );
     }
 

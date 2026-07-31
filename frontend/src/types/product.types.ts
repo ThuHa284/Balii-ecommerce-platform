@@ -117,6 +117,13 @@ export interface Campaign {
   discountValue: number | null;
   giftName: string;
   giftDescription: string;
+  minimumPurchaseQuantity: number;
+  giftVariantId: string | null;
+  giftQuantity: number;
+  giftUnitPrice: number;
+  repeatable: boolean;
+  maxApplications: number | null;
+  stackableWithSale: boolean;
   badgeText: string;
   priorityOrder: number;
   startAt: string;
@@ -125,15 +132,4 @@ export interface Campaign {
   isLive: boolean;
   createdAt: string;
   updatedAt?: string;
-}
-
-export interface ComboTier {
-  id: string;
-  name: string;
-  minItems: number;
-  freeShorts: number;
-  shortsPrice: number; // 0 = free, 119000 = discounted
-  badge: string;
-  description: string;
-  icon: string;
 }

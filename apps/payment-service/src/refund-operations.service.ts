@@ -1,4 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { createHash } from 'crypto';
 import { DataSource } from 'typeorm';
 import { OrderClientService } from './clients/order-client.service';
@@ -17,6 +25,7 @@ type RefundWorkflowRow = {
   reason?: string | null;
   metadata?: Record<string, unknown> | null;
   retryCount?: number | string | null;
+  idempotencyKey?: string | null;
 };
 
 type AdminRefundRow = {
@@ -171,7 +180,19 @@ export class RefundOperationsService {
     method?: string;
     providerRefundId?: string;
   }) {
-    // Stub này giữ shape giống gateway thật để sau này thay adapter không phải đổi BPMN variables.
+    const productionSimulationAllowed =
+      process.env.PAYMENT_SIMULATION_ALLOW_PRODUCTION === 'true';
+    if (
+      process.env.PAYMENT_REFUND_SIMULATION_ENABLED !== 'true' ||
+      ((process.env.APP_ENV || process.env.NODE_ENV) === 'production' &&
+        !productionSimulationAllowed)
+    ) {
+      throw new BadRequestException(
+        'Adapter hoàn tiền nhà cung cấp chưa được cấu hình. Hãy xử lý hoàn tiền thủ công và chỉ xác nhận sau khi khách đã nhận tiền.',
+      );
+    }
+
+    // Chỉ dùng cho local/test để chạy thử BPMN; production bị chặn ở trên.
     const providerRefundId =
       input.providerRefundId ??
       `RF_GATEWAY_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
@@ -195,10 +216,7 @@ export class RefundOperationsService {
     return {
       accepted: true,
       providerRefundId,
-      gatewayMode:
-        input.method && ['vnpay', 'momo'].includes(input.method)
-          ? 'provider'
-          : 'sandbox',
+      gatewayMode: 'simulation',
     };
   }
 
@@ -227,6 +245,7 @@ export class RefundOperationsService {
           r.payment_id AS "paymentId",
           r.amount AS "refundAmount",
           r.reason,
+          r.idempotency_key AS "idempotencyKey",
           r.provider_refund_id AS "providerRefundId",
           p.order_id AS "orderId",
           p.user_id AS "userId",
@@ -276,6 +295,8 @@ export class RefundOperationsService {
 
       if (input.refundResult === 'SUCCESS') {
         const refundedStatusId = await this.getPaymentStatusId('refunded');
+        const partiallyRefundedStatusId =
+          await this.getPaymentStatusId('partially_refunded');
         const refundStatusId = await this.getPaymentStatusId('refunded');
 
         await manager.query(
@@ -304,19 +325,33 @@ export class RefundOperationsService {
 
         const refundAmount = Number(refund.refundAmount);
         const paymentAmount = Number(refund.paymentAmount);
-        const fullyRefunded = refundAmount >= paymentAmount;
+        const cumulativeRows = await manager.query(
+          `
+          SELECT COALESCE(SUM(r.amount), 0) AS total
+          FROM payment_service.refunds r
+          JOIN payment_service.payment_statuses status
+            ON status.id = r.status_id
+          WHERE r.payment_id = $1 AND status.code = 'refunded'
+          `,
+          [input.paymentId],
+        );
+        const fullyRefunded =
+          Number(cumulativeRows[0]?.total || 0) >= paymentAmount;
 
-        if (fullyRefunded) {
-          await manager.query(
-            `
-            UPDATE payment_service.payments
-            SET status_id = $1,
-                updated_at = NOW()
-            WHERE id = $2
-            `,
-            [refundedStatusId, input.paymentId],
-          );
-        }
+        await manager.query(
+          `
+          UPDATE payment_service.payments
+          SET status_id = $1,
+              refunded_amount = $2,
+              updated_at = NOW()
+          WHERE id = $3
+          `,
+          [
+            fullyRefunded ? refundedStatusId : partiallyRefundedStatusId,
+            Math.min(Number(cumulativeRows[0]?.total || 0), paymentAmount),
+            input.paymentId,
+          ],
+        );
 
         const outboxRows = await manager.query(
           `
@@ -359,6 +394,7 @@ export class RefundOperationsService {
           outboxEventId: outboxRows[0].id as string,
           fullyRefunded,
           orderId: refund.orderId,
+          returnRequestId: this.extractReturnRequestId(refund.idempotencyKey),
         };
       }
 
@@ -427,6 +463,7 @@ export class RefundOperationsService {
         outboxEventId: outboxRows[0].id as string,
         fullyRefunded: false,
         orderId: refund.orderId,
+        returnRequestId: this.extractReturnRequestId(refund.idempotencyKey),
       };
     });
 
@@ -438,11 +475,23 @@ export class RefundOperationsService {
       );
     }
 
+    if (result.returnRequestId) {
+      await this.orderClientService.updateReturnRefundResult(
+        result.returnRequestId,
+        result.refundStatus === 'SUCCESS' ? 'completed' : 'failed',
+      );
+    }
+
     return {
       refundStatus: result.refundStatus,
       outboxEventId: result.outboxEventId,
       fullyRefunded: result.fullyRefunded,
     };
+  }
+
+  private extractReturnRequestId(idempotencyKey?: string | null) {
+    const match = /^return:([0-9a-f-]{36})$/i.exec(idempotencyKey ?? '');
+    return match?.[1] ?? null;
   }
 
   async increaseRefundRetryCount(input: { refundId: string }) {

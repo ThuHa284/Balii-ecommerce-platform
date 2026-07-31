@@ -35,8 +35,9 @@ export default function CartDrawer() {
     removeItem,
     updateQuantity,
     hydrateCart,
+    serverSubtotal,
   } = useCartStore();
-  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+  const subtotal = serverSubtotal;
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
