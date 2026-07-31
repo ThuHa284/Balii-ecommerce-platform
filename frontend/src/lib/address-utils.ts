@@ -47,25 +47,27 @@ export function formatAddressLine(
 
 export async function resolveFallbackLocationIds(provinceId: number) {
   const districts = await getDistricts(provinceId);
-  const fallbackDistrict = districts[0];
 
-  if (!fallbackDistrict) {
+  if (!districts.length) {
     throw new Error('Tỉnh/thành phố này chưa có dữ liệu địa giới khả dụng.');
   }
 
-  const wards = await getWards(fallbackDistrict.id);
-  const fallbackWard = wards[0];
+  for (const district of districts) {
+    const wards = await getWards(district.id);
+    const fallbackWard = wards[0];
 
-  if (!fallbackWard) {
-    throw new Error('Tỉnh/thành phố này chưa có phường/xã khả dụng trong hệ thống.');
+    if (fallbackWard) {
+      return {
+        districtId: district.id,
+        wardId: fallbackWard.id,
+      };
+    }
   }
 
-  return {
-    districtId: fallbackDistrict.id,
-    wardId: fallbackWard.id,
-  };
+  throw new Error(
+    'Tỉnh/thành phố này chưa có phường/xã khả dụng trong hệ thống.',
+  );
 }
-
 export async function enrichAddressesWithLocationNames(
   addresses: Address[],
 ): Promise<Address[]> {

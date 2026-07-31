@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { loadEnv } from '@app/common';
 import { VirtualTryonServiceModule } from './virtual-tryon-service.module';
 
@@ -6,6 +7,13 @@ loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(VirtualTryonServiceModule);
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
 
   app.enableCors();
 

@@ -29,3 +29,7 @@ export const ROUTE_TARGETS: RouteTarget[] = [
 export const GATEWAY_TIMEOUT_MS = Number(
   process.env.GATEWAY_TIMEOUT_MS ?? '60000',
 );
+
+export const TRYON_GATEWAY_TIMEOUT_MS = Number(
+  process.env.TRYON_GATEWAY_TIMEOUT_MS ?? '150000',
+);

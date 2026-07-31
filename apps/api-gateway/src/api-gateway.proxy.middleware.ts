@@ -8,7 +8,10 @@ import { Request, Response } from 'express';
 import { request as httpRequest } from 'http';
 import { request as httpsRequest } from 'https';
 import { URL } from 'url';
-import { GATEWAY_TIMEOUT_MS } from './gateway.constants';
+import {
+  GATEWAY_TIMEOUT_MS,
+  TRYON_GATEWAY_TIMEOUT_MS,
+} from './gateway.constants';
 import { GatewayRouteService } from './gateway-route.service';
 
 @Injectable()
@@ -51,7 +54,7 @@ export class ApiGatewayProxyMiddleware implements NestMiddleware {
       {
         method: req.method,
         headers: this.buildHeaders(req, targetUrl, payload),
-        timeout: GATEWAY_TIMEOUT_MS,
+        timeout: this.getRequestTimeout(req),
       },
       (proxyRes) => {
         res.status(proxyRes.statusCode ?? 502);
@@ -110,6 +113,17 @@ export class ApiGatewayProxyMiddleware implements NestMiddleware {
     }
 
     proxyReq.end();
+  }
+
+  private getRequestTimeout(req: Request): number {
+    if (
+      req.method === 'POST' &&
+      ['/try-on/sync', '/try-on/product-design/sync'].includes(req.path)
+    ) {
+      return TRYON_GATEWAY_TIMEOUT_MS;
+    }
+
+    return GATEWAY_TIMEOUT_MS;
   }
 
   private buildHeaders(

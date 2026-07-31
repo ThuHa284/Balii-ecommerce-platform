@@ -73,6 +73,22 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  migrations:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrations
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+
   user-service:
     build:
       context: .
@@ -82,8 +98,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     env_file:
@@ -105,8 +121,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment:
@@ -148,8 +164,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
       payment-service:
         condition: service_started
     env_file:
@@ -171,8 +187,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
       kafka:
         condition: service_started
       camunda:
@@ -199,8 +215,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment:
@@ -219,8 +235,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment:
@@ -239,8 +255,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     env_file:

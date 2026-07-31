@@ -21,7 +21,6 @@ import TryOnResult from '@/components/ai/try-on-result';
 import TryOnShopReferencePicker from '@/components/ai/try-on-shop-reference-picker';
 import TryOnUpload from '@/components/ai/try-on-upload';
 import TryOnWarningModal from '@/components/ai/try-on-warning-modal';
-import AuthGuard from '@/components/auth/auth-guard';
 import {
   getProductBySlug,
   getRecommendedProducts,
@@ -152,10 +151,10 @@ function TryOnContent() {
     setGeneratingPhase,
     setResultImage,
     setResultUrl,
+    setResultId,
     setPersonAnalysis,
     setConfidence,
     setShowGuide,
-    saveToHistory,
   } = useTryOnStore();
 
   const [warningData, setWarningData] = useState<TryOnSyncResponse | null>(
@@ -325,6 +324,7 @@ function TryOnContent() {
 
       setResultImage(response.resultUrl);
       setResultUrl(response.resultUrl);
+      setResultId(response.id ?? null);
       setPersonAnalysis(response.personAnalysis ?? null);
       setConfidence(0);
       setCurrentStep('result');
@@ -332,16 +332,13 @@ function TryOnContent() {
       setIsWarningOpen(false);
       setRecommendedProducts([]);
       toast.success('Tạo ảnh mặc thử thành công.');
-      window.setTimeout(() => {
-        saveToHistory();
-      }, 0);
     },
     [
-      saveToHistory,
       setConfidence,
       setCurrentStep,
       setPersonAnalysis,
       setResultImage,
+      setResultId,
       setResultUrl,
     ],
   );
@@ -521,13 +518,11 @@ function TryOnContent() {
 
       setResultImage(response.resultUrl);
       setResultUrl(response.resultUrl);
+      setResultId(response.id ?? null);
       setPersonAnalysis(null);
       setConfidence(0);
       setCurrentStep('result');
       toast.success('Tạo ảnh sản phẩm thành công.');
-      window.setTimeout(() => {
-        saveToHistory();
-      }, 0);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -542,7 +537,6 @@ function TryOnContent() {
     colorReferenceImage,
     garmentImage,
     patternReferenceImage,
-    saveToHistory,
     selectedProduct?.id,
     setConfidence,
     setCurrentStep,
@@ -551,6 +545,7 @@ function TryOnContent() {
     setIsGenerating,
     setPersonAnalysis,
     setResultImage,
+    setResultId,
     setResultUrl,
     simulateProgress,
   ]);
@@ -780,7 +775,9 @@ function TryOnContent() {
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-500 text-[11px] font-bold text-white">
                       1
                     </div>
-                    <h2 className="text-sm font-medium text-foreground">Ảnh của bạn</h2>
+                    <h2 className="text-sm font-medium text-foreground">
+                      Ảnh của bạn
+                    </h2>
                   </div>
                   <TryOnUpload compact />
                   <PersonAnalysisCard
@@ -797,7 +794,9 @@ function TryOnContent() {
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-500 text-[11px] font-bold text-white">
                       2
                     </div>
-                    <h2 className="text-sm font-medium text-foreground">Form gốc</h2>
+                    <h2 className="text-sm font-medium text-foreground">
+                      Form gốc
+                    </h2>
                   </div>
                   <TryOnGarmentPicker compact />
                 </div>
@@ -808,7 +807,9 @@ function TryOnContent() {
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-[11px] font-bold text-white">
                       ✨
                     </div>
-                    <h2 className="text-sm font-medium text-foreground">Kết quả</h2>
+                    <h2 className="text-sm font-medium text-foreground">
+                      Kết quả
+                    </h2>
                   </div>
                   {isGenerating || resultImage ? (
                     <TryOnResult compact />
@@ -837,8 +838,8 @@ function TryOnContent() {
                 </div>
 
                 <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/90 px-2.5 py-1.5 text-[11px] text-amber-800">
-                  Nếu backend trả về lỗi quota Gemini, tab demo sẽ chưa thể
-                  tạo ảnh cho đến khi API key có quota hoặc billing hợp lệ.
+                  Nếu backend trả về lỗi quota Gemini, tab demo sẽ chưa thể tạo
+                  ảnh cho đến khi API key có quota hoặc billing hợp lệ.
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
@@ -932,19 +933,17 @@ function TryOnContent() {
 
 export default function TryOnPage() {
   return (
-    <AuthGuard redirectTo="/login?redirect=/try-on">
-      <Suspense
-        fallback={
-          <div className="flex min-h-screen items-center justify-center pb-16 pt-28">
-            <div className="text-center">
-              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-violet-300 border-t-violet-500" />
-              <p className="text-sm text-muted-foreground">Đang tải...</p>
-            </div>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center pb-16 pt-28">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-violet-300 border-t-violet-500" />
+            <p className="text-sm text-muted-foreground">Đang tải...</p>
           </div>
-        }
-      >
-        <TryOnContent />
-      </Suspense>
-    </AuthGuard>
+        </div>
+      }
+    >
+      <TryOnContent />
+    </Suspense>
   );
 }

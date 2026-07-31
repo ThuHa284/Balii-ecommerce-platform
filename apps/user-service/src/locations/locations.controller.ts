@@ -16,7 +16,14 @@ export class LocationsController {
   }
 
   @Get('wards')
-  findWards(@Query('districtId') districtId: string) {
+  findWards(
+    @Query('districtId') districtId?: string,
+    @Query('provinceId') provinceId?: string,
+  ) {
+    if (provinceId) {
+      return this.locationsService.findWardsByProvince(Number(provinceId));
+    }
+
     return this.locationsService.findWards(Number(districtId));
   }
 }

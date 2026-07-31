@@ -1,4 +1,10 @@
-import { IsBooleanString, IsIn, IsOptional, IsString } from 'class-validator';
+import {
+  IsBooleanString,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateTryOnDto {
   @IsOptional()
@@ -14,7 +20,7 @@ export class CreateTryOnDto {
   garmentPhotoType?: 'auto' | 'model' | 'flat-lay';
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   productId?: string;
 
   @IsOptional()
@@ -33,6 +39,6 @@ export class CreateTryOnDto {
 
 export class CreateProductDesignDto {
   @IsOptional()
-  @IsString()
+  @IsUUID()
   productId?: string;
 }
