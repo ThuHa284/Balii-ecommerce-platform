@@ -287,6 +287,22 @@ type BackendMarketSearchResponse = {
   skippedCount?: number;
 };
 
+export interface AdminVectorStoreDiagnostics {
+  embeddingEnabled: boolean;
+  embeddingModel: string;
+  qdrantUrl: string;
+  collection: string;
+  collectionReady: boolean;
+  indexedPoints: number | null;
+  lastError: string | null;
+}
+
+export interface AdminVectorDiagnostics {
+  vectorHealthy: boolean;
+  vector: AdminVectorStoreDiagnostics;
+  message?: string;
+}
+
 export interface AdminDashboardStats {
   totalRevenue: number;
   totalOrders: number;
@@ -309,6 +325,36 @@ export interface AdminAnalyticsStats {
   monthlyRevenue: AdminRevenuePoint[];
   topProducts: AdminTopProduct[];
   orderStatusBreakdown: AdminOrderStatusPoint[];
+}
+
+export async function getAdminVectorDiagnostics(): Promise<AdminVectorDiagnostics> {
+  const { data } = await apiClient.get<{
+    success: boolean;
+    message: string;
+    data: {
+      vectorHealthy: boolean;
+      vector: AdminVectorStoreDiagnostics;
+    };
+  }>('/chatbot/diagnostics');
+
+  return {
+    ...data.data,
+    message: data.message,
+  };
+}
+
+export async function reindexAdminVectorDatabase(): Promise<AdminVectorStoreDiagnostics> {
+  const { data } = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: AdminVectorStoreDiagnostics;
+  }>('/chatbot/reindex');
+
+  if (!data.success) {
+    throw new Error(data.message);
+  }
+
+  return data.data;
 }
 
 export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
@@ -522,6 +568,18 @@ export async function runAdminWorkflowDemo(payload: {
   );
   return data;
 }
+export async function resolveAdminWorkflowDemoIncident(payload: {
+  processInstanceId: string;
+  orderId?: string;
+  paymentId?: string;
+}): Promise<AdminWorkflowMonitorResponse> {
+  const { data } = await apiClient.post<AdminWorkflowMonitorResponse>(
+    '/payments/admin/workflow-demo/resolve',
+    payload,
+  );
+  return data;
+}
+
 export async function getAdminWorkflowOverview(): Promise<AdminWorkflowOverviewResponse> {
   const { data } = await apiClient.get<AdminWorkflowOverviewResponse>(
     '/payments/admin/workflow-overview',

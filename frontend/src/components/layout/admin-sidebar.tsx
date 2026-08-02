@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   BarChart3,
+  Database,
   Grid2x2,
   LayoutDashboard,
   Library,
@@ -48,6 +49,11 @@ const adminLinks: AdminLink[] = [
     label: 'Kafka Events',
     icon: Network,
     roles: [UserRole.SUPER_ADMIN],
+  },
+  {
+    href: '/admin/vector-database',
+    label: 'Vector Database',
+    icon: Database,
   },
   { href: '/admin/vouchers', label: 'Voucher', icon: Ticket },
   { href: '/admin/users', label: 'Khách hàng', icon: Users },

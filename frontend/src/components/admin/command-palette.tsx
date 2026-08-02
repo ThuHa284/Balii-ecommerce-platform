@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   BarChart3,
+  Database,
   LayoutDashboard,
   Library,
   Megaphone,
@@ -100,6 +101,14 @@ const NAV_OPTIONS: NavOption[] = [
     icon: BarChart3,
     keywords:
       'phan tich thi truong market analysis tim bang anh google lens san pham tuong tu doi thu',
+  },
+  {
+    label: 'Giám sát Vector Database',
+    href: '/admin/vector-database',
+    category: 'Hệ thống AI',
+    icon: Database,
+    keywords:
+      'qdrant vector database embedding collection points semantic search',
   },
   {
     label: 'Giám sát Kafka Events',

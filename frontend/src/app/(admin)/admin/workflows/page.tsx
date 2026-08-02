@@ -3,6 +3,7 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import {
   AlertTriangle,
+  ExternalLink,
   Loader2,
   PauseCircle,
   PlayCircle,
@@ -17,6 +18,7 @@ import {
   AdminWorkflowContext,
   getAdminWorkflowContexts,
   getAdminWorkflowMonitor,
+  resolveAdminWorkflowDemoIncident,
   runAdminWorkflowDemo,
 } from '@/lib/api/admin.api';
 import {
@@ -463,6 +465,35 @@ export default function AdminWorkflowsPage() {
     }
   }
 
+  async function handleResolveDemoIncident() {
+    const processInstanceId = result?.paymentWorkflow.processInstanceId;
+    if (!processInstanceId || !result) {
+      setError('Chưa có process instance bị incident để khôi phục.');
+      return;
+    }
+
+    try {
+      setDemoRunning(true);
+      setError(null);
+      const data = await resolveAdminWorkflowDemoIncident({
+        processInstanceId,
+        orderId: result.payment.orderId,
+        paymentId: result.payment.id,
+      });
+      setResult(data);
+      setLastUpdated(new Date().toISOString());
+      setAutoRefresh(true);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Không thể gỡ lỗi demo và retry workflow.',
+      );
+    } finally {
+      setDemoRunning(false);
+    }
+  }
+
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await loadWorkflow({
@@ -473,14 +504,25 @@ export default function AdminWorkflowsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-3xl font-bold text-foreground">
-          Workflow Monitor
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Xem trực tiếp sơ đồ BPMN, bước đang chạy, lịch sử và incident của
-          payment hoặc refund.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-3xl font-bold text-foreground">
+            Workflow Monitor
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            Xem trực tiếp sơ đồ BPMN, bước đang chạy, lịch sử và incident của
+            payment hoặc refund.
+          </p>
+        </div>
+        <a
+          href="http://localhost:8082/camunda/app/cockpit/default/"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white/70 px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-white"
+        >
+          <ExternalLink className="h-4 w-4" />
+          Mở Camunda Cockpit
+        </a>
       </div>
 
       <WorkflowOverview />
@@ -763,6 +805,22 @@ export default function AdminWorkflowsPage() {
             workflow={result.paymentWorkflow}
             actionSlot={
               <div className="flex flex-wrap items-center gap-2">
+                {result.paymentWorkflow.state === 'INCIDENT' ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleResolveDemoIncident()}
+                    disabled={demoRunning || loading}
+                    title="Xóa fault giả lập, tăng retries cho external task và cho workflow chạy tiếp."
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {demoRunning ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Gỡ lỗi demo và Retry
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {

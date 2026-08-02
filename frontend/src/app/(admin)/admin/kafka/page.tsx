@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
+  ExternalLink,
   Inbox,
   Loader2,
   Network,
@@ -119,7 +120,7 @@ function KafkaDashboard() {
           </p>
         </div>
 
-        <div>
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => void loadData()}
@@ -129,6 +130,15 @@ function KafkaDashboard() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Làm mới
           </button>
+          <a
+            href={data?.kafkaUiUrl || 'http://localhost:8081'}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Mở Kafka UI: Topic & Partition
+          </a>
         </div>
       </div>
 
@@ -400,9 +410,14 @@ function KafkaDemoPanel() {
     const t0 = performance.now();
     try {
       const result = await runKafkaDemoSync({ recipient, message });
-      setSyncResult({ ...result, clientRttMs: Math.round(performance.now() - t0) });
+      setSyncResult({
+        ...result,
+        clientRttMs: Math.round(performance.now() - t0),
+      });
     } catch (err) {
-      setDemoError(err instanceof Error ? err.message : 'Lỗi khi chạy demo đồng bộ.');
+      setDemoError(
+        err instanceof Error ? err.message : 'Lỗi khi chạy demo đồng bộ.',
+      );
     } finally {
       setSyncBusy(false);
     }
@@ -414,9 +429,14 @@ function KafkaDemoPanel() {
     const t0 = performance.now();
     try {
       const result = await runKafkaDemoAsync({ recipient, message });
-      setAsyncResult({ ...result, clientRttMs: Math.round(performance.now() - t0) });
+      setAsyncResult({
+        ...result,
+        clientRttMs: Math.round(performance.now() - t0),
+      });
     } catch (err) {
-      setDemoError(err instanceof Error ? err.message : 'Lỗi khi chạy demo Kafka.');
+      setDemoError(
+        err instanceof Error ? err.message : 'Lỗi khi chạy demo Kafka.',
+      );
     } finally {
       setAsyncBusy(false);
     }
@@ -430,9 +450,10 @@ function KafkaDemoPanel() {
             Demo: Kafka vs không Kafka
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Cùng một hành động &quot;gửi thông báo đơn hàng&quot;, làm theo 2 cách.
-            Đồng bộ: caller bị chặn tới khi xử lý xong. Bất đồng bộ (Kafka): caller
-            được trả về ngay, consumer xử lý nền (xem log bên dưới).
+            Cùng một hành động &quot;gửi thông báo đơn hàng&quot;, làm theo 2
+            cách. Đồng bộ: caller bị chặn tới khi xử lý xong. Bất đồng bộ
+            (Kafka): caller được trả về ngay, consumer xử lý nền (xem log bên
+            dưới).
           </p>
         </div>
         <span
@@ -442,7 +463,9 @@ function KafkaDemoPanel() {
               : 'bg-amber-100 text-amber-700'
           }`}
         >
-          {status?.connected ? 'Consumer demo đang chạy' : 'Consumer demo chưa kết nối'}
+          {status?.connected
+            ? 'Consumer demo đang chạy'
+            : 'Consumer demo chưa kết nối'}
         </span>
       </div>
 
@@ -515,7 +538,8 @@ function KafkaDemoPanel() {
             <h3 className="font-semibold">Qua Kafka (bất đồng bộ)</h3>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Publish event rồi trả về ngay. Consumer xử lý nền, không chặn caller.
+            Publish event rồi trả về ngay. Consumer xử lý nền, không chặn
+            caller.
           </p>
           <button
             type="button"
@@ -556,15 +580,16 @@ function KafkaDemoPanel() {
                 <span className="font-mono">{entry.recipient}</span>
                 <span className="truncate">{entry.message}</span>
                 <span className="text-muted-foreground">
-                  xử lý sau {entry.latencyMs} ms · {formatDateTime(entry.processedAt)}
+                  xử lý sau {entry.latencyMs} ms ·{' '}
+                  {formatDateTime(entry.processedAt)}
                 </span>
               </div>
             ))}
           </div>
         ) : (
           <p className="mt-2 text-xs text-muted-foreground">
-            Chưa có event nào được consumer xử lý. Bấm &quot;Gửi qua Kafka&quot; để thấy
-            message được xử lý nền sau vài giây.
+            Chưa có event nào được consumer xử lý. Bấm &quot;Gửi qua Kafka&quot;
+            để thấy message được xử lý nền sau vài giây.
           </p>
         )}
       </div>

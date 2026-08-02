@@ -269,6 +269,19 @@ export class PaymentServiceController {
   ): ReturnType<PaymentServiceService['runAdminWorkflowDemo']> {
     return this.paymentServiceService.runAdminWorkflowDemo(body);
   }
+  @Post('admin/workflow-demo/resolve')
+  @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
+  resolveAdminWorkflowDemoIncident(
+    @Body()
+    body: {
+      processInstanceId: string;
+      orderId?: string;
+      paymentId?: string;
+    },
+  ): ReturnType<PaymentServiceService['resolveAdminWorkflowDemoIncident']> {
+    return this.paymentServiceService.resolveAdminWorkflowDemoIncident(body);
+  }
+
   @Get('admin/workflows')
   @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   getAdminWorkflows(

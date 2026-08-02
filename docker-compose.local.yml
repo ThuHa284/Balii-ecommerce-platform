@@ -1,0 +1,182 @@
+services:
+  production-env-check:
+    command:
+      - sh
+      - -c
+      - echo "Skipping production env validation for local Docker Compose"
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - kafka
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        cub kafka-ready -b kafka:29092 1 60 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.success --partitions 3 --replication-factor 1 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.failed --partitions 3 --replication-factor 1 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.expired --partitions 3 --replication-factor 1 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.refund.completed --partitions 3 --replication-factor 1 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic notification.refund.completed --partitions 3 --replication-factor 1
+    restart: 'no'
+
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_CLUSTERS_0_NAME: balii-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      DYNAMIC_CONFIG_ENABLED: 'true'
+    ports:
+      - '127.0.0.1:8081:8080'
+    restart: unless-stopped
+
+  camunda:
+    ports: !override
+      - '127.0.0.1:8082:8080'
+
+  qdrant:
+    ports:
+      - '127.0.0.1:6335:6333'
+
+  api-gateway:
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+      GATEWAY_SERVICE_SECRET: balii-local-gateway-secret
+      INTERNAL_SERVICE_SECRET: balii-local-internal-secret
+
+  user-service:
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+      GATEWAY_SERVICE_SECRET: balii-local-gateway-secret
+      INTERNAL_SERVICE_SECRET: balii-local-internal-secret
+
+  product-service:
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+      GATEWAY_SERVICE_SECRET: balii-local-gateway-secret
+      INTERNAL_SERVICE_SECRET: balii-local-internal-secret
+
+  cart-service:
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+      GATEWAY_SERVICE_SECRET: balii-local-gateway-secret
+      INTERNAL_SERVICE_SECRET: balii-local-internal-secret
+
+  order-service:
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+      GATEWAY_SERVICE_SECRET: balii-local-gateway-secret
+      INTERNAL_SERVICE_SECRET: balii-local-internal-secret
+
+  payment-service:
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+      GATEWAY_SERVICE_SECRET: balii-local-gateway-secret
+      INTERNAL_SERVICE_SECRET: balii-local-internal-secret
+      PAYMENT_SIMULATION_ENABLED: 'true'
+      VNPAY_PAYMENT_URL: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+      VNPAY_RETURN_URL: http://localhost:4000/payments/vnpay/return
+      VNPAY_IPN_URL: http://localhost:4000/payments/vnpay/ipn
+      PAYMENT_PUBLIC_RETURN_URL: http://localhost:3000/checkout/result
+
+  voucher-service:
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+      GATEWAY_SERVICE_SECRET: balii-local-gateway-secret
+      INTERNAL_SERVICE_SECRET: balii-local-internal-secret
+
+  market-analysis-service:
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+      GATEWAY_SERVICE_SECRET: balii-local-gateway-secret
+      INTERNAL_SERVICE_SECRET: balii-local-internal-secret
+
+  virtual-tryon-service:
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+      GATEWAY_SERVICE_SECRET: balii-local-gateway-secret
+      INTERNAL_SERVICE_SECRET: balii-local-internal-secret
+
+  chatbot-service:
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+      GATEWAY_SERVICE_SECRET: balii-local-gateway-secret
+      INTERNAL_SERVICE_SECRET: balii-local-internal-secret
+      QDRANT_URL: http://qdrant:6333
+
+  frontend:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+        NEXT_PUBLIC_SOCKET_URL: http://localhost:4000
+        NEXT_PUBLIC_SHOW_ACADEMIC_NOTICE: 'false'
+        NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION: 'true'
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_SOCKET_URL: http://localhost:4000
+      NEXT_PUBLIC_SHOW_ACADEMIC_NOTICE: 'false'
+      NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION: 'true'

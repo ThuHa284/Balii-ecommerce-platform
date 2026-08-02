@@ -1855,6 +1855,23 @@ export class PaymentServiceService {
     return this.getAdminWorkflowMonitor({ paymentId: payment.id });
   }
 
+  async resolveAdminWorkflowDemoIncident(input: {
+    processInstanceId: string;
+    orderId?: string;
+    paymentId?: string;
+  }) {
+    const payment = await this.findAdminWorkflowDemoPayment({
+      orderId: input.orderId,
+      paymentId: input.paymentId,
+    });
+
+    await this.camundaClientService.resolveDemoIncident(
+      input.processInstanceId,
+    );
+
+    return this.getAdminWorkflowMonitor({ paymentId: payment.id });
+  }
+
   private async findAdminWorkflowDemoPayment(input: {
     orderId?: string;
     paymentId?: string;
