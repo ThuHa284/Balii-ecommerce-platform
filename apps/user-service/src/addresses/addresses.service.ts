@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
@@ -22,65 +26,85 @@ export class AddressesService {
   }
 
   async create(userId: string, dto: CreateAddressDto) {
-    console.log('========== CREATE ADDRESS ==========');
-    console.log('USER ID:', userId);
-    console.log('DTO:', dto);
+    return this.dataSource.transaction(async (manager) => {
+      await this.lockUser(manager, userId);
+      await this.validateLocationHierarchy(manager, dto);
 
-    const count = await this.addressRepo.count({
-      where: { userId },
+      const count = await manager.count(UserAddress, { where: { userId } });
+      if (count >= 5) {
+        throw new BadRequestException(
+          'Mỗi tài khoản chỉ được lưu tối đa 5 địa chỉ.',
+        );
+      }
+
+      const address = manager.create(UserAddress, {
+        userId,
+        ...dto,
+        isDefault: count === 0,
+      });
+      return manager.save(address);
     });
-
-    console.log('ADDRESS COUNT:', count);
-
-    const address = this.addressRepo.create({
-      userId,
-      ...dto,
-      isDefault: count === 0,
-    });
-
-    console.log('ADDRESS ENTITY:', address);
-
-    const savedAddress = await this.addressRepo.save(address);
-
-    console.log('SAVED ADDRESS:', savedAddress);
-    console.log('===================================');
-
-    return savedAddress;
   }
 
   async update(userId: string, id: string, dto: UpdateAddressDto) {
-    const address = await this.addressRepo.findOne({
-      where: { id, userId },
+    return this.dataSource.transaction(async (manager) => {
+      await this.lockUser(manager, userId);
+      const address = await manager.findOne(UserAddress, {
+        where: { id, userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!address) {
+        throw new NotFoundException('Không tìm thấy địa chỉ');
+      }
+
+      await this.validateLocationHierarchy(manager, {
+        provinceId: dto.provinceId ?? address.provinceId,
+        districtId: dto.districtId ?? address.districtId,
+        wardId: dto.wardId ?? address.wardId,
+      });
+      Object.assign(address, dto);
+      return manager.save(address);
     });
-
-    if (!address) {
-      throw new NotFoundException('Không tìm thấy địa chỉ');
-    }
-
-    Object.assign(address, dto);
-    return this.addressRepo.save(address);
   }
 
   async remove(userId: string, id: string) {
-    const address = await this.addressRepo.findOne({
-      where: { id, userId },
+    return this.dataSource.transaction(async (manager) => {
+      await this.lockUser(manager, userId);
+      const address = await manager.findOne(UserAddress, {
+        where: { id, userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!address) {
+        throw new NotFoundException('Không tìm thấy địa chỉ');
+      }
+
+      const wasDefault = address.isDefault;
+      await manager.remove(address);
+      if (wasDefault) {
+        await manager.query(
+          `
+          UPDATE user_service.user_addresses
+          SET is_default = TRUE
+          WHERE id = (
+            SELECT id FROM user_service.user_addresses
+            WHERE user_id = $1
+            ORDER BY id
+            LIMIT 1
+          )
+          `,
+          [userId],
+        );
+      }
+      return { message: 'Xóa địa chỉ thành công' };
     });
-
-    if (!address) {
-      throw new NotFoundException('Không tìm thấy địa chỉ');
-    }
-
-    await this.addressRepo.remove(address);
-
-    return {
-      message: 'Xóa địa chỉ thành công',
-    };
   }
 
   async setDefault(userId: string, id: string) {
     return this.dataSource.transaction(async (manager) => {
+      await this.lockUser(manager, userId);
       const address = await manager.findOne(UserAddress, {
         where: { id, userId },
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!address) {
@@ -95,5 +119,41 @@ export class AddressesService {
         where: { id, userId },
       });
     });
+  }
+
+  private async lockUser(
+    manager: import('typeorm').EntityManager,
+    userId: string,
+  ) {
+    const rows = await manager.query<Array<{ id: string }>>(
+      `SELECT id FROM user_service.users WHERE id = $1 FOR UPDATE`,
+      [userId],
+    );
+    if (!rows.length) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+  }
+
+  private async validateLocationHierarchy(
+    manager: import('typeorm').EntityManager,
+    location: { provinceId: number; districtId: number; wardId: number },
+  ) {
+    const rows = await manager.query<Array<{ exists: number }>>(
+      `
+      SELECT 1
+      FROM user_service.wards ward
+      JOIN user_service.districts district ON district.id = ward.district_id
+      WHERE ward.id = $1
+        AND district.id = $2
+        AND district.province_id = $3
+      LIMIT 1
+      `,
+      [location.wardId, location.districtId, location.provinceId],
+    );
+    if (!rows.length) {
+      throw new BadRequestException(
+        'Tỉnh, quận/huyện và phường/xã không hợp lệ.',
+      );
+    }
   }
 }

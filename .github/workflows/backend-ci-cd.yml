@@ -11,6 +11,7 @@ on:
         'infra/camunda/**',
         'package*.json',
         'Dockerfile.backend',
+        'Dockerfile.migrations',
         'docker-compose.prod.yml',
         '.github/workflows/backend-ci-cd.yml',
       ]
@@ -25,6 +26,7 @@ on:
         'infra/camunda/**',
         'package*.json',
         'Dockerfile.backend',
+        'Dockerfile.migrations',
         'docker-compose.prod.yml',
         '.github/workflows/backend-ci-cd.yml',
       ]
@@ -41,6 +43,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit -p apps/api-gateway/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/user-service/tsconfig.app.json
       - run: npx tsc --noEmit -p apps/order-service/tsconfig.app.json
       - run: npx tsc --noEmit -p apps/payment-service/tsconfig.app.json
       - run: npx tsc --noEmit -p apps/virtual-tryon-service/tsconfig.app.json
@@ -70,7 +73,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          source: 'apps,libs,database,frontend,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,docker-compose.prod.yml,.dockerignore'
+          source: 'apps,libs,database,frontend,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,Dockerfile.migrations,docker-compose.prod.yml,.dockerignore'
           target: /opt/balii-backend
       - name: Rebuild backend services
         uses: appleboy/ssh-action@v1.2.0

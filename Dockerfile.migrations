@@ -1,0 +1,14 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY --chown=node:node package.json package-lock.json nest-cli.json tsconfig.json tsconfig.build.json ./
+COPY --chown=node:node apps ./apps
+COPY --chown=node:node libs ./libs
+
+RUN npm ci
+
+ENV NODE_ENV=production
+USER node
+
+CMD ["npm", "run", "migration:run"]

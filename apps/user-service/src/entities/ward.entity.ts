@@ -10,4 +10,7 @@ export class Ward {
 
   @Column()
   name!: string;
+
+  @Column({ type: 'varchar', length: 5, nullable: true })
+  code!: string | null;
 }
