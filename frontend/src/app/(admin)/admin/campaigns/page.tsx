@@ -31,6 +31,8 @@ import { formatCurrency } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { Campaign, CampaignDiscountType, Product } from '@/types/product.types';
 
+const MAX_CAMPAIGN_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+
 const discountTypeOptions: Array<{
   value: CampaignDiscountType;
   label: string;
@@ -62,7 +64,9 @@ function toDateTimeLocalInput(value: string) {
 }
 
 function normalizeDateTimeInput(value: string) {
-  return value ? new Date(value).toISOString() : '';
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
 }
 
 function getCampaignOfferLabel(campaign: Campaign) {
@@ -230,8 +234,8 @@ export default function AdminCampaignsPage() {
 
   function handleImageFileChange(file: File | null, kind: 'cover' | 'banner') {
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Ảnh quá lớn, tối đa 10MB.');
+    if (file.size > MAX_CAMPAIGN_IMAGE_SIZE_BYTES) {
+      toast.error('Ảnh quá lớn, dung lượng tối đa là 5 MB.');
       return;
     }
 
@@ -259,6 +263,18 @@ export default function AdminCampaignsPage() {
 
     if (!name.trim() || !slug.trim() || !startAt || !endAt) {
       toast.error('Vui lòng điền đầy đủ các trường bắt buộc.');
+      return;
+    }
+
+    const normalizedStartAt = normalizeDateTimeInput(startAt);
+    const normalizedEndAt = normalizeDateTimeInput(endAt);
+    if (!normalizedStartAt || !normalizedEndAt) {
+      toast.error('Ngày giờ bắt đầu hoặc kết thúc không hợp lệ.');
+      return;
+    }
+
+    if (new Date(normalizedStartAt) >= new Date(normalizedEndAt)) {
+      toast.error('Thời gian kết thúc phải sau thời gian bắt đầu.');
       return;
     }
 
@@ -306,8 +322,8 @@ export default function AdminCampaignsPage() {
         stackableWithSale,
         badgeText: badgeText.trim(),
         priorityOrder: Number(priorityOrder || 0),
-        startAt: normalizeDateTimeInput(startAt),
-        endAt: normalizeDateTimeInput(endAt),
+        startAt: normalizedStartAt,
+        endAt: normalizedEndAt,
         isActive,
       };
 
@@ -703,6 +719,8 @@ export default function AdminCampaignsPage() {
                   <input
                     type="datetime-local"
                     required
+                    lang="vi-VN"
+                    step={60}
                     value={startAt}
                     onChange={(event) => setStartAt(event.target.value)}
                     className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
@@ -715,6 +733,8 @@ export default function AdminCampaignsPage() {
                   <input
                     type="datetime-local"
                     required
+                    lang="vi-VN"
+                    step={60}
                     value={endAt}
                     onChange={(event) => setEndAt(event.target.value)}
                     className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"

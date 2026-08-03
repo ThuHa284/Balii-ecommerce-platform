@@ -176,6 +176,10 @@ function normalizeApiErrorMessage(
     return 'Dữ liệu đang xung đột. Vui lòng kiểm tra lại.';
   }
 
+  if (status === 413) {
+    return 'Ảnh tải lên quá lớn. Dung lượng tối đa là 5 MB.';
+  }
+
   if (status === 422) {
     if (requestUrl.includes('/users/me/addresses')) {
       return 'Thông tin địa chỉ chưa hợp lệ. Vui lòng kiểm tra lại.';
