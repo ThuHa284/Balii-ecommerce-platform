@@ -135,7 +135,6 @@ export const useAuthStore = create<AuthState>()(
           districtId: addressData.districtId || fallbackIds.districtId,
           wardId: addressData.wardId || fallbackIds.wardId,
           streetAddress: encodeStoredAddress(addressData.street, addressData.ward),
-          isDefault: addressData.isDefault ?? false,
         });
         const shouldSetDefault =
           addressData.isDefault === true && addresses.length > 0;
@@ -172,7 +171,6 @@ export const useAuthStore = create<AuthState>()(
             data.street && data.ward
               ? encodeStoredAddress(data.street, data.ward)
               : data.street,
-          isDefault: data.isDefault,
         });
         if (data.isDefault) {
           await setDefaultAddressApi(id);

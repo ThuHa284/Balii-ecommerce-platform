@@ -14,7 +14,6 @@ type AddressPayload = {
   districtId: number;
   wardId: number;
   streetAddress: string;
-  isDefault: boolean;
 };
 
 export async function getMyAddresses(): Promise<Address[]> {
