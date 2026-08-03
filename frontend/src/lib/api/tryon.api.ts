@@ -24,6 +24,10 @@ async function imageUrlToFile(
   imageUrl: string,
   baseName: string,
 ): Promise<File> {
+  if (imageUrl.startsWith('data:')) {
+    return dataUrlToFile(imageUrl, baseName);
+  }
+
   const response = await fetch(imageUrl);
 
   if (!response.ok) {
@@ -35,6 +39,28 @@ async function imageUrlToFile(
 
   return new File([blob], `${baseName}.${extension}`, {
     type: blob.type || 'image/jpeg',
+  });
+}
+
+function dataUrlToFile(dataUrl: string, baseName: string): File {
+  const matches = dataUrl.match(/^data:([^;,]+)?(?:;[^,]*)?;base64,(.*)$/);
+
+  if (!matches) {
+    throw new Error(`Không thể đọc ảnh ${baseName}.`);
+  }
+
+  const mimeType = matches[1] || 'image/jpeg';
+  const binary = window.atob(matches[2]);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  const extension = mimeType.split('/')[1] || 'jpg';
+
+  return new File([bytes], `${baseName}.${extension}`, {
+    type: mimeType,
   });
 }
 
@@ -134,11 +160,7 @@ export async function analyzeTryOnPersonImage(
   const { data } = await apiClient.post<{
     success: true;
     data: PersonAnalysis;
-  }>('/try-on/analyze-person', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  }>('/try-on/analyze-person', formData);
 
   return data.data;
 }
@@ -173,7 +195,6 @@ export async function createTryOnSync(
 ): Promise<TryOnSyncResponse> {
   const response = await apiClient.post('/try-on/sync', formData, {
     headers: {
-      'Content-Type': 'multipart/form-data',
       ...getCurrentUserHeaders(),
     },
     timeout: 180000,
@@ -204,7 +225,6 @@ export async function submitProductDesignRequest(
       formData,
       {
         headers: {
-          'Content-Type': 'multipart/form-data',
           ...getCurrentUserHeaders(),
         },
         timeout: 180000,
