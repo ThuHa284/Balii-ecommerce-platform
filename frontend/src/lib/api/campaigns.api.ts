@@ -34,11 +34,6 @@ export async function uploadCampaignImage(
   const { data } = await apiClient.post<{ url: string; publicId: string }>(
     `/campaigns/images?kind=${kind}`,
     formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    },
   );
 
   return data;

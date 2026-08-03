@@ -9,6 +9,7 @@ on:
         'database/**',
         'frontend/**',
         'infra/camunda/**',
+        'infra/nginx/**',
         'package*.json',
         'Dockerfile.backend',
         'Dockerfile.migrations',
@@ -24,6 +25,7 @@ on:
         'database/**',
         'frontend/**',
         'infra/camunda/**',
+        'infra/nginx/**',
         'package*.json',
         'Dockerfile.backend',
         'Dockerfile.migrations',
@@ -73,7 +75,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          source: 'apps,libs,database,frontend,infra/camunda,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,Dockerfile.migrations,docker-compose.prod.yml,.dockerignore'
+          source: 'apps,libs,database,frontend,infra/camunda,infra/nginx,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,Dockerfile.migrations,docker-compose.prod.yml,.dockerignore'
           target: /opt/balii-backend
       - name: Rebuild backend services
         uses: appleboy/ssh-action@v1.2.0
@@ -93,6 +95,9 @@ jobs:
             curl --fail --retry 12 --retry-delay 5 http://127.0.0.1:4000/health/ready
             sed -i 's/\r$//' infra/camunda/deploy-bpmn.sh
             CAMUNDA_URL=http://127.0.0.1:8080/engine-rest bash infra/camunda/deploy-bpmn.sh
+            install -m 0644 infra/nginx/upload-limits.conf /etc/nginx/conf.d/balii-upload-limits.conf
+            nginx -t
+            systemctl reload nginx
       - name: Run production smoke test
         env:
           PROD_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
