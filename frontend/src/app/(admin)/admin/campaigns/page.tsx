@@ -31,7 +31,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { Campaign, CampaignDiscountType, Product } from '@/types/product.types';
 
-const MAX_CAMPAIGN_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_CAMPAIGN_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 
 const discountTypeOptions: Array<{
   value: CampaignDiscountType;
@@ -212,7 +212,7 @@ export default function AdminCampaignsPage() {
   function handleImageFileChange(file: File | null, kind: 'cover' | 'banner') {
     if (!file) return;
     if (file.size > MAX_CAMPAIGN_IMAGE_SIZE_BYTES) {
-      toast.error('Ảnh quá lớn, dung lượng tối đa là 5 MB.');
+      toast.error('Ảnh quá lớn, dung lượng tối đa là 10 MB.');
       return;
     }
 
