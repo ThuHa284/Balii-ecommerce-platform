@@ -3,9 +3,6 @@ import { API_BASE_URL } from '../constants';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
   withCredentials: true,
 });
 
@@ -119,6 +116,9 @@ function normalizeApiErrorMessage(
     code?: string;
     response?: {
       status?: number;
+      data?: {
+        message?: unknown;
+      };
     };
   };
 
@@ -131,8 +131,13 @@ function normalizeApiErrorMessage(
   }
 
   const status = apiError.response.status ?? 0;
+  const serverMessage = getServerErrorMessage(apiError.response);
 
   if (status === 400) {
+    if (serverMessage) {
+      return serverMessage;
+    }
+
     if (requestUrl.includes('/auth/register')) {
       return 'Thông tin đăng ký chưa hợp lệ. Vui lòng kiểm tra lại.';
     }
@@ -177,7 +182,7 @@ function normalizeApiErrorMessage(
   }
 
   if (status === 413) {
-    return 'Ảnh tải lên quá lớn. Dung lượng tối đa là 5 MB.';
+    return 'Ảnh tải lên quá lớn. Dung lượng tối đa là 10 MB.';
   }
 
   if (status === 422) {
@@ -201,6 +206,20 @@ function normalizeApiErrorMessage(
   }
 
   return 'Có lỗi xảy ra. Vui lòng thử lại.';
+}
+
+function getServerErrorMessage(response: {
+  data?: {
+    message?: unknown;
+  };
+}): string {
+  const message = response.data?.message;
+
+  if (Array.isArray(message)) {
+    return message.filter(Boolean).join('\n');
+  }
+
+  return typeof message === 'string' ? message : '';
 }
 
 export default apiClient;

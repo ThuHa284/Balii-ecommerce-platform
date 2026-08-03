@@ -162,7 +162,10 @@ export class CampaignsService {
           'balii/campaigns/banners'
         : process.env.CLOUDINARY_CAMPAIGN_FOLDER || 'balii/campaigns';
 
-    const uploaded = await this.cloudinaryService.uploadImage(file, folder);
+    const uploaded = await this.cloudinaryService.uploadImage(file, folder, {
+      maxBytes: 10 * 1024 * 1024,
+      fieldName: kind === 'banner' ? 'ảnh banner' : 'ảnh đại diện',
+    });
 
     return {
       url: uploaded.secure_url,

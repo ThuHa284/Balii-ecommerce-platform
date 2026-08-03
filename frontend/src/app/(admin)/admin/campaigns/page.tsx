@@ -32,6 +32,8 @@ import { useAuthStore } from '@/store/auth.store';
 import { Campaign, CampaignDiscountType, Product } from '@/types/product.types';
 
 const MAX_CAMPAIGN_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+const CAMPAIGN_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
+const CAMPAIGN_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const discountTypeOptions: Array<{
   value: CampaignDiscountType;
@@ -211,6 +213,11 @@ export default function AdminCampaignsPage() {
 
   function handleImageFileChange(file: File | null, kind: 'cover' | 'banner') {
     if (!file) return;
+    if (!CAMPAIGN_IMAGE_TYPES.has(file.type)) {
+      toast.error('Ảnh chiến dịch chỉ hỗ trợ JPG, PNG hoặc WebP.');
+      return;
+    }
+
     if (file.size > MAX_CAMPAIGN_IMAGE_SIZE_BYTES) {
       toast.error('Ảnh quá lớn, dung lượng tối đa là 10 MB.');
       return;
@@ -833,7 +840,7 @@ export default function AdminCampaignsPage() {
                   <input
                     ref={imageInputRef}
                     type="file"
-                    accept="image/*"
+                    accept={CAMPAIGN_IMAGE_ACCEPT}
                     onChange={(event) =>
                       handleImageFileChange(
                         event.target.files?.[0] ?? null,
@@ -873,7 +880,7 @@ export default function AdminCampaignsPage() {
                   <input
                     ref={bannerInputRef}
                     type="file"
-                    accept="image/*"
+                    accept={CAMPAIGN_IMAGE_ACCEPT}
                     onChange={(event) =>
                       handleImageFileChange(
                         event.target.files?.[0] ?? null,
