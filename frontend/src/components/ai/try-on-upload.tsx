@@ -13,14 +13,105 @@ interface TryOnUploadProps {
   compact?: boolean;
 }
 
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const TARGET_IMAGE_BYTES = 7.5 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 1600;
+
 function validateImage(file: File) {
-  if (file.size > 10 * 1024 * 1024) {
-    throw new Error('Ảnh quá lớn. Vui lòng chọn ảnh dưới 10MB.');
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error('Ảnh quá lớn. Vui lòng chọn ảnh không quá 8MB.');
   }
 
   if (!file.type.startsWith('image/')) {
     throw new Error('Vui lòng chọn file ảnh JPG, PNG hoặc WebP.');
   }
+}
+
+function loadImage(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new window.Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Cannot read the selected image.'));
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function canvasToJpegFile(
+  canvas: HTMLCanvasElement,
+  originalName: string,
+) {
+  const baseName = originalName.replace(/\.[^.]+$/, '') || 'tryon-photo';
+  const qualitySteps = [0.86, 0.76, 0.66, 0.56];
+
+  for (const quality of qualitySteps) {
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', quality),
+    );
+
+    if (!blob) {
+      continue;
+    }
+
+    const file = new File([blob], `${baseName}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    });
+
+    if (
+      file.size <= MAX_IMAGE_BYTES ||
+      quality === qualitySteps[qualitySteps.length - 1]
+    ) {
+      return file;
+    }
+  }
+
+  throw new Error('Cannot process the selected image.');
+}
+
+async function normalizeTryOnImage(file: File) {
+  const hasImageMime = file.type.startsWith('image/');
+  const hasLikelyImageName = /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+
+  if (!hasImageMime && !hasLikelyImageName) {
+    validateImage(file);
+  }
+
+  const shouldConvert =
+    file.size > TARGET_IMAGE_BYTES ||
+    !['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
+
+  if (!shouldConvert) {
+    validateImage(file);
+    return file;
+  }
+
+  const image = await loadImage(file);
+  const scale = Math.min(
+    1,
+    MAX_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight),
+  );
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('Cannot process the selected image.');
+  }
+
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  const normalizedFile = await canvasToJpegFile(canvas, file.name);
+  validateImage(normalizedFile);
+  return normalizedFile;
 }
 
 function readFileAsDataUrl(file: File) {
@@ -68,8 +159,8 @@ export default function TryOnUpload({
   const handleUseImageFile = useCallback(
     async (file: File) => {
       try {
-        validateImage(file);
-        const imageDataUrl = await readFileAsDataUrl(file);
+        const normalizedFile = await normalizeTryOnImage(file);
+        const imageDataUrl = await readFileAsDataUrl(normalizedFile);
         setUserImage(imageDataUrl);
       } catch (error) {
         toast.error(
@@ -97,13 +188,17 @@ export default function TryOnUpload({
     input.type = 'file';
     input.accept = 'image/*';
     input.capture = 'user';
+    input.style.display = 'none';
     input.onchange = (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
 
       if (file) {
         void handleUseImageFile(file);
       }
+
+      input.remove();
     };
+    document.body.appendChild(input);
     input.click();
   }, [handleUseImageFile]);
 
