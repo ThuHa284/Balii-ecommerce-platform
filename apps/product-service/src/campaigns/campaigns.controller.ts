@@ -31,7 +31,7 @@ export class CampaignsController {
   @Post('images')
   @UseGuards(new HeaderRolesGuard(['ADMIN', 'SUPER_ADMIN']))
   @UseInterceptors(
-    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
+    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }),
   )
   uploadImage(
     @UploadedFile() file: Express.Multer.File,

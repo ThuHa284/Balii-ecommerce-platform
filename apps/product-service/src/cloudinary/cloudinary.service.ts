@@ -44,10 +44,11 @@ export class CloudinaryService implements OnModuleInit, OnModuleDestroy {
   async uploadImage(
     file: Express.Multer.File,
     folder: string,
+    options: { maxBytes?: number; fieldName?: string } = {},
   ): Promise<UploadApiResponse> {
     validateUploadedImage(file, {
-      maxBytes: 5 * 1024 * 1024,
-      fieldName: 'ảnh tải lên',
+      maxBytes: options.maxBytes ?? 5 * 1024 * 1024,
+      fieldName: options.fieldName ?? 'ảnh tải lên',
     });
     const uploaded = await new Promise<UploadApiResponse>((resolve, reject) => {
       const uploadStream = this.cloudinary.uploader.upload_stream(
