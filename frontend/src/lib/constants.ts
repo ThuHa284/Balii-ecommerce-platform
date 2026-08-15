@@ -65,14 +65,18 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   pending: 'Chờ thanh toán',
   paid: 'Đã thanh toán',
   failed: 'Thanh toán thất bại',
+  cancelled: 'Đã hủy thanh toán',
   refunded: 'Đã hoàn tiền',
+  partially_refunded: 'Đã hoàn tiền một phần',
 };
 
 export const PAYMENT_STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
   paid: 'bg-emerald-100 text-emerald-800',
   failed: 'bg-rose-100 text-rose-800',
+  cancelled: 'bg-slate-100 text-slate-700',
   refunded: 'bg-slate-100 text-slate-800',
+  partially_refunded: 'bg-amber-100 text-amber-800',
 };
 
 export const REFUND_STATUS_LABELS: Record<string, string> = {
@@ -140,8 +144,3 @@ export const NAV_LINKS = [
   { href: '/faq', label: 'Hỏi đáp (FAQ)' },
   { href: '/contact', label: 'Liên hệ' },
 ] as const;
-
-export const COMBO_SHORTS_BASE_PRICE = 99000;
-export const COMBO_SHORTS_BUNDLE_PRICE = 20000;
-export const FREESHIP_MIN_ITEMS = 2;
-export const FREESHIP_MIN_AMOUNT = 500000;

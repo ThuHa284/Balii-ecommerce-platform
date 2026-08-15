@@ -3,6 +3,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import axios from 'axios';
 import FormData from 'form-data';
+import { validateUploadedImage } from '@app/common';
 
 @Injectable()
 export class PersonAnalysisService {
@@ -14,9 +15,10 @@ export class PersonAnalysisService {
       throw new BadRequestException('Thiếu ảnh người mẫu để phân tích.');
     }
 
-    if (!personImage.mimetype.startsWith('image/')) {
-      throw new BadRequestException('Ảnh người mẫu phải là tệp hình ảnh.');
-    }
+    validateUploadedImage(personImage, {
+      maxBytes: 8 * 1024 * 1024,
+      fieldName: 'ảnh người mẫu',
+    });
 
     const formData = new FormData();
 

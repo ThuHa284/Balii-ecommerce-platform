@@ -1,5 +1,10 @@
-import { Injectable, BadGatewayException } from '@nestjs/common';
+import {
+  Injectable,
+  BadGatewayException,
+  ConflictException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 
 type CheckoutCartItem = {
@@ -23,6 +28,7 @@ type CheckoutCartItem = {
 export type CheckoutCart = {
   ownerKey: string;
   items: CheckoutCartItem[];
+  promotionItems: CheckoutCartItem[];
   subtotal: number;
   discountAmount: number;
   shippingFee: number;
@@ -48,6 +54,11 @@ export class CartClientService {
           {
             headers: {
               'x-user-id': userId,
+              'x-internal-service-key':
+                process.env.INTERNAL_SERVICE_SECRET ||
+                (process.env.NODE_ENV === 'production'
+                  ? ''
+                  : 'balii-local-internal'),
               ...(sessionId ? { 'x-session-id': sessionId } : {}),
             },
           },
@@ -55,21 +66,41 @@ export class CartClientService {
       );
 
       return response.data;
-    } catch {
+    } catch (error) {
+      const upstream = (error as AxiosError<{ message?: string }>).response;
+      if (upstream?.status === 400 || upstream?.status === 409) {
+        throw new ConflictException(
+          upstream.data?.message || 'Giỏ hàng không còn đủ tồn kho để checkout.',
+        );
+      }
       throw new BadGatewayException('Unable to fetch checkout cart');
     }
   }
 
-  async clearCart(userId: string, sessionId?: string): Promise<void> {
+  async clearCart(
+    userId: string,
+    sessionId: string | undefined,
+    expectedUpdatedAt: string,
+  ): Promise<boolean> {
     try {
-      await firstValueFrom(
-        this.httpService.delete(`${this.cartServiceUrl}/cart`, {
-          headers: {
-            'x-user-id': userId,
-            ...(sessionId ? { 'x-session-id': sessionId } : {}),
+      const response = await firstValueFrom(
+        this.httpService.delete<{ success: boolean }>(
+          `${this.cartServiceUrl}/cart`,
+          {
+            headers: {
+              'x-user-id': userId,
+              'x-internal-service-key':
+                process.env.INTERNAL_SERVICE_SECRET ||
+                (process.env.NODE_ENV === 'production'
+                  ? ''
+                  : 'balii-local-internal'),
+              ...(sessionId ? { 'x-session-id': sessionId } : {}),
+              'x-cart-version': expectedUpdatedAt,
+            },
           },
-        }),
+        ),
       );
+      return response.data.success;
     } catch {
       throw new BadGatewayException(
         'Unable to clear cart after order creation',

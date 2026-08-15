@@ -15,11 +15,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { COMBO_TIERS, MOCK_COMBO_SHORTS } from '@/lib/api/mock-data';
 import { formatCurrency } from '@/lib/utils';
 import { useCartStore } from '@/store/cart.store';
 import ProductGrid from '@/components/product/product-grid';
-import ComboSelector from '@/components/product/combo-selector';
 import { Product } from '@/types/product.types';
 import {
   getProductBySlug,
@@ -243,73 +241,6 @@ export default function ProductDetailPage() {
       price,
       totalPrice: price * quantity,
     });
-    setCartDrawerOpen(true);
-  };
-
-  const handleSelectCombo = (
-    tier: (typeof COMBO_TIERS)[number],
-    shortsSize: string,
-    shortsColor: string,
-  ) => {
-    if (!selectedVariant) return;
-
-    void addItem({
-      id: `cart_${Date.now()}_main`,
-      productId: product.id,
-      productName: product.name,
-      productSlug: product.slug,
-      thumbnail:
-        selectedVariant.images?.[0] ||
-        galleryItems[0]?.image ||
-        product.thumbnail,
-      variant: selectedVariant,
-      campaign: product.activeCampaign
-        ? {
-            id: product.activeCampaign.id,
-            name: product.activeCampaign.name,
-            discountType: product.activeCampaign.discountType,
-            discountValue: product.activeCampaign.discountValue,
-            badgeText: product.activeCampaign.badgeText,
-          }
-        : null,
-      quantity,
-      price,
-      totalPrice: price * quantity,
-    });
-
-    const shortsColorObj =
-      MOCK_COMBO_SHORTS.colors.find((color) => color.name === shortsColor) ||
-      MOCK_COMBO_SHORTS.colors[0];
-
-    const shortsVariant = {
-      id: `var_shorts_${Date.now()}`,
-      productId: MOCK_COMBO_SHORTS.id,
-      size: shortsSize,
-      color: shortsColor,
-      colorCode: shortsColorObj.code,
-      sku: `SHORTS-${shortsSize}-${shortsColor.substring(0, 2).toUpperCase()}`,
-      price: MOCK_COMBO_SHORTS.basePrice,
-      salePrice: tier.freeShorts > 0 ? 0 : tier.shortsPrice,
-      stock: 99,
-      images: [],
-    };
-
-    const shortsQuantity = tier.freeShorts > 0 ? tier.freeShorts : 1;
-    const shortsPrice = tier.freeShorts > 0 ? 0 : tier.shortsPrice;
-
-    void addItem({
-      id: `cart_${Date.now()}_shorts`,
-      productId: MOCK_COMBO_SHORTS.id,
-      productName: `${MOCK_COMBO_SHORTS.name} (${tier.name})`,
-      productSlug: MOCK_COMBO_SHORTS.slug,
-      thumbnail: MOCK_COMBO_SHORTS.image,
-      variant: shortsVariant,
-      campaign: null,
-      quantity: shortsQuantity,
-      price: shortsPrice,
-      totalPrice: shortsPrice * shortsQuantity,
-    });
-
     setCartDrawerOpen(true);
   };
 
@@ -538,12 +469,6 @@ export default function ProductDetailPage() {
                   Còn {selectedVariant.stock} sản phẩm trong kho
                 </p>
               )}
-
-              {/* Combo Selector */}
-              <ComboSelector
-                productPrice={price}
-                onSelectCombo={handleSelectCombo}
-              />
 
               {/* AI Try-On Link */}
               <Link

@@ -9,6 +9,7 @@ import {
   KnowledgeSearchResult,
   ProductContext,
   RetrievedDocument,
+  VectorDiagnostics,
 } from './knowledge.types';
 
 type QdrantCollectionResponse = {
@@ -46,21 +47,47 @@ type QdrantQueryResponse = {
     | QdrantPoint[];
 };
 
+type QdrantCountResponse = {
+  result?: {
+    count?: number;
+  };
+};
+
+const QDRANT_POINT_NAMESPACE = 'balii-chatbot-knowledge';
+
+export function toQdrantPointId(documentId: string) {
+  const bytes = createHash('sha256')
+    .update(`${QDRANT_POINT_NAMESPACE}:${documentId}`)
+    .digest()
+    .subarray(0, 16);
+
+  // Qdrant accepts unsigned integers or UUIDs as point IDs. Build a stable
+  // RFC 4122 UUID so reindexing upserts instead of duplicating documents.
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 @Injectable()
 export class QdrantVectorStoreService {
   private readonly logger = new Logger(QdrantVectorStoreService.name);
   private readonly client: AxiosInstance;
+  private readonly qdrantUrl: string;
   private readonly collectionName: string;
   private readonly scoreThreshold: number;
   private syncPromise: Promise<void> | null = null;
   private syncedSignature: string | null = null;
+  private lastError: string | null = null;
+  private forceRecreateOnNextSync = false;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly catalogKnowledgeService: CatalogKnowledgeService,
     private readonly embeddingService: EmbeddingService,
   ) {
-    const qdrantUrl =
+    this.qdrantUrl =
       this.configService.get<string>('QDRANT_URL') || 'http://localhost:6333';
     const qdrantApiKey = this.configService.get<string>('QDRANT_API_KEY');
 
@@ -72,7 +99,7 @@ export class QdrantVectorStoreService {
     );
 
     this.client = axios.create({
-      baseURL: qdrantUrl,
+      baseURL: this.qdrantUrl,
       timeout: 30000,
       headers: qdrantApiKey ? { 'api-key': qdrantApiKey } : undefined,
     });
@@ -82,8 +109,48 @@ export class QdrantVectorStoreService {
     return this.embeddingService.isEnabled();
   }
 
+  /**
+   * Health snapshot for the vector arm. Also reports the actual indexed point
+   * count so an empty collection (never successfully synced) is visible.
+   */
+  async getDiagnostics(): Promise<VectorDiagnostics> {
+    let collectionReady = false;
+    let indexedPoints: number | null = null;
+
+    try {
+      const response = await this.client.get(
+        `/collections/${this.collectionName}`,
+      );
+      collectionReady = response.status === 200;
+      const count = await this.client.post<QdrantCountResponse>(
+        `/collections/${this.collectionName}/points/count`,
+        { exact: true },
+      );
+      const countValue = count.data.result?.count;
+      indexedPoints = typeof countValue === 'number' ? countValue : null;
+      this.lastError = null;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        collectionReady = false;
+      } else {
+        this.lastError = error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    return {
+      embeddingEnabled: this.embeddingService.isEnabled(),
+      embeddingModel: this.embeddingService.getEmbeddingModel(),
+      qdrantUrl: this.qdrantUrl,
+      collection: this.collectionName,
+      collectionReady,
+      indexedPoints,
+      lastError: this.embeddingService.getLastError() ?? this.lastError,
+    };
+  }
+
   async reindex() {
     this.syncedSignature = null;
+    this.forceRecreateOnNextSync = true;
     await this.ensureSynced();
   }
 
@@ -115,14 +182,16 @@ export class QdrantVectorStoreService {
         .map((point) => this.mapPointToDocument(point))
         .filter((document): document is RetrievedDocument => Boolean(document));
 
+      this.lastError = null;
       return {
         documents,
         suggestedProducts: this.extractSuggestedProducts(documents),
         retrievalMode: 'vector',
       };
     } catch (error) {
+      this.lastError = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Vector retrieval failed, falling back to keyword retrieval: ${error instanceof Error ? error.message : String(error)}`,
+        `Vector retrieval failed, falling back to keyword retrieval: ${this.lastError}`,
       );
       return null;
     }
@@ -158,35 +227,41 @@ export class QdrantVectorStoreService {
       throw new Error('Unable to determine embedding vector size.');
     }
 
-    await this.ensureCollection(vectorSize);
+    await this.ensureCollection(vectorSize, this.forceRecreateOnNextSync);
 
     for (const batch of this.chunk(documents, vectors, 32)) {
-      await this.client.put(`/collections/${this.collectionName}/points`, {
-        points: batch.map((item) => ({
-          id: item.document.id,
-          vector: item.vector,
-          payload: {
-            id: item.document.id,
-            type: item.document.type,
-            title: item.document.title,
-            content: item.document.content,
-            ...item.document.metadata,
-          },
-        })),
-      });
+      await this.client.put(
+        `/collections/${this.collectionName}/points`,
+        {
+          points: batch.map((item) => ({
+            id: toQdrantPointId(item.document.id),
+            vector: item.vector,
+            payload: {
+              id: item.document.id,
+              type: item.document.type,
+              title: item.document.title,
+              content: item.document.content,
+              ...item.document.metadata,
+            },
+          })),
+        },
+        { params: { wait: true } },
+      );
     }
 
     this.syncedSignature = signature;
+    this.forceRecreateOnNextSync = false;
+    this.lastError = null;
   }
 
-  private async ensureCollection(vectorSize: number) {
+  private async ensureCollection(vectorSize: number, forceRecreate = false) {
     try {
       const response = await this.client.get<QdrantCollectionResponse>(
         `/collections/${this.collectionName}`,
       );
       const existingSize = this.extractVectorSize(response.data);
 
-      if (existingSize === vectorSize) {
+      if (!forceRecreate && existingSize === vectorSize) {
         return;
       }
 

@@ -14,6 +14,13 @@ export interface CampaignPayload {
   discountValue?: number | null;
   giftName?: string;
   giftDescription?: string;
+  minimumPurchaseQuantity?: number;
+  giftVariantId?: string;
+  giftQuantity?: number;
+  giftUnitPrice?: number;
+  repeatable?: boolean;
+  maxApplications?: number | null;
+  stackableWithSale?: boolean;
   badgeText?: string;
   priorityOrder?: number;
   startAt: string;

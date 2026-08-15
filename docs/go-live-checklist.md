@@ -23,11 +23,9 @@
 npm run validate:prod-env -- .env.production
 ```
 
-- Chạy migration trước khi mở traffic:
-
-```bash
-npm run migration:run
-```
+- Compose chạy service `migrations` một lần và chỉ khởi động các service dùng DB
+  sau khi migration thành công. Nếu service này lỗi, không được mở traffic hoặc
+  bỏ qua bằng cách khởi động riêng các service ứng dụng.
 
 - Build và khởi động stack:
 
@@ -47,7 +45,9 @@ APP_ENV_FILE=.env.production docker compose --env-file .env.production -f docker
 
 - DNS đã trỏ đúng.
 - Reverse proxy hoặc load balancer đã bật HTTPS.
-- Callback VNPay public URL khớp `VNPAY_RETURN_URL`.
+- Nếu dùng VNPay thật, callback public URL phải khớp `VNPAY_RETURN_URL`. Với cấu
+  hình mô phỏng hiện tại, phải giữ nhãn thanh toán thử nghiệm và không ghi nhận
+  đây là giao dịch ngân hàng thật.
 - SMTP provider đã mở quyền gửi thực tế.
 - Log, monitoring, alerting và xoay log đã có cấu hình ngoài Docker Compose.
 

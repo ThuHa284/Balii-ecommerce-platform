@@ -1,0 +1,8 @@
+{
+  "name": "Balii UI Generator",
+  "id": "balii-ui-generator-local",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page"
+}

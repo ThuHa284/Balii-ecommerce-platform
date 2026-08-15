@@ -99,7 +99,9 @@ type BackendCart = {
     unitPrice: number;
     quantity: number;
     subtotal: number;
+    isPromotionReward?: boolean;
   }>;
+  promotionItems?: BackendCart['items'];
   subtotal: number;
   discountAmount: number;
   shippingFee: number;
@@ -185,6 +187,13 @@ type BackendCampaign = {
   discountValue?: number | null;
   giftName?: string;
   giftDescription?: string;
+  minimumPurchaseQuantity?: number;
+  giftVariantId?: string | null;
+  giftQuantity?: number;
+  giftUnitPrice?: number;
+  repeatable?: boolean;
+  maxApplications?: number | null;
+  stackableWithSale?: boolean;
   badgeText?: string;
   priorityOrder?: number;
   startAt: string;
@@ -370,6 +379,14 @@ export function mapCampaign(input: BackendCampaign): Campaign {
       input.discountValue != null ? Number(input.discountValue) : null,
     giftName: input.giftName ?? '',
     giftDescription: input.giftDescription ?? '',
+    minimumPurchaseQuantity: Number(input.minimumPurchaseQuantity ?? 1),
+    giftVariantId: input.giftVariantId ?? null,
+    giftQuantity: Number(input.giftQuantity ?? 0),
+    giftUnitPrice: Number(input.giftUnitPrice ?? 0),
+    repeatable: input.repeatable ?? true,
+    maxApplications:
+      input.maxApplications != null ? Number(input.maxApplications) : null,
+    stackableWithSale: input.stackableWithSale ?? false,
     badgeText: input.badgeText ?? '',
     priorityOrder: Number(input.priorityOrder ?? 0),
     startAt: input.startAt,
@@ -387,7 +404,7 @@ function parseVariantLabel(label?: string) {
 }
 
 export function mapCart(input: BackendCart): Cart {
-  const items: CartItem[] = input.items.map((item) => {
+  const mapCartItem = (item: BackendCart['items'][number]): CartItem => {
     const parsed = parseVariantLabel(item.variantLabel);
     const variantSize = item.variantSize ?? parsed.size;
     const variantColor = item.variantColor ?? parsed.color;
@@ -425,11 +442,15 @@ export function mapCart(input: BackendCart): Cart {
       quantity: item.quantity,
       price: Number(item.unitPrice),
       totalPrice: Number(item.subtotal),
+      isPromotionReward: item.isPromotionReward ?? false,
     };
-  });
+  };
+  const items = input.items.map(mapCartItem);
+  const promotionItems = (input.promotionItems ?? []).map(mapCartItem);
 
   return {
     items,
+    promotionItems,
     subtotal: Number(input.subtotal ?? 0),
     discount: Number(input.discountAmount ?? 0),
     shippingFee: Number(input.shippingFee ?? 0),

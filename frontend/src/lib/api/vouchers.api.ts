@@ -4,7 +4,6 @@ import {
   UserVoucher,
   Voucher,
   VoucherDiscountType,
-  VoucherRedeemResult,
   VoucherUsage,
   VoucherValidationResult,
 } from '@/types/voucher.types';
@@ -19,6 +18,7 @@ type VoucherApiResponse = {
   minOrderValue: number;
   maxDiscount: number | null;
   usageLimit: number | null;
+  userLimitPerUser: number;
   usedCount: number;
   startDate: string;
   endDate: string;
@@ -53,14 +53,6 @@ type VoucherUsageApiResponse = {
   voucherType: VoucherDiscountType;
 };
 
-type VoucherRedeemApiResponse = {
-  success: boolean;
-  discountAmount: number;
-  finalAmount: number;
-  usage: VoucherUsageApiResponse;
-  voucher: VoucherApiResponse;
-};
-
 function mapVoucher(input: VoucherApiResponse): Voucher {
   return {
     id: input.id,
@@ -72,6 +64,7 @@ function mapVoucher(input: VoucherApiResponse): Voucher {
     minOrderValue: Number(input.minOrderValue ?? 0),
     maxDiscount: input.maxDiscount != null ? Number(input.maxDiscount) : null,
     usageLimit: Number(input.usageLimit ?? 999999999),
+    userLimitPerUser: Number(input.userLimitPerUser ?? 1),
     usedCount: Number(input.usedCount ?? 0),
     startDate: input.startDate,
     endDate: input.endDate,
@@ -115,18 +108,6 @@ function mapVoucherUsage(input: VoucherUsageApiResponse): VoucherUsage {
   };
 }
 
-function mapVoucherRedeem(
-  input: VoucherRedeemApiResponse,
-): VoucherRedeemResult {
-  return {
-    success: Boolean(input.success),
-    discountAmount: Number(input.discountAmount ?? 0),
-    finalAmount: Number(input.finalAmount ?? 0),
-    usage: mapVoucherUsage(input.usage),
-    voucher: mapVoucher(input.voucher),
-  };
-}
-
 function toVoucherPayload(data: CreateVoucherData) {
   return {
     code: data.code,
@@ -137,6 +118,7 @@ function toVoucherPayload(data: CreateVoucherData) {
     minOrderValue: data.minOrderValue,
     maxDiscount: data.maxDiscount,
     usageLimit: data.usageLimit,
+    userLimitPerUser: data.userLimitPerUser,
     startDate: data.startDate,
     endDate: data.endDate,
     isActive: data.isActive,
@@ -182,22 +164,6 @@ export async function validateVoucher(
     },
   );
   return mapVoucherValidation(data);
-}
-
-export async function redeemVoucher(
-  code: string,
-  orderId: string,
-  orderAmount: number,
-): Promise<VoucherRedeemResult> {
-  const { data } = await apiClient.post<VoucherRedeemApiResponse>(
-    '/vouchers/redeem',
-    {
-      code,
-      orderId,
-      orderAmount,
-    },
-  );
-  return mapVoucherRedeem(data);
 }
 
 export async function getMyVoucherUsages(): Promise<VoucherUsage[]> {

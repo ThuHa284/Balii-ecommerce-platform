@@ -23,7 +23,27 @@ export class PaymentProcessingWorker implements OnModuleInit {
     // Mỗi topic nên chỉ làm một việc nhỏ để workflow dễ retry/rẽ nhánh.
     const client = this.camundaClient.getClient();
 
-    client.subscribe(
+    // Demo hook: if the process was started with a `demoFaultTopic` variable,
+    // the worker injects an immediate failure (retries=0) when it reaches that
+    // topic. Camunda then raises an incident, parking the token on that service
+    // task so the admin workflow diagram shows exactly where it is "stuck".
+    // This only fires for processes that explicitly carry the variable, so real
+    // checkout flows are never affected.
+    const guardedSubscribe = (
+      topic: string,
+      handler: (ctx: { task: any; taskService: any }) => Promise<void>,
+    ) => {
+      client.subscribe(topic, async (ctx: { task: any; taskService: any }) => {
+        const faultTopic = ctx.task.variables.get('demoFaultTopic');
+        if (faultTopic && String(faultTopic) === topic) {
+          await this.raiseDemoIncident(ctx.task, ctx.taskService, topic);
+          return;
+        }
+        await handler(ctx);
+      });
+    };
+
+    guardedSubscribe(
       'payment.validate-request',
       async ({ task, taskService }) => {
         try {
@@ -46,7 +66,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.check-idempotency',
       async ({ task, taskService }) => {
         try {
@@ -69,7 +89,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.create-or-reuse',
       async ({ task, taskService }) => {
         try {
@@ -98,7 +118,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.generate-provider-url',
       async ({ task, taskService }) => {
         try {
@@ -121,7 +141,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.verify-signature',
       async ({ task, taskService }) => {
         try {
@@ -148,7 +168,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.check-duplicate-callback',
       async ({ task, taskService }) => {
         try {
@@ -167,7 +187,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.persist-result-transaction',
       async ({ task, taskService }) => {
         try {
@@ -197,7 +217,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'outbox.signal-publisher',
       async ({ task, taskService }) => {
         try {
@@ -209,7 +229,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'workflow.correlate-payment-success',
       async ({ task, taskService }) => {
         try {
@@ -228,7 +248,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe('order.cancel-release', async ({ task, taskService }) => {
+    guardedSubscribe('order.cancel-release', async ({ task, taskService }) => {
       try {
         const orderId = task.variables.get('orderId');
         const paymentId = task.variables.get('paymentId');
@@ -244,7 +264,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       }
     });
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.save-invalid-webhook',
       async ({ task, taskService }) => {
         try {
@@ -259,7 +279,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.mark-review-required',
       async ({ task, taskService }) => {
         try {
@@ -279,7 +299,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.mark-expired-transaction',
       async ({ task, taskService }) => {
         try {
@@ -298,7 +318,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.find-pending-for-reconciliation',
       async ({ task, taskService }) => {
         try {
@@ -326,7 +346,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.query-gateway-status',
       async ({ task, taskService }) => {
         try {
@@ -352,7 +372,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.persist-reconciled-success',
       async ({ task, taskService }) => {
         try {
@@ -377,7 +397,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.persist-reconciled-failed',
       async ({ task, taskService }) => {
         try {
@@ -408,7 +428,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'payment.increase-reconciliation-attempt',
       async ({ task, taskService }) => {
         try {
@@ -429,7 +449,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.validate-request',
       async ({ task, taskService }) => {
         try {
@@ -458,7 +478,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.check-payment-status',
       async ({ task, taskService }) => {
         try {
@@ -488,7 +508,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.check-order-fulfillment-status',
       async ({ task, taskService }) => {
         try {
@@ -498,6 +518,9 @@ export class PaymentProcessingWorker implements OnModuleInit {
           const refundAllowed = task.variables.get('refundAllowed');
           const amount = task.variables.get('amount');
           const refundableAmount = task.variables.get('refundableAmount');
+          const approvedReturnRequest = task.variables.get(
+            'approvedReturnRequest',
+          );
 
           const result =
             await this.paymentService.checkRefundOrderFulfillmentStatus({
@@ -507,6 +530,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
               refundAllowed: Boolean(refundAllowed),
               amount: Number(amount),
               refundableAmount: Number(refundableAmount),
+              approvedReturnRequest: Boolean(approvedReturnRequest),
             });
 
           const variables = new Variables();
@@ -521,7 +545,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.validate-condition',
       async ({ task, taskService }) => {
         try {
@@ -550,7 +574,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.check-idempotency',
       async ({ task, taskService }) => {
         try {
@@ -583,7 +607,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe('refund.create-record', async ({ task, taskService }) => {
+    guardedSubscribe('refund.create-record', async ({ task, taskService }) => {
       try {
         const paymentId = task.variables.get('paymentId');
         const approvedRefundAmount = task.variables.get('approvedRefundAmount');
@@ -613,7 +637,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       }
     });
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.call-gateway-api',
       async ({ task, taskService }) => {
         try {
@@ -633,6 +657,18 @@ export class PaymentProcessingWorker implements OnModuleInit {
           variables.set('providerRefundId', result.providerRefundId);
           variables.set('refundRequestAccepted', result.accepted);
           variables.set('gatewayMode', result.gatewayMode);
+          if (result.gatewayMode === 'simulation') {
+            variables.set('refundResult', 'SUCCESS');
+            variables.set(
+              'rawPayload',
+              JSON.stringify({
+                simulated: true,
+                refundId,
+                paymentId,
+                providerRefundId: result.providerRefundId,
+              }),
+            );
+          }
 
           await taskService.complete(task, variables);
         } catch (error) {
@@ -641,7 +677,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.persist-result-transaction',
       async ({ task, taskService }) => {
         try {
@@ -672,7 +708,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.increase-retry-count',
       async ({ task, taskService }) => {
         try {
@@ -692,7 +728,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.update-rejected',
       async ({ task, taskService }) => {
         try {
@@ -731,7 +767,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.create-exchange-request',
       async ({ task, taskService }) => {
         try {
@@ -768,7 +804,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'refund.update-order-inventory-exchange',
       async ({ task, taskService }) => {
         try {
@@ -791,7 +827,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'notification.refund-completed',
       async ({ task, taskService }) => {
         try {
@@ -808,7 +844,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'notification.refund-rejected',
       async ({ task, taskService }) => {
         try {
@@ -833,7 +869,7 @@ export class PaymentProcessingWorker implements OnModuleInit {
       },
     );
 
-    client.subscribe(
+    guardedSubscribe(
       'notification.exchange-created',
       async ({ task, taskService }) => {
         try {
@@ -857,6 +893,25 @@ export class PaymentProcessingWorker implements OnModuleInit {
     );
 
     console.log('[Camunda] Payment Processing Worker subscribed');
+  }
+
+  /**
+   * Demo-only: fail a task with retries=0 so Camunda raises an incident on the
+   * next poll (no 30s retry wait), parking the token on this service task.
+   * Resolve it in Camunda Cockpit (Increment Retries / Retry job) once the
+   * simulated downstream problem is "fixed".
+   */
+  private async raiseDemoIncident(task: any, taskService: any, topic: string) {
+    console.warn(`[Camunda DEMO] Injecting incident at topic "${topic}"`);
+    await taskService.handleFailure(task, {
+      errorMessage: `[DEMO] Injected fault at ${topic}`,
+      errorDetails:
+        `This process was started with demoFaultTopic=${topic} to demonstrate ` +
+        `a stuck Task Service. Fix the simulated downstream issue, then ` +
+        `Increment Retries / Retry the job in Camunda Cockpit to let it continue.`,
+      retries: 0,
+      retryTimeout: 0,
+    });
   }
 
   private async handleFailure(task: any, taskService: any, error: any) {

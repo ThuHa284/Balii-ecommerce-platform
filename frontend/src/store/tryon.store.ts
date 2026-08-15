@@ -18,6 +18,8 @@ interface TryOnState {
   garmentSource: 'shop' | 'upload' | null;
   resultImage: string | null;
   resultUrl: string | null;
+  resultId: string | null;
+  isResultSaved: boolean;
   personAnalysis: PersonAnalysis | null;
   currentStep: TryOnStep;
   isGenerating: boolean;
@@ -37,6 +39,8 @@ interface TryOnState {
   setSelectedProduct: (product: Product | null) => void;
   setResultImage: (image: string | null) => void;
   setResultUrl: (url: string | null) => void;
+  setResultId: (id: string | null) => void;
+  setResultSaved: (saved: boolean) => void;
   setPersonAnalysis: (analysis: PersonAnalysis | null) => void;
   setCurrentStep: (step: TryOnStep) => void;
   setIsGenerating: (value: boolean) => void;
@@ -61,6 +65,8 @@ const initialState = {
   garmentSource: null,
   resultImage: null,
   resultUrl: null,
+  resultId: null,
+  isResultSaved: false,
   personAnalysis: null,
   currentStep: 'upload' as TryOnStep,
   isGenerating: false,
@@ -95,8 +101,14 @@ export const useTryOnStore = create<TryOnState>()(
           garmentSource: source,
         }),
       setSelectedProduct: (product) => set({ selectedProduct: product }),
-      setResultImage: (image) => set({ resultImage: image }),
+      setResultImage: (image) =>
+        set({
+          resultImage: image,
+          ...(image ? {} : { resultId: null, isResultSaved: false }),
+        }),
       setResultUrl: (url) => set({ resultUrl: url }),
+      setResultId: (id) => set({ resultId: id, isResultSaved: false }),
+      setResultSaved: (saved) => set({ isResultSaved: saved }),
       setPersonAnalysis: (analysis) => set({ personAnalysis: analysis }),
       setCurrentStep: (step) => set({ currentStep: step }),
       setIsGenerating: (value) => set({ isGenerating: value }),
@@ -111,6 +123,8 @@ export const useTryOnStore = create<TryOnState>()(
           resultImage: null,
           resultUrl: null,
           personAnalysis: null,
+          resultId: null,
+          isResultSaved: false,
           confidence: null,
           isGenerating: false,
           generationProgress: 0,
@@ -161,6 +175,11 @@ export const useTryOnStore = create<TryOnState>()(
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         userImage: state.userImage,
+        resultImage: state.resultImage,
+        resultUrl: state.resultUrl,
+        resultId: state.resultId,
+        isResultSaved: state.isResultSaved,
+        currentStep: state.currentStep,
         history: state.history,
       }),
     },

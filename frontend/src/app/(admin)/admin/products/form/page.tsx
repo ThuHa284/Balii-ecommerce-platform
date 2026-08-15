@@ -155,6 +155,8 @@ function ProductFormContent() {
   ]);
   const [images, setImages] = useState<ImageRow[]>([]);
   const [variantGroups, setVariantGroups] = useState<VariantGroupRow[]>([]);
+  const [imageIdsToDelete, setImageIdsToDelete] = useState<string[]>([]);
+  const [variantIdsToDelete, setVariantIdsToDelete] = useState<string[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const isEdit = !!existingProduct;
@@ -396,7 +398,7 @@ function ProductFormContent() {
     );
   };
 
-  const removeImage = async (index: number) => {
+  const removeImage = (index: number) => {
     const target = images[index];
     if (!target) return;
 
@@ -406,14 +408,7 @@ function ProductFormContent() {
         return;
       }
 
-      try {
-        await deleteProductImage(target.id!);
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : 'Xóa ảnh thất bại.',
-        );
-        return;
-      }
+      setImageIdsToDelete((current) => [...current, target.id!]);
     } else if (target.url.startsWith('blob:')) {
       URL.revokeObjectURL(target.url);
     }
@@ -509,7 +504,7 @@ function ProductFormContent() {
     );
   };
 
-  const removeSizeRow = async (groupIndex: number, sizeIndex: number) => {
+  const removeSizeRow = (groupIndex: number, sizeIndex: number) => {
     const targetGroup = variantGroups[groupIndex];
     const targetSizeRow = targetGroup?.sizeRows[sizeIndex];
     if (!targetGroup || !targetSizeRow) return;
@@ -520,14 +515,7 @@ function ProductFormContent() {
         return;
       }
 
-      try {
-        await deleteProductVariant(targetSizeRow.id);
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : 'Xóa size thất bại.',
-        );
-        return;
-      }
+      setVariantIdsToDelete((current) => [...current, targetSizeRow.id!]);
     }
 
     setVariantGroups((current) =>
@@ -544,7 +532,7 @@ function ProductFormContent() {
     );
   };
 
-  const removeVariantGroup = async (groupIndex: number) => {
+  const removeVariantGroup = (groupIndex: number) => {
     const target = variantGroups[groupIndex];
     if (!target) return;
 
@@ -555,14 +543,7 @@ function ProductFormContent() {
           return;
         }
 
-        try {
-          await deleteProductVariant(sizeRow.id);
-        } catch (error) {
-          toast.error(
-            error instanceof Error ? error.message : 'Xóa biến thể thất bại.',
-          );
-          return;
-        }
+        setVariantIdsToDelete((current) => [...current, sizeRow.id!]);
       }
     }
 
@@ -756,6 +737,10 @@ function ProductFormContent() {
         savedProduct.id,
       );
       await syncImages(savedProduct.id, groupRepresentativeVariantIdMap);
+      await Promise.all(imageIdsToDelete.map((id) => deleteProductImage(id)));
+      await Promise.all(
+        variantIdsToDelete.map((id) => deleteProductVariant(id)),
+      );
 
       toast.success(
         isEdit ? 'Cập nhật sản phẩm thành công.' : 'Thêm sản phẩm thành công.',

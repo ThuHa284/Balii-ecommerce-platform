@@ -1,9 +1,4 @@
-import {
-  Product,
-  Category,
-  Collection,
-  ComboTier,
-} from '@/types/product.types';
+import { Product, Category, Collection } from '@/types/product.types';
 
 export const MOCK_CATEGORIES: Category[] = [
   {
@@ -426,55 +421,5 @@ export const MOCK_COLLECTIONS: Collection[] = [
     season: 'Fall 2024',
     isActive: true,
     createdAt: '2024-05-01T00:00:00Z',
-  },
-];
-
-export const MOCK_COMBO_SHORTS = {
-  id: 'combo_shorts_001',
-  name: 'Quần Bảo Hộ Lụa',
-  slug: 'quan-bao-ho-lua',
-  description: 'Quần bảo hộ lụa mềm mại, co giãn thoải mái',
-  basePrice: 99000,
-  comboPrice: 20000,
-  image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=400',
-  sizes: ['S', 'M', 'L', 'XL'],
-  colors: [
-    { name: 'Hồng pastel', code: '#F8BBD0' },
-    { name: 'Trắng ngà', code: '#FFF8E7' },
-    { name: 'Đen', code: '#212121' },
-    { name: 'Be nude', code: '#EFEBE9' },
-  ],
-};
-
-export const COMBO_TIERS: ComboTier[] = [
-  {
-    id: 'combo_1',
-    name: 'Combo Tiết Kiệm',
-    minItems: 1,
-    freeShorts: 0,
-    shortsPrice: 20000,
-    badge: 'Quà tặng',
-    description: 'Mua 1 sản phẩm + 1 quần bảo hộ chỉ thêm 20K',
-    icon: 'gift',
-  },
-  {
-    id: 'combo_2',
-    name: 'Combo Hot',
-    minItems: 2,
-    freeShorts: 1,
-    shortsPrice: 0,
-    badge: 'Nổi bật',
-    description: 'Mua 2 sản phẩm - Tặng 1 quần bảo hộ',
-    icon: 'flame',
-  },
-  {
-    id: 'combo_3',
-    name: 'Combo VIP',
-    minItems: 3,
-    freeShorts: 2,
-    shortsPrice: 0,
-    badge: 'Cao cấp',
-    description: 'Mua 3 sản phẩm - Tặng 2 quần bảo hộ',
-    icon: 'gem',
   },
 ];

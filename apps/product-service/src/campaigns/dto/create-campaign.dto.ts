@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -63,6 +64,38 @@ export class CreateCampaignDto {
   @IsOptional()
   @IsString()
   giftDescription?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  minimumPurchaseQuantity?: number;
+
+  @IsOptional()
+  @IsUUID('4')
+  giftVariantId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  giftQuantity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  giftUnitPrice?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  repeatable?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxApplications?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  stackableWithSale?: boolean;
 
   @IsOptional()
   @IsString()

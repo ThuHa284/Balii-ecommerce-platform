@@ -6,6 +6,7 @@
 - Backend `nest build` và `npm test -- --runInBand` đang pass.
 - Repo đã có đường deploy Docker/Compose tối thiểu qua:
   - `Dockerfile.backend`
+  - `Dockerfile.migrations`
   - `frontend/Dockerfile`
 - `docker-compose.prod.yml`
 - Bộ manifest Kubernetes trong `infra/k8s/` vẫn đang rỗng, chưa nên dùng làm đường deploy chính.
@@ -20,37 +21,35 @@
 npm run init:prod-env
 ```
 
-   Hoặc chỉ định domain ngay từ đầu:
+Hoặc chỉ định domain ngay từ đầu:
 
 ```bash
 powershell -ExecutionPolicy Bypass -File scripts/bootstrap-production-env.ps1 -FrontendUrl https://shop.your-domain.com -ApiGatewayUrl https://api.your-domain.com
 ```
+
 2. Điền toàn bộ secret thật.
    Tham chiếu nhanh tại `docs/production-env-matrix.md`.
-3. Chạy migration DB trước khi mở traffic:
-
-```bash
-npm run migration:run
-```
-
-4. Kiểm tra file env trước khi chạy:
+3. Kiểm tra file env trước khi chạy:
 
 ```bash
 npm run validate:prod-env -- .env.production
 ```
 
-5. Build và chạy stack:
+4. Build và chạy stack:
 
 ```bash
 APP_ENV_FILE=.env.production docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
 ```
 
-6. Kiểm tra:
+Compose sẽ chạy service one-shot `migrations`; các service dùng DB chỉ được
+khởi động khi migration hoàn tất thành công.
+
+5. Kiểm tra:
    - Frontend: `http://localhost:3000`
    - API Gateway: `http://localhost:4000/health`
    - API Gateway readiness: `http://localhost:4000/health/ready`
 
-7. Đi qua checklist trước khi mở traffic thật:
+6. Đi qua checklist trước khi mở traffic thật:
 
 ```bash
 docs/go-live-checklist.md
@@ -66,7 +65,7 @@ docs/go-live-checklist.md
 - Hai service AI ngoài luồng hiện chưa được container hóa trong repo này:
   - `ai-service/ai-gender-age-service`
   - `ai-service/google-lens-worker`
-  Nếu dùng tính năng phụ thuộc chúng, cần deploy riêng và cấu hình URL thật.
+    Nếu dùng tính năng phụ thuộc chúng, cần deploy riêng và cấu hình URL thật.
 
 ## Ghi chú quan trọng
 

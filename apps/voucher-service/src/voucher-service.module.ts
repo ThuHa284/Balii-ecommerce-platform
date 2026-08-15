@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { loadEnv } from '@app/common';
+import { getSecuritySecret, loadEnv } from '@app/common';
 import { UserVoucher } from './entities/user-voucher.entity';
 import { Voucher } from './entities/voucher.entity';
 import { VoucherUsage } from './entities/voucher-usage.entity';
@@ -18,7 +18,7 @@ loadEnv();
       host: process.env.DB_HOST || 'localhost',
       port: Number(process.env.DB_PORT || 5433),
       username: process.env.DB_USERNAME || 'balii_admin',
-      password: process.env.DB_PASSWORD || '123456',
+      password: getSecuritySecret('DB_PASSWORD', '123456'),
       database: process.env.DB_DATABASE || 'balii_sleepwear',
       schema: 'voucher_service',
       autoLoadEntities: true,

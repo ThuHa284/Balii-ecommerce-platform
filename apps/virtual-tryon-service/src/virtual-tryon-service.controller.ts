@@ -50,6 +50,14 @@ export class VirtualTryonServiceController {
     return this.virtualTryonService.createTryOn(files, dto, userId);
   }
 
+  @Post('history/:id/save')
+  saveTryOnResult(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId?: string,
+  ) {
+    return this.virtualTryonService.saveTryOnResult(id, userId);
+  }
+
   @Get('history')
   getHistory(@Headers('x-user-id') userId?: string) {
     return this.virtualTryonService.getHistory(userId);
@@ -69,8 +77,11 @@ export class VirtualTryonServiceController {
   }
 
   @Get(':id')
-  getTryOnResult(@Param('id') id: string) {
-    return this.virtualTryonService.getTryOnResult(id);
+  getTryOnResult(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId?: string,
+  ) {
+    return this.virtualTryonService.getTryOnResult(id, userId);
   }
 
   @Post('sync')

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   BarChart3,
+  Database,
   LayoutDashboard,
   Library,
   Megaphone,
@@ -14,6 +15,7 @@ import {
   ShoppingCart,
   Ticket,
   Users,
+  Warehouse,
 } from 'lucide-react';
 import { hasRoleAccess } from '@/lib/api/admin.utils';
 import { useAuthStore } from '@/store/auth.store';
@@ -42,6 +44,13 @@ const NAV_OPTIONS: NavOption[] = [
     category: 'Bán hàng',
     icon: Package,
     keywords: 'san pham products hang hoa kho',
+  },
+  {
+    label: 'Đối soát Tồn kho',
+    href: '/admin/inventory',
+    category: 'Bán hàng',
+    icon: Warehouse,
+    keywords: 'ton kho inventory bien dong giu cho doi soat stock',
   },
   {
     label: 'Quản lý Bộ sưu tập',
@@ -92,6 +101,14 @@ const NAV_OPTIONS: NavOption[] = [
     icon: BarChart3,
     keywords:
       'phan tich thi truong market analysis tim bang anh google lens san pham tuong tu doi thu',
+  },
+  {
+    label: 'Giám sát Vector Database',
+    href: '/admin/vector-database',
+    category: 'Hệ thống AI',
+    icon: Database,
+    keywords:
+      'qdrant vector database embedding collection points semantic search',
   },
   {
     label: 'Giám sát Kafka Events',

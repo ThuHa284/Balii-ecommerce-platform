@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -43,8 +44,11 @@ export class ProductsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productsService.findOne(id);
+  findOne(@Param('id') id: string, @Headers('x-user-role') role?: string) {
+    return this.productsService.findOne(
+      id,
+      ['ADMIN', 'SUPER_ADMIN'].includes(role ?? ''),
+    );
   }
 
   @Patch(':id')

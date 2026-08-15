@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -43,8 +44,10 @@ export class CampaignsController {
   }
 
   @Get()
-  findAll() {
-    return this.campaignsService.findAll();
+  findAll(@Headers('x-user-role') role?: string) {
+    return this.campaignsService.findAll(
+      ['ADMIN', 'SUPER_ADMIN'].includes(role ?? ''),
+    );
   }
 
   @Get('active')
@@ -58,8 +61,11 @@ export class CampaignsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.campaignsService.findOne(id);
+  findOne(@Param('id') id: string, @Headers('x-user-role') role?: string) {
+    return this.campaignsService.findOne(
+      id,
+      ['ADMIN', 'SUPER_ADMIN'].includes(role ?? ''),
+    );
   }
 
   @Patch(':id')

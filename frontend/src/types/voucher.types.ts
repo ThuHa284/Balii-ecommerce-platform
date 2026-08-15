@@ -8,6 +8,7 @@ export interface Voucher {
   minOrderValue: number;
   maxDiscount: number | null;
   usageLimit: number;
+  userLimitPerUser: number;
   usedCount: number;
   startDate: string;
   endDate: string;
@@ -43,15 +44,15 @@ export interface VoucherRedeemResult {
 }
 
 export enum VoucherDiscountType {
-  PERCENT = "percent",
-  FIXED = "fixed",
+  PERCENT = 'percent',
+  FIXED = 'fixed',
 }
 
 export enum VoucherStatus {
-  ACTIVE = "active",
-  EXPIRED = "expired",
-  USED_UP = "used_up",
-  INACTIVE = "inactive",
+  ACTIVE = 'active',
+  EXPIRED = 'expired',
+  USED_UP = 'used_up',
+  INACTIVE = 'inactive',
 }
 
 export interface UserVoucher {
@@ -71,6 +72,7 @@ export interface CreateVoucherData {
   minOrderValue: number;
   maxDiscount: number | null;
   usageLimit: number;
+  userLimitPerUser: number;
   startDate: string;
   endDate: string;
   isActive: boolean;

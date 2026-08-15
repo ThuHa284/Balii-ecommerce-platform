@@ -69,40 +69,40 @@ ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_service.provinces (id, name, code)
 VALUES
-    (1, 'Thành phố Hà Nội', 'HNI'),
-    (2, 'Thành phố Hải Phòng', 'HPG'),
-    (3, 'Thành phố Huế', 'HUE'),
-    (4, 'Thành phố Đà Nẵng', 'DNG'),
-    (5, 'Thành phố Hồ Chí Minh', 'HCM'),
-    (6, 'Thành phố Cần Thơ', 'CTO'),
-    (7, 'Tỉnh Tuyên Quang', 'TQG'),
-    (8, 'Tỉnh Lào Cai', 'LCI'),
-    (9, 'Tỉnh Thái Nguyên', 'TNG'),
-    (10, 'Tỉnh Phú Thọ', 'PTO'),
-    (11, 'Tỉnh Bắc Ninh', 'BNH'),
-    (12, 'Tỉnh Hưng Yên', 'HYN'),
-    (13, 'Tỉnh Ninh Bình', 'NBH'),
-    (14, 'Tỉnh Thanh Hóa', 'THA'),
-    (15, 'Tỉnh Nghệ An', 'NAN'),
-    (16, 'Tỉnh Hà Tĩnh', 'HTH'),
-    (17, 'Tỉnh Quảng Trị', 'QTI'),
-    (18, 'Tỉnh Quảng Ngãi', 'QNI'),
-    (19, 'Tỉnh Gia Lai', 'GLI'),
-    (20, 'Tỉnh Khánh Hòa', 'KHA'),
-    (21, 'Tỉnh Lâm Đồng', 'LDG'),
-    (22, 'Tỉnh Đắk Lắk', 'DLK'),
-    (23, 'Tỉnh Đồng Nai', 'DNI'),
-    (24, 'Tỉnh Tây Ninh', 'TNI'),
-    (25, 'Tỉnh Đồng Tháp', 'DTP'),
-    (26, 'Tỉnh Vĩnh Long', 'VLG'),
-    (27, 'Tỉnh An Giang', 'AGG'),
-    (28, 'Tỉnh Cà Mau', 'CMU'),
-    (29, 'Tỉnh Lai Châu', 'LCH'),
-    (30, 'Tỉnh Điện Biên', 'DBN'),
-    (31, 'Tỉnh Sơn La', 'SLA'),
-    (32, 'Tỉnh Lạng Sơn', 'LSN'),
-    (33, 'Tỉnh Quảng Ninh', 'QNH'),
-    (34, 'Tỉnh Cao Bằng', 'CBG')
+    (1, 'Thành phố Hà Nội', '01'),
+    (2, 'Thành phố Hải Phòng', '31'),
+    (3, 'Thành phố Huế', '46'),
+    (4, 'Thành phố Đà Nẵng', '48'),
+    (5, 'Thành phố Hồ Chí Minh', '79'),
+    (6, 'Thành phố Cần Thơ', '92'),
+    (7, 'Tỉnh Tuyên Quang', '08'),
+    (8, 'Tỉnh Lào Cai', '15'),
+    (9, 'Tỉnh Thái Nguyên', '19'),
+    (10, 'Tỉnh Phú Thọ', '25'),
+    (11, 'Tỉnh Bắc Ninh', '24'),
+    (12, 'Tỉnh Hưng Yên', '33'),
+    (13, 'Tỉnh Ninh Bình', '37'),
+    (14, 'Tỉnh Thanh Hoá', '38'),
+    (15, 'Tỉnh Nghệ An', '40'),
+    (16, 'Tỉnh Hà Tĩnh', '42'),
+    (17, 'Tỉnh Quảng Trị', '44'),
+    (18, 'Tỉnh Quảng Ngãi', '51'),
+    (19, 'Tỉnh Gia Lai', '52'),
+    (20, 'Tỉnh Khánh Hoà', '56'),
+    (21, 'Tỉnh Lâm Đồng', '68'),
+    (22, 'Tỉnh Đắk Lắk', '66'),
+    (23, 'Thành phố Đồng Nai', '75'),
+    (24, 'Tỉnh Tây Ninh', '80'),
+    (25, 'Tỉnh Đồng Tháp', '82'),
+    (26, 'Tỉnh Vĩnh Long', '86'),
+    (27, 'Tỉnh An Giang', '91'),
+    (28, 'Tỉnh Cà Mau', '96'),
+    (29, 'Tỉnh Lai Châu', '12'),
+    (30, 'Tỉnh Điện Biên', '11'),
+    (31, 'Tỉnh Sơn La', '14'),
+    (32, 'Tỉnh Lạng Sơn', '20'),
+    (33, 'Tỉnh Quảng Ninh', '22'),
+    (34, 'Tỉnh Cao Bằng', '04')
 ON CONFLICT (id) DO UPDATE
 SET name = EXCLUDED.name,
     code = EXCLUDED.code;
@@ -111,18 +111,47 @@ SET name = EXCLUDED.name,
 -- giữ dữ liệu mẫu để user_address không lỗi khóa ngoại.
 INSERT INTO user_service.districts (id, province_id, name)
 VALUES
-    (1, 5, 'Quận 1')
+    (1, 1, '[Hệ thống] Đơn vị hành chính hai cấp')
 ON CONFLICT (id) DO UPDATE
 SET province_id = EXCLUDED.province_id,
     name = EXCLUDED.name;
 
 INSERT INTO user_service.wards (id, district_id, name)
 VALUES
-    (1, 1, 'Phường Bến Nghé')
+    (1, 1, '[Hệ thống] Phường/xã nhập thủ công')
 ON CONFLICT (id) DO UPDATE
 SET district_id = EXCLUDED.district_id,
     name = EXCLUDED.name;
 
+SELECT setval(
+    pg_get_serial_sequence('user_service.districts', 'id'),
+    COALESCE((SELECT MAX(id) FROM user_service.districts), 1),
+    TRUE
+);
+SELECT setval(
+    pg_get_serial_sequence('user_service.wards', 'id'),
+    COALESCE((SELECT MAX(id) FROM user_service.wards), 1),
+    TRUE
+);
+
+INSERT INTO user_service.districts (province_id, name)
+SELECT province.id, '[Hệ thống] Đơn vị hành chính hai cấp'
+FROM user_service.provinces province
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM user_service.districts district
+    WHERE district.province_id = province.id
+);
+
+INSERT INTO user_service.wards (district_id, name)
+SELECT district.id, '[Hệ thống] Phường/xã nhập thủ công'
+FROM user_service.districts district
+WHERE district.name = '[Hệ thống] Đơn vị hành chính hai cấp'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM user_service.wards ward
+      WHERE ward.district_id = district.id
+  );
 SELECT setval(pg_get_serial_sequence('user_service.provinces', 'id'), 34, TRUE);
 SELECT setval(pg_get_serial_sequence('user_service.districts', 'id'), COALESCE((SELECT MAX(id) FROM user_service.districts), 1), TRUE);
 SELECT setval(pg_get_serial_sequence('user_service.wards', 'id'), COALESCE((SELECT MAX(id) FROM user_service.wards), 1), TRUE);
@@ -362,6 +391,16 @@ VALUES
 ON CONFLICT (slug) DO NOTHING;
 
 -- ============================================================
+-- VOUCHER LOOKUPS
+-- ============================================================
+
+INSERT INTO voucher_service.voucher_types (code, label)
+VALUES
+    ('percent', 'Giảm theo phần trăm'),
+    ('fixed', 'Giảm số tiền cố định')
+ON CONFLICT (code) DO UPDATE SET label = EXCLUDED.label;
+
+-- ============================================================
 -- ORDER AND PAYMENT LOOKUPS
 -- ============================================================
 
@@ -396,7 +435,7 @@ INSERT INTO payment_service.payment_providers (id, code, name, is_active)
 VALUES
     (1, 'cod', 'Thanh toán khi nhận hàng', TRUE),
     (2, 'bank_transfer', 'Chuyển khoản ngân hàng', TRUE),
-    (3, 'mock_online', 'ổng thanh toán mô phỏng', TRUE),
+    (3, 'mock_online', 'Cổng thanh toán mô phỏng', TRUE),
     (4, 'vnpay', 'VNPay', TRUE),
     (5, 'momo', 'MoMo', TRUE)
 ON CONFLICT (code) DO NOTHING;
@@ -406,7 +445,9 @@ VALUES
     (1, 'pending', 'Chờ thanh toán'),
     (2, 'paid', 'Đã thanh toán'),
     (3, 'failed', 'Thanh toán thất bại'),
-    (4, 'refunded', 'Đã hoàn tiền')
+    (4, 'refunded', 'Đã hoàn tiền'),
+    (5, 'partially_refunded', 'Đã hoàn tiền một phần'),
+    (6, 'cancelled', 'Đã hủy')
 ON CONFLICT (code) DO NOTHING;
 
 SELECT setval(

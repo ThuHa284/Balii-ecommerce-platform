@@ -359,7 +359,9 @@ export default function TryOnUpload({
           onClick={() => fileInputRef.current?.click()}
           className={cn(
             'group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-300/50 glass-card transition-all hover:border-violet-400 hover:bg-white/50',
-            compact ? 'aspect-[3/4] gap-2' : 'aspect-square max-h-[360px] gap-4',
+            compact
+              ? 'aspect-[3/4] gap-2'
+              : 'aspect-square max-h-[360px] gap-4',
           )}
         >
           <div
@@ -385,7 +387,7 @@ export default function TryOnUpload({
               Tải ảnh của bạn
             </p>
             <p className="text-xs text-muted-foreground">
-              JPG, PNG hoặc WebP (tối đa 10MB)
+              JPG, PNG hoặc WebP (tối đa 8MB)
             </p>
           </div>
         </div>

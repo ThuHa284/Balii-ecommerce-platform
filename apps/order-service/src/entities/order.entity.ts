@@ -48,6 +48,20 @@ export class Order {
   @Column({ name: 'shipping_method_id', type: 'int', nullable: true })
   shippingMethodId?: number | null;
 
+  @Column({ name: 'voucher_id', type: 'uuid', nullable: true })
+  voucherId?: string | null;
+
+  @Column({ name: 'checkout_idempotency_key', type: 'uuid', unique: true })
+  checkoutIdempotencyKey!: string;
+
+  @Column({
+    name: 'inventory_state',
+    type: 'varchar',
+    length: 20,
+    default: 'reserved',
+  })
+  inventoryState!: 'reserved' | 'committed' | 'released' | 'returned';
+
   @Column({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

@@ -166,6 +166,16 @@ export default function VnpayCheckoutPage() {
   }, [orderId, router]);
 
   const paymentUrl = payment?.paymentUrl ?? null;
+  const isPaymentSimulation =
+    ENABLE_VNPAY_SIMULATION ||
+    (() => {
+      if (!paymentUrl) return false;
+      try {
+        return new URL(paymentUrl).searchParams.get('simulation') === 'true';
+      } catch {
+        return false;
+      }
+    })();
   const paymentStatus = order?.paymentStatus ?? payment?.status ?? 'pending';
   const paymentStatusClass =
     PAYMENT_STATUS_COLORS[paymentStatus] || PAYMENT_STATUS_COLORS.pending;
@@ -259,8 +269,9 @@ export default function VnpayCheckoutPage() {
             Quét mã QR để thanh toán
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
-            Bạn vẫn đang ở giao diện của Balii. Sau khi VNPay xác nhận, trang sẽ
-            tự động cập nhật kết quả thanh toán.
+            {isPaymentSimulation
+              ? 'Đây là giao dịch mô phỏng phục vụ website demo; không có tiền thật được chuyển qua VNPay.'
+              : 'Bạn vẫn đang ở giao diện của Balii. Sau khi VNPay xác nhận, trang sẽ tự động cập nhật kết quả thanh toán.'}
           </p>
         </div>
 
@@ -272,10 +283,14 @@ export default function VnpayCheckoutPage() {
               </div>
               <div>
                 <p className="font-heading text-xl font-semibold text-foreground">
-                  Mã QR thanh toán VNPay
+                  {isPaymentSimulation
+                    ? 'Mã QR thanh toán mô phỏng'
+                    : 'Mã QR thanh toán VNPay'}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Sử dụng ứng dụng ngân hàng hoặc ví hỗ trợ quét QR.
+                  {isPaymentSimulation
+                    ? 'Không quét bằng ứng dụng ngân hàng. Hãy dùng nút giả lập bên dưới.'
+                    : 'Sử dụng ứng dụng ngân hàng hoặc ví hỗ trợ quét QR.'}
                 </p>
               </div>
             </div>
@@ -299,22 +314,24 @@ export default function VnpayCheckoutPage() {
                 </span>
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <a
-                  href={paymentUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-primary inline-flex items-center justify-center gap-2"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Mở VNPay
-                </a>
+                {!isPaymentSimulation ? (
+                  <a
+                    href={paymentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-primary inline-flex items-center justify-center gap-2"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Mở VNPay
+                  </a>
+                ) : null}
                 <Link
                   href={`/account/orders/${order.id}`}
                   className="btn-outline"
                 >
                   Xem đơn hàng
                 </Link>
-                {ENABLE_VNPAY_SIMULATION &&
+                {isPaymentSimulation &&
                 payment.method === 'vnpay' &&
                 paymentStatus === 'pending' ? (
                   <button
@@ -329,10 +346,10 @@ export default function VnpayCheckoutPage() {
                   </button>
                 ) : null}
               </div>
-              {ENABLE_VNPAY_SIMULATION ? (
+              {isPaymentSimulation ? (
                 <p className="mt-4 text-xs text-amber-700">
-                  Chế độ test đang bật. Nút giả lập chỉ dùng cho môi trường dev
-                  hoặc sandbox.
+                  Chế độ demo đang bật trên production. Đây không phải giao dịch
+                  VNPay thật và không phát sinh dòng tiền thực tế.
                 </p>
               ) : null}
             </div>

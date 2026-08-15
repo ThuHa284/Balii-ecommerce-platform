@@ -95,11 +95,8 @@ Lưu ý: nhiều hàm API ở `frontend/src/lib/api/*` đang chạy với `USE_M
 - PostgreSQL
 - Redis
 - Kafka + Zookeeper
-- Elasticsearch + Kibana
-- MinIO
 - Camunda
 - Qdrant
-- Mailhog
 
 ## Yêu cầu môi trường
 
@@ -164,14 +161,8 @@ Trong code frontend:
 | Redis | `6379` |
 | Zookeeper | `2181` |
 | Kafka | `9092` |
-| Elasticsearch | `9200` |
-| Kibana | `5601` |
-| MinIO API | `9000` |
-| MinIO Console | `9001` |
 | Camunda | `8080` |
 | Qdrant | `6333` |
-| Mailhog SMTP | `1025` |
-| Mailhog UI | `8025` |
 
 Khởi động:
 

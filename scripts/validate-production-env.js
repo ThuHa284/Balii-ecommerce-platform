@@ -16,6 +16,9 @@ const REQUIRED_KEYS = [
   'NEXT_PUBLIC_SOCKET_URL',
   'JWT_SECRET',
   'JWT_REFRESH_SECRET',
+  'INTERNAL_SERVICE_SECRET',
+  'GATEWAY_SERVICE_SECRET',
+  'PAYMENT_WEBHOOK_SHARED_SECRET',
   'USER_SERVICE_URL',
   'PRODUCT_SERVICE_URL',
   'CART_SERVICE_URL',
@@ -59,6 +62,16 @@ const PLACEHOLDER_PATTERNS = [
   /^ops@example\.com$/i,
   /^mailer@example\.com$/i,
 ];
+
+const MINIMUM_SECRET_LENGTHS = {
+  DB_PASSWORD: 16,
+  JWT_SECRET: 32,
+  JWT_REFRESH_SECRET: 32,
+  INTERNAL_SERVICE_SECRET: 32,
+  GATEWAY_SERVICE_SECRET: 32,
+  PAYMENT_WEBHOOK_SHARED_SECRET: 32,
+  VNPAY_HASH_SECRET: 32,
+};
 
 function parseEnvFile(contents) {
   const values = {};
@@ -108,6 +121,29 @@ const placeholderSuggested = SUGGESTED_KEYS.filter(
 const missingSuggested = SUGGESTED_KEYS.filter((key) => !env[key]?.trim());
 
 const problems = [];
+const warnings = [];
+const isThesisDemo = env.DEPLOYMENT_PROFILE === 'thesis-demo';
+
+for (const [key, minimumLength] of Object.entries(MINIMUM_SECRET_LENGTHS)) {
+  const value = env[key]?.trim();
+  if (value && !isPlaceholder(value) && value.length < minimumLength) {
+    const message = `${key} phải có ít nhất ${minimumLength} ký tự.`;
+    if (isThesisDemo && key === 'DB_PASSWORD') {
+      warnings.push(
+        `${message} Chưa tự đổi để tránh làm gián đoạn PostgreSQL hiện tại.`,
+      );
+    } else {
+      problems.push(message);
+    }
+  }
+}
+
+if (
+  env.TRUST_PROXY_HOPS &&
+  (!/^\d+$/.test(env.TRUST_PROXY_HOPS) || Number(env.TRUST_PROXY_HOPS) > 5)
+) {
+  problems.push('TRUST_PROXY_HOPS phải là số nguyên từ 0 đến 5.');
+}
 
 if (missingRequired.length) {
   problems.push('Bien bat buoc dang thieu:');
@@ -164,7 +200,36 @@ if (
   );
 }
 
-if (env.APP_ENV === 'production') {
+if (env.APP_ENV === 'production' && !isThesisDemo) {
+  if (env.PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS !== 'false') {
+    problems.push(
+      'PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS phải là false trên production.',
+    );
+  }
+
+  if (env.PAYMENT_SIMULATION_ALLOW_PRODUCTION !== 'false') {
+    problems.push(
+      'PAYMENT_SIMULATION_ALLOW_PRODUCTION phải là false trên production.',
+    );
+  }
+
+  if (env.DISABLE_EMAIL_VERIFICATION === 'true') {
+    problems.push('DISABLE_EMAIL_VERIFICATION phải là false trên production.');
+  }
+  for (const key of [
+    'MAIL_HOST',
+    'MAIL_PORT',
+    'MAIL_USER',
+    'MAIL_PASS',
+    'MAIL_FROM',
+  ]) {
+    if (!env[key]?.trim() || isPlaceholder(env[key].trim())) {
+      problems.push(
+        `${key} phải được cấu hình thật khi xác minh email đang bật.`,
+      );
+    }
+  }
+
   if (env.VNPAY_ENVIRONMENT !== 'production') {
     problems.push(
       'VNPAY_ENVIRONMENT phải là production trước khi nhận thanh toán thật.',
@@ -186,12 +251,28 @@ if (env.APP_ENV === 'production') {
   if (env.PAYMENT_SIMULATION_ENABLED !== 'false') {
     problems.push('PAYMENT_SIMULATION_ENABLED phải là false trên production.');
   }
-
+  if (env.PAYMENT_REFUND_SIMULATION_ENABLED !== 'false') {
+    problems.push(
+      'PAYMENT_REFUND_SIMULATION_ENABLED phải là false trên production.',
+    );
+  }
   if (env.NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION !== 'false') {
     problems.push(
       'NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATION phải là false trên production.',
     );
   }
+}
+
+if (env.APP_ENV === 'production' && isThesisDemo) {
+  if (env.PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS !== 'false') {
+    problems.push(
+      'PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS phải là false kể cả trong profile thesis-demo.',
+    );
+  }
+
+  warnings.push(
+    'Đang dùng profile thesis-demo: cho phép VNPay sandbox, mô phỏng thanh toán, bỏ qua xác minh email và mô phỏng hoàn tiền.',
+  );
 }
 
 if (problems.length) {
@@ -204,6 +285,13 @@ if (problems.length) {
 }
 
 console.log(`Env hop le o muc co the deploy baseline: ${envFileArg}`);
+
+if (warnings.length) {
+  console.warn('\nCảnh báo triển khai:');
+  for (const warning of warnings) {
+    console.warn(`- ${warning}`);
+  }
+}
 
 if (missingSuggested.length) {
   console.log('\nBien tuy chon/chuc nang nang cao chua dien:');

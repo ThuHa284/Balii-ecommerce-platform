@@ -17,10 +17,7 @@ export class CloudinaryService {
     buffer: Buffer,
     folder: string,
     publicId?: string,
-  ): Promise<{
-    url: string;
-    publicId: string;
-  }> {
+  ): Promise<{ url: string; publicId: string }> {
     return new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
@@ -42,6 +39,13 @@ export class CloudinaryService {
       );
 
       stream.end(buffer);
+    });
+  }
+
+  async deleteImage(publicId: string): Promise<void> {
+    await cloudinary.uploader.destroy(publicId, {
+      resource_type: 'image',
+      invalidate: true,
     });
   }
 }

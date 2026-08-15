@@ -1,11 +1,17 @@
-"use client";
+'use client';
 
-import { useCompareStore } from "@/store/compare.store";
-import { X, ArrowRightLeft, Trash2, ChevronDown, ChevronUp } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { formatCurrency } from "@/lib/utils";
-import { useState } from "react";
+import { useCompareStore } from '@/store/compare.store';
+import {
+  X,
+  ArrowRightLeft,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { formatCurrency } from '@/lib/utils';
+import { useState } from 'react';
 
 export default function FloatingCompareBar() {
   const { compareItems, removeItem, clearCompare } = useCompareStore();
@@ -18,14 +24,12 @@ export default function FloatingCompareBar() {
     return (
       <button
         onClick={() => setIsCollapsed(false)}
-        className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2.5 bg-white/80 backdrop-blur-xl border border-violet-200/60 shadow-2xl rounded-full px-5 py-3 animate-slide-up hover:shadow-violet-300/30 transition-all hover:scale-[1.02] active:scale-95"
+        className="fixed bottom-36 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 bg-white/80 backdrop-blur-xl border border-violet-200/60 shadow-2xl rounded-full px-5 py-3 animate-slide-up hover:shadow-violet-300/30 transition-all hover:scale-[1.02] active:scale-95"
       >
         <div className="p-1.5 rounded-lg bg-violet-100 text-violet-600">
           <ArrowRightLeft className="w-4 h-4" />
         </div>
-        <span className="text-sm font-bold text-slate-800">
-          So sánh
-        </span>
+        <span className="text-sm font-bold text-slate-800">So sánh</span>
         <span className="flex items-center justify-center h-5 w-5 rounded-full bg-violet-500 text-[10px] font-bold text-white">
           {compareItems.length}
         </span>
@@ -35,7 +39,7 @@ export default function FloatingCompareBar() {
   }
 
   return (
-    <div className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-2xl bg-white/80 backdrop-blur-xl border border-violet-200/60 shadow-2xl rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4 animate-slide-up">
+    <div className="fixed bottom-36 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-[92%] max-w-2xl bg-white/80 backdrop-blur-xl border border-violet-200/60 shadow-2xl rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4 animate-slide-up">
       {/* Label & Stats */}
       <div className="flex items-center gap-2 justify-between w-full sm:w-auto">
         <div className="flex items-center gap-2">
@@ -43,8 +47,12 @@ export default function FloatingCompareBar() {
             <ArrowRightLeft className="w-4 h-4" />
           </div>
           <div>
-            <h4 className="text-xs sm:text-sm font-extrabold text-slate-800">So sánh sản phẩm</h4>
-            <p className="text-[10px] text-muted-foreground">Tối đa 3 sản phẩm ({compareItems.length}/3)</p>
+            <h4 className="text-xs sm:text-sm font-extrabold text-slate-800">
+              So sánh sản phẩm
+            </h4>
+            <p className="text-[10px] text-muted-foreground">
+              Tối đa 3 sản phẩm ({compareItems.length}/3)
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -75,11 +83,20 @@ export default function FloatingCompareBar() {
               className="relative flex items-center gap-2 bg-slate-50/50 border border-slate-100 p-1.5 pr-3 rounded-xl shrink-0 group hover:border-violet-200 transition-colors"
             >
               <div className="relative w-9 h-12 rounded-lg overflow-hidden shrink-0 shadow-sm">
-                <Image src={product.thumbnail} alt={product.name} fill className="object-cover" />
+                <Image
+                  src={product.thumbnail}
+                  alt={product.name}
+                  fill
+                  className="object-cover"
+                />
               </div>
               <div className="max-w-[100px] sm:max-w-[120px]">
-                <h5 className="text-[10px] font-bold text-slate-800 truncate">{product.name}</h5>
-                <p className="text-[10px] font-semibold text-violet-600">{formatCurrency(price)}</p>
+                <h5 className="text-[10px] font-bold text-slate-800 truncate">
+                  {product.name}
+                </h5>
+                <p className="text-[10px] font-semibold text-violet-600">
+                  {formatCurrency(price)}
+                </p>
               </div>
               <button
                 onClick={() => removeItem(product.id)}
@@ -93,14 +110,16 @@ export default function FloatingCompareBar() {
         })}
 
         {/* Empty slots placeholders */}
-        {Array.from({ length: Math.max(0, 3 - compareItems.length) }).map((_, idx) => (
-          <div
-            key={idx}
-            className="hidden sm:flex items-center justify-center w-[120px] h-12 rounded-xl border border-dashed border-slate-200 text-slate-400 text-[10px] font-medium"
-          >
-            Trống
-          </div>
-        ))}
+        {Array.from({ length: Math.max(0, 3 - compareItems.length) }).map(
+          (_, idx) => (
+            <div
+              key={idx}
+              className="hidden sm:flex items-center justify-center w-[120px] h-12 rounded-xl border border-dashed border-slate-200 text-slate-400 text-[10px] font-medium"
+            >
+              Trống
+            </div>
+          ),
+        )}
       </div>
 
       {/* Compare Action Buttons */}
@@ -109,6 +128,7 @@ export default function FloatingCompareBar() {
           onClick={clearCompare}
           className="hidden sm:flex items-center justify-center p-2.5 text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
           title="Xoá toàn bộ danh sách so sánh"
+          aria-label="Xóa toàn bộ danh sách so sánh"
         >
           <Trash2 className="w-4 h-4" />
         </button>

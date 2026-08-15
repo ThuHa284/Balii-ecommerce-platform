@@ -89,8 +89,12 @@ export class PaymentWebhookSecurityService {
     rawPayload: string,
     signature?: string,
   ): boolean {
-    // Cho phép bỏ verify chỉ khi môi trường local/dev bật cờ rõ ràng.
-    if (process.env.PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS === 'true') {
+    // Chỉ cho phép bỏ verify ở local/dev; production luôn fail-closed.
+    const appEnv = process.env.APP_ENV || process.env.NODE_ENV;
+    if (
+      appEnv !== 'production' &&
+      process.env.PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS === 'true'
+    ) {
       return true;
     }
 

@@ -13,7 +13,9 @@ export class PersonAnalysisController {
   constructor(private readonly personAnalysisService: PersonAnalysisService) {}
 
   @Post('analyze-person')
-  @UseInterceptors(FileInterceptor('personImage'))
+  @UseInterceptors(
+    FileInterceptor('personImage', { limits: { fileSize: 8 * 1024 * 1024 } }),
+  )
   async analyzePerson(@UploadedFile() personImage: Express.Multer.File) {
     const analysis =
       await this.personAnalysisService.analyzePerson(personImage);

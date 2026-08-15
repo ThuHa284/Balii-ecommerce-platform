@@ -14,6 +14,14 @@ import {
   CamundaVariableMap,
 } from './camunda-monitor.types';
 
+type CamundaExternalTaskSummary = {
+  id: string;
+  processInstanceId: string;
+  topicName: string;
+  retries: number | null;
+  errorMessage?: string | null;
+};
+
 const MONITORED_PROCESS_KEYS = [
   'Process_Payment_Processing',
   'Process_Refund_Workflow',
@@ -132,6 +140,74 @@ export class CamundaClientService implements OnModuleInit {
     );
   }
 
+  async resolveDemoIncident(processInstanceId: string) {
+    const normalizedProcessInstanceId = processInstanceId.trim();
+    if (!normalizedProcessInstanceId) {
+      throw new Error('Missing Camunda process instance id');
+    }
+
+    const variables = await this.getProcessVariables(
+      normalizedProcessInstanceId,
+    );
+    const faultTopic = variables.demoFaultTopic?.value;
+    if (!faultTopic) {
+      throw new Error('Process instance này không có lỗi demo để khôi phục.');
+    }
+
+    const externalTasks = await this.fetchCamunda<CamundaExternalTaskSummary[]>(
+      `/external-task?processInstanceId=${encodeURIComponent(normalizedProcessInstanceId)}`,
+    );
+    const failedTasks = externalTasks.filter(
+      (task) => task.retries === 0 || Boolean(task.errorMessage),
+    );
+
+    if (failedTasks.length === 0) {
+      throw new Error(
+        'Không tìm thấy external task đang bị incident để retry.',
+      );
+    }
+
+    const clearFaultResponse = await fetch(
+      `${this.baseUrl}/process-instance/${encodeURIComponent(normalizedProcessInstanceId)}/variables/demoFaultTopic`,
+      { method: 'DELETE' },
+    );
+    if (!clearFaultResponse.ok && clearFaultResponse.status !== 404) {
+      const errorBody = await clearFaultResponse.text();
+      throw new Error(
+        `Không thể gỡ lỗi demo khỏi process (${clearFaultResponse.status}): ${errorBody}`,
+      );
+    }
+
+    await Promise.all(
+      failedTasks.map(async (task) => {
+        const response = await fetch(
+          `${this.baseUrl}/external-task/${encodeURIComponent(task.id)}/retries`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ retries: 1 }),
+          },
+        );
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(
+            `Không thể retry external task ${task.id} (${response.status}): ${errorBody}`,
+          );
+        }
+      }),
+    );
+
+    return {
+      processInstanceId: normalizedProcessInstanceId,
+      clearedFaultTopic: faultTopic,
+      retriedTasks: failedTasks.map((task) => ({
+        id: task.id,
+        topicName: task.topicName,
+      })),
+    };
+  }
+
   async getProcessDefinitionXml(
     processDefinitionId: string,
   ): Promise<CamundaProcessDefinitionXml> {
@@ -238,7 +314,44 @@ export class CamundaClientService implements OnModuleInit {
     amount: number;
     method: string;
     idempotencyKey?: string;
+    /**
+     * Demo-only: name of an external-task topic at which the worker should
+     * inject a fault so the process gets stuck with an incident on that
+     * service task. Used by the admin workflow demo, never set in real flows.
+     */
+    demoFaultTopic?: string;
   }) {
+    const variables: Record<string, { value: unknown; type: string }> = {
+      orderId: {
+        value: input.orderId,
+        type: 'String',
+      },
+      userId: {
+        value: input.userId,
+        type: 'String',
+      },
+      amount: {
+        value: Number(input.amount),
+        type: 'Double',
+      },
+      method: {
+        value: input.method,
+        type: 'String',
+      },
+      idempotencyKey: {
+        value:
+          input.idempotencyKey || `checkout_${input.orderId}_${input.method}`,
+        type: 'String',
+      },
+    };
+
+    if (input.demoFaultTopic) {
+      variables.demoFaultTopic = {
+        value: input.demoFaultTopic,
+        type: 'String',
+      };
+    }
+
     const response = await fetch(
       `${this.baseUrl}/process-definition/key/Process_Payment_Processing/start`,
       {
@@ -248,30 +361,7 @@ export class CamundaClientService implements OnModuleInit {
         },
         body: JSON.stringify({
           businessKey: input.orderId,
-          variables: {
-            orderId: {
-              value: input.orderId,
-              type: 'String',
-            },
-            userId: {
-              value: input.userId,
-              type: 'String',
-            },
-            amount: {
-              value: Number(input.amount),
-              type: 'Double',
-            },
-            method: {
-              value: input.method,
-              type: 'String',
-            },
-            idempotencyKey: {
-              value:
-                input.idempotencyKey ||
-                `checkout_${input.orderId}_${input.method}`,
-              type: 'String',
-            },
-          },
+          variables,
         }),
       },
     );
@@ -332,6 +422,7 @@ export class CamundaClientService implements OnModuleInit {
     amount: number;
     reason: string;
     idempotencyKey?: string;
+    approvedReturnRequest?: boolean;
   }) {
     const response = await fetch(
       `${this.baseUrl}/process-definition/key/Process_Refund_Workflow/start`,
@@ -368,6 +459,10 @@ export class CamundaClientService implements OnModuleInit {
                 input.idempotencyKey ||
                 `refund_${input.paymentId}_${Number(input.amount)}`,
               type: 'String',
+            },
+            approvedReturnRequest: {
+              value: input.approvedReturnRequest === true,
+              type: 'Boolean',
             },
           },
         }),

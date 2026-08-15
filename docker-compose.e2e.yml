@@ -1,0 +1,5 @@
+services:
+  # E2E chỉ cần các service nói chuyện với Camunda trong Docker network;
+  # không chiếm cổng 8080 của máy phát triển.
+  camunda:
+    ports: !override []

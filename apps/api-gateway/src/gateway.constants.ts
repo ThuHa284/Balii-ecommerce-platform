@@ -16,6 +16,7 @@ export const ROUTE_TARGETS: RouteTarget[] = [
   { prefix: '/orders', targetEnv: 'ORDER_SERVICE_URL' },
   { prefix: '/payments', targetEnv: 'PAYMENT_SERVICE_URL' },
   { prefix: '/vouchers', targetEnv: 'VOUCHER_SERVICE_URL' },
+  { prefix: '/admin/inventory-movements', targetEnv: 'PRODUCT_SERVICE_URL' },
   { prefix: '/admin/vouchers', targetEnv: 'VOUCHER_SERVICE_URL' },
   {
     prefix: '/admin/market-analysis',
@@ -28,4 +29,8 @@ export const ROUTE_TARGETS: RouteTarget[] = [
 
 export const GATEWAY_TIMEOUT_MS = Number(
   process.env.GATEWAY_TIMEOUT_MS ?? '60000',
+);
+
+export const TRYON_GATEWAY_TIMEOUT_MS = Number(
+  process.env.TRYON_GATEWAY_TIMEOUT_MS ?? '150000',
 );

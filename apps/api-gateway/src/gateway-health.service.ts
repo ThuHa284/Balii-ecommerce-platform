@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { request as httpRequest } from 'http';
 import { request as httpsRequest } from 'https';
 import { URL } from 'url';
@@ -13,7 +13,6 @@ export class GatewayHealthService {
     return {
       service: 'api-gateway',
       status: 'ok',
-      routes: this.gatewayRouteService.describeRoutes(),
     };
   }
 
@@ -34,11 +33,19 @@ export class GatewayHealthService {
       ? 'ok'
       : 'degraded';
 
-    return {
+    const response = {
       service: 'api-gateway',
       status,
-      upstreams,
+      upstreams: upstreams.map(({ prefix, reachable, statusCode }) => ({
+        prefix,
+        reachable,
+        statusCode,
+      })),
     };
+    if (status !== 'ok') {
+      throw new ServiceUnavailableException(response);
+    }
+    return response;
   }
 
   private pingUpstream(

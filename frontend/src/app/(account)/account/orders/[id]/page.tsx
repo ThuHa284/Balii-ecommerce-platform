@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import {
@@ -64,12 +63,20 @@ function ReturnStatusBadge({ status }: { status: ReturnRequest['status'] }) {
     pending: 'bg-amber-100 text-amber-700',
     approved: 'bg-emerald-100 text-emerald-700',
     rejected: 'bg-rose-100 text-rose-700',
+    refund_pending: 'bg-sky-100 text-sky-700',
+    refund_failed: 'bg-rose-100 text-rose-700',
+    manual_refund_pending: 'bg-violet-100 text-violet-700',
+    completed: 'bg-emerald-100 text-emerald-700',
   } satisfies Record<ReturnRequest['status'], string>;
 
   const labels = {
     pending: 'Chờ duyệt',
-    approved: 'Đã duyệt',
+    approved: 'Đã duyệt, chờ nhận hàng',
     rejected: 'Từ chối',
+    refund_pending: 'Đang hoàn tiền',
+    refund_failed: 'Hoàn tiền đang được xử lý lại',
+    manual_refund_pending: 'Chờ hoàn tiền thủ công',
+    completed: 'Đã hoàn tất',
   } satisfies Record<ReturnRequest['status'], string>;
 
   return (
@@ -89,6 +96,9 @@ export default function OrderDetailPage() {
   const [returnReason, setReturnReason] = useState('');
   const [returnImages, setReturnImages] = useState<File[]>([]);
   const [returnImagePreviews, setReturnImagePreviews] = useState<string[]>([]);
+  const [returnQuantities, setReturnQuantities] = useState<
+    Record<string, number>
+  >({});
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
   const loadOrder = useEffectEvent(async () => {
@@ -106,7 +116,7 @@ export default function OrderDetailPage() {
   });
 
   useEffect(() => {
-    void loadOrder();
+    queueMicrotask(() => void loadOrder());
   }, [params.id]);
 
   useEffect(() => {
@@ -158,16 +168,29 @@ export default function OrderDetailPage() {
       return;
     }
 
+    const selectedItems = order.items
+      .map((item) => ({
+        orderItemId: item.id,
+        quantity: returnQuantities[item.id] ?? 0,
+      }))
+      .filter((item) => item.quantity > 0);
+    if (selectedItems.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một sản phẩm cần trả.');
+      return;
+    }
+
     try {
       setIsSubmittingReturn(true);
       const created = await createOrderReturnRequest(order.id, {
         reason: returnReason.trim(),
         images: returnImages,
+        items: selectedItems,
       });
       setReturnRequests((current) => [created, ...current]);
       setReturnReason('');
       setReturnImages([]);
       setReturnImagePreviews([]);
+      setReturnQuantities({});
       toast.success('Đã gửi yêu cầu trả hàng để admin xác nhận.');
     } catch (error) {
       toast.error(
@@ -182,8 +205,8 @@ export default function OrderDetailPage() {
 
   const activeReturnRequest = useMemo(
     () =>
-      returnRequests.find((request) =>
-        ['pending', 'approved'].includes(request.status),
+      returnRequests.find(
+        (request) => !['rejected', 'completed'].includes(request.status),
       ) ?? null,
     [returnRequests],
   );
@@ -478,7 +501,7 @@ export default function OrderDetailPage() {
                       {request.adminNote ? (
                         <div
                           className={`mt-3 rounded-xl border px-4 py-3 text-sm ${
-                            request.status === 'approved'
+                            request.status !== 'rejected'
                               ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                               : 'border-rose-200 bg-rose-50 text-rose-800'
                           }`}
@@ -494,6 +517,73 @@ export default function OrderDetailPage() {
 
               {canRequestReturn ? (
                 <div className="space-y-4">
+                  <div className="space-y-3 rounded-2xl border border-white/60 bg-white/50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          Chọn sản phẩm và số lượng cần trả
+                        </p>
+                        {order.items.some(
+                          (item) => item.campaignDiscountType === 'GIFT',
+                        ) ? (
+                          <p className="mt-1 text-xs text-amber-700">
+                            Nếu trả sản phẩm thuộc combo quà tặng, cần chọn đủ
+                            các sản phẩm còn lại của chính combo đó. Sản phẩm
+                            ngoài combo không bị ảnh hưởng.
+                          </p>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReturnQuantities(
+                            Object.fromEntries(
+                              order.items.map((item) => [
+                                item.id,
+                                item.quantity,
+                              ]),
+                            ),
+                          )
+                        }
+                        className="text-xs font-semibold text-violet-700"
+                      >
+                        Chọn toàn bộ
+                      </button>
+                    </div>
+                    {order.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {item.productName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Đã mua: {item.quantity}
+                          </p>
+                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          max={item.quantity}
+                          value={returnQuantities[item.id] ?? 0}
+                          onChange={(event) => {
+                            const quantity = Math.min(
+                              item.quantity,
+                              Math.max(0, Number(event.target.value) || 0),
+                            );
+                            setReturnQuantities((current) => ({
+                              ...current,
+                              [item.id]: quantity,
+                            }));
+                          }}
+                          className="w-20 rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
                   <textarea
                     value={returnReason}
                     onChange={(e) => setReturnReason(e.target.value)}

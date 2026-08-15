@@ -16,13 +16,17 @@ export interface CartItem {
   campaignDiscountValue?: number | null;
   campaignBadgeText?: string | null;
   unitPrice: number;
+  isOnSale?: boolean;
   quantity: number;
   subtotal: number;
+  isPromotionReward?: boolean;
+  sourceCampaignId?: string | null;
 }
 
 export interface Cart {
   ownerKey: string;
   items: CartItem[];
+  promotionItems: CartItem[];
   subtotal: number;
   discountAmount: number;
   shippingFee: number;

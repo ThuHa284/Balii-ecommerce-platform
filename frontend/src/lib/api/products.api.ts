@@ -63,6 +63,26 @@ export interface RecommendedProduct {
   thumbnail: string;
 }
 
+export interface InventoryMovement {
+  id: string;
+  variantId: string;
+  productId: string;
+  sku: string;
+  productName: string;
+  sizeLabel: string | null;
+  colorName: string | null;
+  itemType: string | null;
+  eventType: string;
+  referenceType: string | null;
+  referenceId: string | null;
+  actorId: string | null;
+  stockDelta: number;
+  reservedDelta: number;
+  stockAfter: number;
+  reservedAfter: number;
+  createdAt: string;
+}
+
 type ProductResponse = Product;
 type ProductListResponse = ProductResponse[];
 
@@ -144,6 +164,23 @@ export async function getAdminProducts(keyword?: string): Promise<Product[]> {
   });
 
   return data.map(mapProduct);
+}
+
+export async function getInventoryMovements(
+  variantId?: string,
+  limit = 100,
+): Promise<InventoryMovement[]> {
+  const { data } = await apiClient.get<InventoryMovement[]>(
+    '/admin/inventory-movements',
+    { params: { variantId: variantId || undefined, limit } },
+  );
+  return data.map((movement) => ({
+    ...movement,
+    stockDelta: Number(movement.stockDelta),
+    reservedDelta: Number(movement.reservedDelta),
+    stockAfter: Number(movement.stockAfter),
+    reservedAfter: Number(movement.reservedAfter),
+  }));
 }
 
 export async function createProduct(payload: ProductPayload): Promise<Product> {

@@ -61,7 +61,7 @@ export class GoogleLensImageSearchAdapter {
 
       return Array.isArray(response.data.data) ? response.data.data : [];
     } catch (error) {
-      if (axios.isAxiosError(error)) {
+      if (axios.isAxiosError<{ detail?: unknown }>(error)) {
         if (
           error.code === 'ECONNREFUSED' ||
           error.code === 'ENOTFOUND' ||
@@ -75,9 +75,10 @@ export class GoogleLensImageSearchAdapter {
         }
 
         if (error.response) {
+          const responseData = error.response.data;
           const detail =
-            typeof error.response.data?.detail === 'string'
-              ? error.response.data.detail
+            typeof responseData?.detail === 'string'
+              ? responseData.detail
               : null;
 
           this.logger.error(

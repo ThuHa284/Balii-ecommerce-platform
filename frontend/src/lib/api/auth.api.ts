@@ -13,7 +13,6 @@ type BackendAuthUser = Parameters<typeof mapUser>[0];
 
 type BackendAuthResponse = {
   accessToken: string;
-  refreshToken?: string;
   user: BackendAuthUser;
 };
 
@@ -27,7 +26,6 @@ export async function loginApi(
 
   if (typeof window !== 'undefined') {
     window.__BALII_ACCESS_TOKEN__ = data.accessToken;
-    window.__BALII_REFRESH_TOKEN__ = data.refreshToken;
     window.__BALII_USER_ID__ = data.user?.id;
   }
 
@@ -37,19 +35,37 @@ export async function loginApi(
 
   return {
     accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
     user: mapUser(data.user, addresses),
   };
 }
 
-export async function registerApi(
-  registerData: RegisterData,
-): Promise<AuthResponse> {
-  await apiClient.post('/auth/register', registerData);
-  return loginApi({
+export async function registerApi(registerData: RegisterData): Promise<{
+  message: string;
+  userId: string;
+  requiresEmailVerification: boolean;
+}> {
+  const payload = {
     email: registerData.email,
     password: registerData.password,
-  });
+    fullName: registerData.fullName,
+    phone: registerData.phone || undefined,
+  };
+  const { data } = await apiClient.post<{
+    message: string;
+    userId: string;
+    requiresEmailVerification: boolean;
+  }>('/auth/register', payload);
+  return data;
+}
+
+export async function verifyEmailApi(
+  token: string,
+): Promise<{ message: string }> {
+  const { data } = await apiClient.get<{ message: string }>(
+    '/auth/verify-email',
+    { params: { token } },
+  );
+  return data;
 }
 
 export async function logoutApi(): Promise<void> {
@@ -63,41 +79,42 @@ export async function refreshTokenApi(): Promise<AuthResponse> {
     );
   }
 
-  const refreshToken = window.__BALII_REFRESH_TOKEN__;
-  const userId = window.__BALII_USER_ID__;
-
-  if (!refreshToken || !userId) {
-    throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-  }
-
-  const { data } = await apiClient.post<BackendAuthResponse>('/auth/refresh', {
-    userId,
-    refreshToken,
-  });
+  const { data } = await apiClient.post<BackendAuthResponse>(
+    '/auth/refresh',
+    {},
+    { withCredentials: true },
+  );
 
   window.__BALII_ACCESS_TOKEN__ = data.accessToken;
-  window.__BALII_REFRESH_TOKEN__ = data.refreshToken;
-  window.__BALII_USER_ID__ = data.user?.id ?? userId;
+  window.__BALII_USER_ID__ = data.user.id;
 
   const addresses = await getMyAddresses().catch(() => []);
 
   return {
     accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
     user: mapUser(data.user, addresses),
   };
 }
 
-export function forgotPasswordApi(email: string): Promise<{ message: string }> {
-  return Promise.resolve({
-    message: `Tính năng quên mật khẩu chưa được hỗ trợ. Vui lòng liên hệ hỗ trợ cho ${email}.`,
-  });
+export async function forgotPasswordApi(
+  email: string,
+): Promise<{ message: string }> {
+  const { data } = await apiClient.post<{ message: string }>(
+    '/auth/forgot-password',
+    { email },
+  );
+  return data;
 }
 
-export function resetPasswordApi(): Promise<{ message: string }> {
-  return Promise.resolve({
-    message: 'Tính năng đặt lại mật khẩu chưa được hỗ trợ trên hệ thống này.',
-  });
+export async function resetPasswordApi(
+  token: string,
+  newPassword: string,
+): Promise<{ message: string }> {
+  const { data } = await apiClient.post<{ message: string }>(
+    '/auth/reset-password',
+    { token, newPassword },
+  );
+  return data;
 }
 
 export async function getProfileApi(): Promise<User> {
