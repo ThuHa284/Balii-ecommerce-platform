@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -29,6 +29,17 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const confirmPasswordRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const control = confirmPasswordRef.current;
+    if (!control) return;
+    control.setCustomValidity(
+      formData.confirmPassword && formData.password !== formData.confirmPassword
+        ? 'Mật khẩu xác nhận không khớp.'
+        : '',
+    );
+  }, [formData.confirmPassword, formData.password]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -162,6 +173,11 @@ export default function RegisterPage() {
               <div className="relative">
                 <field.icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
+                  ref={
+                    field.name === 'confirmPassword'
+                      ? confirmPasswordRef
+                      : undefined
+                  }
                   id={`register-${field.name}`}
                   type={field.type}
                   name={field.name}
@@ -188,6 +204,11 @@ export default function RegisterPage() {
                     field.name === 'password' ||
                     field.name === 'confirmPassword'
                       ? 128
+                      : undefined
+                  }
+                  pattern={
+                    field.name === 'phone'
+                      ? '^(0|\\+84)[0-9]{9,10}$'
                       : undefined
                   }
                   className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-white/60 border border-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-white transition-all text-xs placeholder:text-muted-foreground/60"

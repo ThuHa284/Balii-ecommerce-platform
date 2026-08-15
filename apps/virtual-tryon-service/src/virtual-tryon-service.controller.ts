@@ -45,8 +45,9 @@ export class VirtualTryonServiceController {
   createTryOn(
     @UploadedFiles() files: TryOnUploadFiles,
     @Body() dto: CreateTryOnDto,
+    @Headers('x-user-id') userId?: string,
   ) {
-    return this.virtualTryonService.createTryOn(files, dto);
+    return this.virtualTryonService.createTryOn(files, dto, userId);
   }
 
   @Post('history/:id/save')
@@ -100,8 +101,9 @@ export class VirtualTryonServiceController {
   createTryOnSync(
     @UploadedFiles() files: TryOnUploadFiles,
     @Body() dto: CreateTryOnDto,
+    @Headers('x-user-id') userId?: string,
   ) {
-    return this.virtualTryonService.createTryOnSync(files, dto);
+    return this.virtualTryonService.createTryOnSync(files, dto, userId);
   }
 
   @Post('product-design/sync')
@@ -122,7 +124,8 @@ export class VirtualTryonServiceController {
   createProductDesignSync(
     @UploadedFiles() files: ProductDesignUploadFiles,
     @Body() dto: CreateProductDesignDto,
+    @Headers('x-user-id') userId?: string,
   ) {
-    return this.virtualTryonService.createProductDesignSync(files, dto);
+    return this.virtualTryonService.createProductDesignSync(files, dto, userId);
   }
 }

@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import Link from 'next/link';
+import { useState, useEffect, useRef } from 'react';
 import {
   Search,
   ShoppingBag,
@@ -11,15 +11,17 @@ import {
   User,
   Package,
   Ticket,
+  LayoutDashboard,
   LogOut,
   ChevronDown,
-} from "lucide-react";
-import { NAV_LINKS } from "@/lib/constants";
-import { useHasMounted } from "@/hooks/use-has-mounted";
-import { useCartStore } from "@/store/cart.store";
-import { useUIStore } from "@/store/ui.store";
-import { useAuthStore } from "@/store/auth.store";
-import { cn } from "@/lib/utils";
+} from 'lucide-react';
+import { NAV_LINKS } from '@/lib/constants';
+import { useHasMounted } from '@/hooks/use-has-mounted';
+import { useCartStore } from '@/store/cart.store';
+import { useUIStore } from '@/store/ui.store';
+import { useAuthStore } from '@/store/auth.store';
+import { cn } from '@/lib/utils';
+import { UserRole } from '@/types/user.types';
 
 // ─── Auth Section ────────────────────────────────────────────────────────────
 
@@ -42,8 +44,8 @@ function AuthSection() {
         setDropdownOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // ── Guest ──────────────────────────────────────────────────────────────────
@@ -65,14 +67,14 @@ function AuthSection() {
   // ── Authenticated ──────────────────────────────────────────────────────────
   const initials = user?.fullName
     ? user.fullName
-        .split(" ")
+        .split(' ')
         .slice(-2)
         .map((w) => w[0])
-        .join("")
+        .join('')
         .toUpperCase()
-    : "U";
+    : 'U';
 
-  const displayName = user?.fullName ?? user?.email ?? "Tài khoản";
+  const displayName = user?.fullName ?? user?.email ?? 'Tài khoản';
 
   return (
     <div ref={dropdownRef} className="relative">
@@ -89,8 +91,8 @@ function AuthSection() {
         </div>
         <ChevronDown
           className={cn(
-            "w-3.5 h-3.5 text-foreground/60 transition-transform duration-200 hidden sm:block",
-            dropdownOpen && "rotate-180"
+            'w-3.5 h-3.5 text-foreground/60 transition-transform duration-200 hidden sm:block',
+            dropdownOpen && 'rotate-180',
           )}
         />
       </button>
@@ -98,11 +100,11 @@ function AuthSection() {
       {/* Dropdown panel */}
       <div
         className={cn(
-          "absolute right-0 top-full mt-2 w-56 rounded-2xl glass-card shadow-xl border border-white/20 overflow-hidden z-50",
-          "transition-all duration-200 origin-top-right",
+          'absolute right-0 top-full mt-2 w-56 rounded-2xl glass-card shadow-xl border border-white/20 overflow-hidden z-50',
+          'transition-all duration-200 origin-top-right',
           dropdownOpen
-            ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
-            : "opacity-0 scale-95 -translate-y-2 pointer-events-none"
+            ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
+            : 'opacity-0 scale-95 -translate-y-2 pointer-events-none',
         )}
         role="menu"
         aria-label="Tuỳ chọn tài khoản"
@@ -122,6 +124,18 @@ function AuthSection() {
 
         {/* Menu items */}
         <nav className="py-1.5" role="none">
+          {(user?.role === UserRole.ADMIN ||
+            user?.role === UserRole.SUPER_ADMIN) && (
+            <Link
+              href="/admin/dashboard"
+              onClick={() => setDropdownOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-violet-600 hover:bg-violet-50/60 transition-colors group"
+              role="menuitem"
+            >
+              <LayoutDashboard className="w-4 h-4 text-violet-500" />
+              Vào trang quản trị
+            </Link>
+          )}
           <Link
             href="/account/profile"
             onClick={() => setDropdownOpen(false)}
@@ -201,12 +215,12 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const { items, toggleCartDrawer } = useCartStore();
   const { toggleMobileNav, isSearchOpen, setSearchOpen } = useUIStore();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -214,8 +228,8 @@ export default function Header() {
   return (
     <header
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-500",
-        scrolled ? "glass-navbar py-3" : "bg-transparent py-5"
+        'fixed top-0 left-0 right-0 z-50 transition-all duration-500',
+        scrolled ? 'glass-navbar py-3' : 'bg-transparent py-5',
       )}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -299,8 +313,8 @@ export default function Header() {
         {/* Search Bar — Expandable */}
         <div
           className={cn(
-            "overflow-hidden transition-all duration-500",
-            isSearchOpen ? "max-h-20 mt-4 opacity-100" : "max-h-0 opacity-0"
+            'overflow-hidden transition-all duration-500',
+            isSearchOpen ? 'max-h-20 mt-4 opacity-100' : 'max-h-0 opacity-0',
           )}
         >
           <form

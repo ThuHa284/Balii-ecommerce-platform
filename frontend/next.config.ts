@@ -55,6 +55,7 @@ process.env.NEXT_PUBLIC_SOCKET_URL ??=
 const publicApiUrl = process.env.NEXT_PUBLIC_API_URL || defaultApiUrl;
 const publicSocketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || defaultSocketUrl;
 const publicWebSocketUrl = publicSocketUrl.replace(/^http/, 'ws');
+const publicSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
 
 const nextConfig: NextConfig = {
   turbopack: {
@@ -87,6 +88,8 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     const isProduction = process.env.NODE_ENV === 'production';
+    const isHttpsDeployment =
+      isProduction && publicSiteUrl.toLowerCase().startsWith('https://');
     const csp = [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline'${isProduction ? '' : " 'unsafe-eval'"}`,
@@ -99,7 +102,7 @@ const nextConfig: NextConfig = {
       "base-uri 'self'",
       "form-action 'self'",
       "frame-ancestors 'none'",
-      isProduction ? 'upgrade-insecure-requests' : '',
+      isHttpsDeployment ? 'upgrade-insecure-requests' : '',
     ]
       .filter(Boolean)
       .join('; ');
@@ -116,7 +119,7 @@ const nextConfig: NextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(self), microphone=(), geolocation=(), payment=()',
           },
-          ...(isProduction
+          ...(isHttpsDeployment
             ? [
                 {
                   key: 'Strict-Transport-Security',

@@ -1,7 +1,13 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Search, Warehouse } from 'lucide-react';
+import {
+  ChevronRight,
+  PackageOpen,
+  RefreshCw,
+  Search,
+  Warehouse,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getInventoryMovements,
@@ -10,6 +16,8 @@ import {
 import { formatDateTime } from '@/lib/utils';
 
 const inventoryEventLabels: Record<string, string> = {
+  initial_stock: 'Khởi tạo tồn kho',
+  variant_created: 'Thêm sản phẩm',
   admin_adjustment: 'Admin điều chỉnh tồn kho',
   order_reserved: 'Đơn hàng giữ hàng',
   order_committed: 'Đơn hàng đã trừ kho',
@@ -25,18 +33,136 @@ const referenceTypeLabels: Record<string, string> = {
   return_request: 'Yêu cầu trả hàng',
 };
 
+type VariantSummary = {
+  variantId: string;
+  sku: string;
+  sizeLabel: string | null;
+  colorName: string | null;
+  itemType: string | null;
+  stockDelta: number;
+  reservedDelta: number;
+  stockAfter: number;
+  reservedAfter: number;
+  movements: InventoryMovement[];
+};
+
+type MovementGroup = {
+  id: string;
+  title: string;
+  eventType: string;
+  referenceType: string | null;
+  referenceId: string | null;
+  productNames: string[];
+  createdAt: string;
+  stockDelta: number;
+  reservedDelta: number;
+  variants: VariantSummary[];
+};
+
 function formatDelta(value: number) {
-  if (value > 0) return `+${value}`;
-  return String(value);
+  return value > 0 ? `+${value}` : String(value);
 }
 
 function formatEventType(eventType: string) {
   return inventoryEventLabels[eventType] ?? eventType;
 }
 
-function formatReferenceType(referenceType?: string | null) {
-  if (!referenceType) return 'Không có';
-  return referenceTypeLabels[referenceType] ?? referenceType;
+function groupKey(movement: InventoryMovement) {
+  if (movement.referenceType === 'order' && movement.referenceId) {
+    return `order:${movement.referenceId}:${movement.eventType}`;
+  }
+  if (movement.referenceType === 'return_request' && movement.referenceId) {
+    return `return:${movement.referenceId}:${movement.eventType}`;
+  }
+  if (
+    movement.eventType === 'variant_created' ||
+    movement.eventType === 'initial_stock' ||
+    movement.eventType === 'admin_adjustment'
+  ) {
+    const minute = movement.createdAt.slice(0, 16);
+    return `admin:${movement.productId}:${movement.actorId ?? 'system'}:${movement.eventType}:${minute}`;
+  }
+  return `${movement.referenceType ?? 'event'}:${movement.referenceId ?? movement.id}:${movement.eventType}`;
+}
+
+export function groupInventoryMovements(
+  movements: InventoryMovement[],
+): MovementGroup[] {
+  const grouped = new Map<string, InventoryMovement[]>();
+  for (const movement of movements) {
+    const key = groupKey(movement);
+    grouped.set(key, [...(grouped.get(key) ?? []), movement]);
+  }
+
+  return [...grouped.entries()].map(([id, rows]) => {
+    const first = rows[0];
+    const byVariant = new Map<string, InventoryMovement[]>();
+    for (const row of rows) {
+      byVariant.set(row.variantId, [
+        ...(byVariant.get(row.variantId) ?? []),
+        row,
+      ]);
+    }
+    const variants = [...byVariant.values()].map((variantRows) => {
+      const latest = variantRows[0];
+      return {
+        variantId: latest.variantId,
+        sku: latest.sku,
+        sizeLabel: latest.sizeLabel,
+        colorName: latest.colorName,
+        itemType: latest.itemType,
+        stockDelta: variantRows.reduce((sum, row) => sum + row.stockDelta, 0),
+        reservedDelta: variantRows.reduce(
+          (sum, row) => sum + row.reservedDelta,
+          0,
+        ),
+        stockAfter: latest.stockAfter,
+        reservedAfter: latest.reservedAfter,
+        movements: variantRows,
+      };
+    });
+    const productNames = [...new Set(rows.map((row) => row.productName))];
+    const referenceLabel = first.referenceType
+      ? (referenceTypeLabels[first.referenceType] ?? first.referenceType)
+      : null;
+    const title =
+      referenceLabel && first.referenceId
+        ? `${referenceLabel} ${first.referenceId}`
+        : `${formatEventType(first.eventType)} · ${productNames.join(', ')}`;
+
+    return {
+      id,
+      title,
+      eventType: first.eventType,
+      referenceType: first.referenceType,
+      referenceId: first.referenceId,
+      productNames,
+      createdAt: first.createdAt,
+      stockDelta: rows.reduce((sum, row) => sum + row.stockDelta, 0),
+      reservedDelta: rows.reduce((sum, row) => sum + row.reservedDelta, 0),
+      variants,
+    };
+  });
+}
+
+function Delta({
+  value,
+  kind = 'stock',
+}: {
+  value: number;
+  kind?: 'stock' | 'reserved';
+}) {
+  const color =
+    value === 0
+      ? 'text-slate-500'
+      : kind === 'stock'
+        ? value > 0
+          ? 'text-emerald-600'
+          : 'text-red-600'
+        : value > 0
+          ? 'text-amber-600'
+          : 'text-sky-600';
+  return <span className={`font-semibold ${color}`}>{formatDelta(value)}</span>;
 }
 
 export default function AdminInventoryPage() {
@@ -47,7 +173,7 @@ export default function AdminInventoryPage() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      setMovements(await getInventoryMovements(undefined, 200));
+      setMovements(await getInventoryMovements(undefined, 500));
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -63,21 +189,24 @@ export default function AdminInventoryPage() {
     queueMicrotask(() => void load());
   }, [load]);
 
-  const filtered = useMemo(() => {
+  const groups = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    if (!keyword) return movements;
-    return movements.filter((movement) =>
-      [
-        movement.productName,
-        movement.sku,
-        movement.eventType,
-        formatEventType(movement.eventType),
-        movement.referenceId,
-        formatReferenceType(movement.referenceType),
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(keyword)),
-    );
+    const filtered = keyword
+      ? movements.filter((movement) =>
+          [
+            movement.productName,
+            movement.sku,
+            movement.sizeLabel,
+            movement.colorName,
+            movement.eventType,
+            formatEventType(movement.eventType),
+            movement.referenceId,
+          ]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(keyword)),
+        )
+      : movements;
+    return groupInventoryMovements(filtered);
   }, [movements, search]);
 
   return (
@@ -89,10 +218,8 @@ export default function AdminInventoryPage() {
             Đối soát tồn kho
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Theo dõi mọi lần nhập, giữ hàng, trừ kho và hoàn kho để kiểm tra lệch tồn.
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Tồn là số còn trong kho. Giữ chỗ là số đã được đặt cho đơn chưa hoàn tất, chưa nên bán cho đơn khác.
+            Mỗi lượt thêm sản phẩm, đặt hàng, hủy hoặc hoàn hàng được gom thành
+            một dòng tổng.
           </p>
         </div>
         <button
@@ -112,89 +239,95 @@ export default function AdminInventoryPage() {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Tìm theo sản phẩm, SKU, loại sự kiện hoặc mã tham chiếu..."
+            placeholder="Tìm theo sản phẩm, SKU, size, màu hoặc mã đơn..."
             className="w-full rounded-xl border border-white/50 bg-white/60 py-2.5 pl-10 pr-3 text-sm"
           />
         </label>
       </div>
 
-      <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50/80 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3">Thời gian</th>
-                <th className="px-4 py-3">Sản phẩm / SKU</th>
-                <th className="px-4 py-3">Sự kiện</th>
-                <th className="px-4 py-3 text-right">Tồn thay đổi</th>
-                <th className="px-4 py-3 text-right">Giữ chỗ thay đổi</th>
-                <th className="px-4 py-3 text-right">Sau ghi nhận</th>
-                <th className="px-4 py-3">Tham chiếu</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map((movement) => (
-                <tr key={movement.id} className="hover:bg-white/45">
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                    {formatDateTime(movement.createdAt)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium">{movement.productName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {movement.sku}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
-                      {formatEventType(movement.eventType)}
-                    </span>
-                  </td>
-                  <td
-                    className={`px-4 py-3 text-right font-semibold ${
-                      movement.stockDelta < 0
-                        ? 'text-red-600'
-                        : movement.stockDelta > 0
-                          ? 'text-emerald-600'
-                          : 'text-slate-500'
-                    }`}
+      <div className="space-y-3">
+        {groups.map((group) => (
+          <details key={group.id} className="group glass-card overflow-hidden">
+            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-4 px-5 py-4 hover:bg-white/45">
+              <ChevronRight className="h-4 w-4 shrink-0 text-violet-500 transition-transform group-open:rotate-90" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold" title={group.title}>
+                  {group.title}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {formatDateTime(group.createdAt)} ·{' '}
+                  {formatEventType(group.eventType)} · {group.variants.length}{' '}
+                  biến thể
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-x-5 text-right text-xs">
+                <span className="text-muted-foreground">Tồn kho</span>
+                <span className="text-muted-foreground">Giữ chỗ</span>
+                <Delta value={group.stockDelta} />
+                <Delta value={group.reservedDelta} kind="reserved" />
+              </div>
+            </summary>
+
+            <div className="border-t border-white/40 bg-slate-50/50 p-4">
+              <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <PackageOpen className="h-4 w-4" /> Tổng theo từng biến thể
+              </div>
+              <div className="space-y-2">
+                {group.variants.map((variant) => (
+                  <details
+                    key={variant.variantId}
+                    className="rounded-xl border border-white/60 bg-white/70"
                   >
-                    {formatDelta(movement.stockDelta)}
-                  </td>
-                  <td
-                    className={`px-4 py-3 text-right font-semibold ${
-                      movement.reservedDelta > 0
-                        ? 'text-amber-600'
-                        : movement.reservedDelta < 0
-                          ? 'text-sky-600'
-                          : 'text-slate-500'
-                    }`}
-                  >
-                    {formatDelta(movement.reservedDelta)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-xs">
-                    Tồn {movement.stockAfter} · giữ chỗ {movement.reservedAfter}
-                  </td>
-                  <td className="max-w-64 px-4 py-3 text-xs text-muted-foreground">
-                    <p>{formatReferenceType(movement.referenceType)}</p>
-                    <p className="truncate" title={movement.referenceId || ''}>
-                      {movement.referenceId || 'Không có mã tham chiếu'}
-                    </p>
-                  </td>
-                </tr>
-              ))}
-              {!loading && filtered.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-10 text-center text-muted-foreground"
-                  >
-                    Chưa có biến động phù hợp.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+                    <summary className="grid cursor-pointer list-none grid-cols-[1fr_auto_auto] items-center gap-4 px-4 py-3 text-sm">
+                      <div>
+                        <p className="font-medium">{variant.sku}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Size {variant.sizeLabel || '—'} · Màu{' '}
+                          {variant.colorName || '—'} ·{' '}
+                          {variant.itemType || 'Sản phẩm'}
+                        </p>
+                      </div>
+                      <span className="text-right text-xs">
+                        Tồn <Delta value={variant.stockDelta} />
+                      </span>
+                      <span className="text-right text-xs">
+                        Giữ{' '}
+                        <Delta value={variant.reservedDelta} kind="reserved" />
+                      </span>
+                    </summary>
+                    <div className="border-t border-slate-100 px-4 py-3">
+                      {variant.movements.map((movement) => (
+                        <div
+                          key={movement.id}
+                          className="grid gap-1 border-b border-slate-100 py-2 text-xs last:border-0 sm:grid-cols-[160px_1fr_auto]"
+                        >
+                          <span className="text-muted-foreground">
+                            {formatDateTime(movement.createdAt)}
+                          </span>
+                          <span>{formatEventType(movement.eventType)}</span>
+                          <span>
+                            Tồn <Delta value={movement.stockDelta} /> · giữ{' '}
+                            <Delta
+                              value={movement.reservedDelta}
+                              kind="reserved"
+                            />{' '}
+                            · sau ghi nhận {movement.stockAfter}/
+                            {movement.reservedAfter}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </div>
+          </details>
+        ))}
+        {!loading && groups.length === 0 ? (
+          <div className="glass-card px-4 py-10 text-center text-muted-foreground">
+            Chưa có biến động phù hợp.
+          </div>
+        ) : null}
       </div>
     </div>
   );

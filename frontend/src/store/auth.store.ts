@@ -40,7 +40,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   user: null,
   token: null,
   isAuthenticated: false,
-  isLoading: false,
+  // AuthProvider refreshes the HttpOnly session cookie after every page load.
+  // Keep guards in a loading state until that first refresh has finished.
+  isLoading: true,
   addresses: [],
   selectedAddressId: null,
 
@@ -124,7 +126,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       districtId: addressData.districtId || fallbackIds!.districtId,
       wardId: addressData.wardId || fallbackIds!.wardId,
       streetAddress: encodeStoredAddress(addressData.street, addressData.ward),
-      isDefault: addressData.isDefault ?? false,
     });
     const shouldSetDefault =
       addressData.isDefault === true && addresses.length > 0;
@@ -158,7 +159,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         data.street && data.ward
           ? encodeStoredAddress(data.street, data.ward)
           : data.street,
-      isDefault: data.isDefault,
     });
     if (data.isDefault) {
       await setDefaultAddressApi(id);

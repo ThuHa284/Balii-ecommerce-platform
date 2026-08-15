@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/providers/auth.provider';
 import { QueryProvider } from '@/providers/query.provider';
+import InlineFormValidation from '@/components/forms/inline-form-validation';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -31,7 +32,10 @@ export default function RootLayout({
     <html lang="vi" suppressHydrationWarning>
       <body>
         <QueryProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <InlineFormValidation />
+            {children}
+          </AuthProvider>
         </QueryProvider>
         <Toaster
           position="top-right"

@@ -12,8 +12,12 @@ import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 type InventoryMovementRow = {
   id: string;
   variantId: string;
+  productId: string;
   sku: string;
   productName: string;
+  sizeLabel: string | null;
+  colorName: string | null;
+  itemType: string | null;
   eventType: string;
   referenceType: string | null;
   referenceId: string | null;
@@ -138,8 +142,12 @@ export class ProductVariantsService {
       SELECT
         movement.id::text,
         movement.variant_id AS "variantId",
+        product.id AS "productId",
         variant.sku,
         product.name AS "productName",
+        variant.size_label AS "sizeLabel",
+        variant.color_name AS "colorName",
+        variant.item_type AS "itemType",
         movement.event_type AS "eventType",
         movement.reference_type AS "referenceType",
         movement.reference_id AS "referenceId",

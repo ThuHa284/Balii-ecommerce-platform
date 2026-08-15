@@ -35,6 +35,7 @@ import {
 import { formatAgeGroupLabel, formatGenderLabel } from '@/lib/tryon-labels';
 import { cn } from '@/lib/utils';
 import { useTryOnStore } from '@/store/tryon.store';
+import { useAuthStore } from '@/store/auth.store';
 import { Product } from '@/types/product.types';
 import {
   PersonAnalysis,
@@ -152,6 +153,7 @@ function TryOnContent() {
     setResultImage,
     setResultUrl,
     setResultId,
+    setResultSaved,
     setPersonAnalysis,
     setConfidence,
     setShowGuide,
@@ -325,6 +327,9 @@ function TryOnContent() {
       setResultImage(response.resultUrl);
       setResultUrl(response.resultUrl);
       setResultId(response.id ?? null);
+      setResultSaved(
+        Boolean(response.id && useAuthStore.getState().isAuthenticated),
+      );
       setPersonAnalysis(response.personAnalysis ?? null);
       setConfidence(0);
       setCurrentStep('result');
@@ -339,6 +344,7 @@ function TryOnContent() {
       setPersonAnalysis,
       setResultImage,
       setResultId,
+      setResultSaved,
       setResultUrl,
     ],
   );

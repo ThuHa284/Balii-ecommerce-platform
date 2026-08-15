@@ -1,5 +1,10 @@
-import { Injectable, BadGatewayException } from '@nestjs/common';
+import {
+  Injectable,
+  BadGatewayException,
+  ConflictException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 
 type CheckoutCartItem = {
@@ -61,7 +66,13 @@ export class CartClientService {
       );
 
       return response.data;
-    } catch {
+    } catch (error) {
+      const upstream = (error as AxiosError<{ message?: string }>).response;
+      if (upstream?.status === 400 || upstream?.status === 409) {
+        throw new ConflictException(
+          upstream.data?.message || 'Giỏ hàng không còn đủ tồn kho để checkout.',
+        );
+      }
       throw new BadGatewayException('Unable to fetch checkout cart');
     }
   }

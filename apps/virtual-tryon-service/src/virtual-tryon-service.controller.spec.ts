@@ -37,7 +37,24 @@ describe('VirtualTryonServiceController', () => {
       await expect(
         virtualTryonServiceController.createTryOn({}, {}),
       ).resolves.toBe(result);
-      expect(virtualTryonService.createTryOn).toHaveBeenCalledWith({}, {});
+      expect(virtualTryonService.createTryOn).toHaveBeenCalledWith(
+        {},
+        {},
+        undefined,
+      );
+    });
+
+    it('automatically associates authenticated results with the account', async () => {
+      const result = { success: true, data: { id: 'job-1' } };
+      virtualTryonService.createTryOn.mockResolvedValue(result);
+
+      await virtualTryonServiceController.createTryOn({}, {}, 'user-1');
+
+      expect(virtualTryonService.createTryOn).toHaveBeenCalledWith(
+        {},
+        {},
+        'user-1',
+      );
     });
   });
 

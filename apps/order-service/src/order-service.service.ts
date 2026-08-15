@@ -325,7 +325,7 @@ export class OrderServiceService {
         });
 
         for (const item of checkoutItems) {
-          const reservedRows = await manager.query(
+          const reservationResult: unknown = await manager.query(
             `
             UPDATE product_service.product_variants
             SET reserved_quantity = reserved_quantity + $2
@@ -336,9 +336,12 @@ export class OrderServiceService {
             `,
             [item.variantId, item.quantity],
           );
+          const reservedRows = this.returnedRows<{ id: string }>(
+            reservationResult,
+          );
 
           if (!reservedRows.length) {
-            throw new BadRequestException(
+            throw new ConflictException(
               `Sản phẩm ${item.productName} không còn đủ tồn kho.`,
             );
           }
@@ -1143,7 +1146,7 @@ export class OrderServiceService {
           discountAmount,
         );
 
-        const inserted = await manager.query(
+        const insertResult: unknown = await manager.query(
           `
           INSERT INTO order_service.return_requests (
             order_id, user_id, reason, image_urls,
@@ -1160,6 +1163,12 @@ export class OrderServiceService {
             requestedRefundAmount,
           ],
         );
+        const inserted = this.returnedRows<{ id: string }>(insertResult);
+        if (!inserted.length) {
+          throw new ServiceUnavailableException(
+            'Không thể tạo yêu cầu trả hàng.',
+          );
+        }
         const id = String(inserted[0].id);
 
         for (const item of selectedRows) {
@@ -2727,7 +2736,7 @@ export class OrderServiceService {
     });
 
     for (const item of itemRows) {
-      const rows =
+      const updateResult: unknown =
         target === 'committed'
           ? await manager.query(
               `
@@ -2758,8 +2767,9 @@ export class OrderServiceService {
                 WHERE id = $1
                 RETURNING id
                 `,
-                [item.variantId, item.quantity],
-              );
+              [item.variantId, item.quantity],
+            );
+      const rows = this.returnedRows<{ id: string }>(updateResult);
 
       if (!rows.length) {
         throw new BadRequestException(
@@ -2782,7 +2792,7 @@ export class OrderServiceService {
     manager: EntityManager,
     orderId: string,
   ): Promise<void> {
-    const usages: Array<{ voucherId: string }> = await manager.query(
+    const usageResult: unknown = await manager.query(
       `
       DELETE FROM voucher_service.voucher_usages
       WHERE order_id = $1
@@ -2790,6 +2800,7 @@ export class OrderServiceService {
       `,
       [orderId],
     );
+    const usages = this.returnedRows<{ voucherId: string }>(usageResult);
 
     for (const usage of usages) {
       await manager.query(
@@ -2801,6 +2812,17 @@ export class OrderServiceService {
         [usage.voucherId],
       );
     }
+  }
+
+  /**
+   * TypeORM/PostgreSQL may return DML ... RETURNING either as the row array
+   * directly or as [rows, affectedCount]. Normalize both representations so
+   * a zero-row conditional inventory update cannot be mistaken for success.
+   */
+  private returnedRows<T>(result: unknown): T[] {
+    if (!Array.isArray(result)) return [];
+    if (Array.isArray(result[0])) return result[0] as T[];
+    return result as T[];
   }
 
   private async cancelPendingPaymentsInTransaction(

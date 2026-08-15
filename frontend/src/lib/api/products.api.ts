@@ -66,8 +66,12 @@ export interface RecommendedProduct {
 export interface InventoryMovement {
   id: string;
   variantId: string;
+  productId: string;
   sku: string;
   productName: string;
+  sizeLabel: string | null;
+  colorName: string | null;
+  itemType: string | null;
   eventType: string;
   referenceType: string | null;
   referenceId: string | null;

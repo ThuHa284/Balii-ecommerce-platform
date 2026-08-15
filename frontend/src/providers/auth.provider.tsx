@@ -27,6 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         await hydrateAddresses();
       } catch {
+        window.__BALII_ACCESS_TOKEN__ = undefined;
+        window.__BALII_USER_ID__ = undefined;
         useAuthStore.setState({
           user: null,
           token: null,

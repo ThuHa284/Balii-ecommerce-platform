@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
@@ -8,16 +8,67 @@ import { useAuthStore } from '@/store/auth.store';
 import { getSafeInternalRedirect } from '@/lib/safe-redirect';
 import { useCartStore } from '@/store/cart.store';
 import { UserRole } from '@/types/user.types';
+import { API_BASE_URL } from '@/lib/constants';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, isLoading } = useAuthStore();
+  const { login, isLoading, isAuthenticated, user } = useAuthStore();
   const hydrateCart = useCartStore((state) => state.hydrateCart);
+  const handledGoogleRedirect = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() =>
+    searchParams.get('google_error')
+      ? 'Không thể đăng nhập bằng Google. Vui lòng thử lại hoặc dùng email và mật khẩu.'
+      : '',
+  );
+
+  useEffect(() => {
+    if (searchParams.get('google_error')) {
+      window.sessionStorage.removeItem('balii-google-login-redirect');
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (
+      handledGoogleRedirect.current ||
+      !searchParams.get('google_success') ||
+      !isAuthenticated ||
+      !user
+    ) {
+      return;
+    }
+    handledGoogleRedirect.current = true;
+    const googleUser = user;
+
+    async function finishGoogleLogin() {
+      await hydrateCart().catch(() => undefined);
+      const storedRedirect = window.sessionStorage.getItem(
+        'balii-google-login-redirect',
+      );
+      window.sessionStorage.removeItem('balii-google-login-redirect');
+
+      if (
+        googleUser.role === UserRole.ADMIN ||
+        googleUser.role === UserRole.SUPER_ADMIN
+      ) {
+        router.replace('/admin/dashboard');
+        return;
+      }
+
+      router.replace(getSafeInternalRedirect(storedRedirect));
+    }
+
+    void finishGoogleLogin();
+  }, [hydrateCart, isAuthenticated, router, searchParams, user]);
+
+  const handleGoogleLogin = () => {
+    const redirectTo = getSafeInternalRedirect(searchParams.get('redirect'));
+    window.sessionStorage.setItem('balii-google-login-redirect', redirectTo);
+    window.location.assign(`${API_BASE_URL}/auth/google`);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,11 +77,11 @@ export default function LoginPage() {
     try {
       await login({ email, password });
       await hydrateCart().catch(() => undefined);
-      const user = useAuthStore.getState().user;
+      const authenticatedUser = useAuthStore.getState().user;
 
       if (
-        user?.role === UserRole.ADMIN ||
-        user?.role === UserRole.SUPER_ADMIN
+        authenticatedUser?.role === UserRole.ADMIN ||
+        authenticatedUser?.role === UserRole.SUPER_ADMIN
       ) {
         router.push('/admin/dashboard');
       } else {
@@ -157,6 +208,31 @@ export default function LoginPage() {
           </button>
         </div>
       </form>
+
+      <div className="my-4 flex items-center gap-3" aria-hidden="true">
+        <div className="h-px flex-1 bg-violet-100" />
+        <span className="text-[11px] font-medium text-muted-foreground">
+          Hoặc
+        </span>
+        <div className="h-px flex-1 bg-violet-100" />
+      </div>
+
+      <button
+        type="button"
+        onClick={handleGoogleLogin}
+        disabled={isLoading}
+        className="w-full rounded-xl border border-violet-100 bg-white/70 px-4 py-2.5 text-xs font-bold text-foreground shadow-sm transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span className="inline-flex items-center justify-center gap-2">
+          <span
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-white font-bold text-blue-600 shadow-sm"
+            aria-hidden="true"
+          >
+            G
+          </span>
+          Tiếp tục với Google
+        </span>
+      </button>
 
       <p className="text-center text-xs text-muted-foreground mt-4">
         Chưa có tài khoản?{' '}

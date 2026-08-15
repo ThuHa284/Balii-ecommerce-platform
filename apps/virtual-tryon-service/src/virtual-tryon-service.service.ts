@@ -521,7 +521,11 @@ export class VirtualTryonServiceService
     };
   }
 
-  async createTryOn(files: TryOnFiles = {}, dto: CreateTryOnDto) {
+  async createTryOn(
+    files: TryOnFiles = {},
+    dto: CreateTryOnDto,
+    userId?: string,
+  ) {
     const apiKey = this.configService.get<string>('FASHN_API_KEY');
     const apiUrl =
       this.configService.get<string>('FASHN_API_URL') ||
@@ -543,7 +547,7 @@ export class VirtualTryonServiceService
       await this.saveHistorySafely({
         status: 'need_confirmation',
         needConfirmation: true,
-        ...this.buildHistoryPayload(dto, undefined, analysis, warningResult),
+        ...this.buildHistoryPayload(dto, userId, analysis, warningResult),
         userConfirmed: false,
       });
 
@@ -608,7 +612,7 @@ export class VirtualTryonServiceService
         fashnJobId: jobId,
         status: 'pending',
         needConfirmation: false,
-        ...this.buildHistoryPayload(dto, undefined, analysis, warningResult),
+        ...this.buildHistoryPayload(dto, userId, analysis, warningResult),
       });
 
       return {
@@ -703,7 +707,9 @@ export class VirtualTryonServiceService
             resultUrl: uploaded.url,
             cloudinaryPublicId: uploaded.publicId,
             completedAt: new Date(),
-            expiresAt: this.getAnonymousMediaExpiryDate(),
+            expiresAt: userId
+              ? this.getMediaExpiryDate()
+              : this.getAnonymousMediaExpiryDate(),
           },
         );
         if (update.affected !== 1) {
@@ -767,8 +773,12 @@ export class VirtualTryonServiceService
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  async createTryOnSync(files: TryOnFiles, dto: CreateTryOnDto) {
-    const created = await this.createTryOn(files, dto);
+  async createTryOnSync(
+    files: TryOnFiles,
+    dto: CreateTryOnDto,
+    userId?: string,
+  ) {
+    const created = await this.createTryOn(files, dto, userId);
 
     if (!created.success && created.needConfirmation) {
       return created;
@@ -789,7 +799,7 @@ export class VirtualTryonServiceService
     for (let i = 0; i < 30; i++) {
       await this.sleep(3000);
 
-      const result = await this.getTryOnResult(jobId);
+      const result = await this.getTryOnResult(jobId, userId);
 
       if (result.data.status === 'completed') {
         return {
@@ -813,7 +823,7 @@ export class VirtualTryonServiceService
             rawProviderResponse: result.data,
             ...this.buildHistoryPayload(
               dto,
-              undefined,
+              userId,
               personAnalysis,
               warningResult,
             ),
@@ -829,7 +839,7 @@ export class VirtualTryonServiceService
           errorMessage: result.data.error || 'FASHN try-on failed',
           ...this.buildHistoryPayload(
             dto,
-            undefined,
+            userId,
             personAnalysis,
             warningResult,
           ),
@@ -856,6 +866,7 @@ export class VirtualTryonServiceService
   async createProductDesignSync(
     files: ProductDesignFiles,
     dto: CreateProductDesignDto,
+    userId?: string,
   ) {
     const apiKey =
       this.configService.get<string>('TRYON_GEMINI_API_KEY') ||
@@ -907,12 +918,15 @@ export class VirtualTryonServiceService
       );
 
       const persisted = await this.saveHistorySafely({
+        userId,
         productId: dto.productId,
         status: 'completed',
         resultUrl: uploaded.url,
         cloudinaryPublicId: uploaded.publicId,
         completedAt: new Date(),
-        expiresAt: this.getAnonymousMediaExpiryDate(),
+        expiresAt: userId
+          ? this.getMediaExpiryDate()
+          : this.getAnonymousMediaExpiryDate(),
       });
       if (!persisted) {
         try {
