@@ -120,6 +120,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
+          command_timeout: 15m
           script: |
             set -eu
             cd /opt/balii-backend
@@ -150,6 +151,8 @@ jobs:
               docker system df || true
               exit 1
             fi
+            docker compose --env-file .env.production.vps -f docker-compose.prod.yml exec -T kafka \
+              kafka-topics --bootstrap-server kafka:29092 --list | grep -Fx 'demo.notification'
             docker compose --env-file .env.production.vps -f docker-compose.prod.yml exec -T postgres \
               sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
               < database/migrations/20260717-add-order-return-requests.sql
