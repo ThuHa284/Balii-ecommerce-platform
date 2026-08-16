@@ -527,6 +527,55 @@ export default function AdminWorkflowsPage() {
 
       <WorkflowOverview />
 
+      <section className="glass-card p-5">
+        <div className="flex items-start gap-3">
+          <Route className="mt-0.5 h-5 w-5 shrink-0 text-violet-600" />
+          <div>
+            <h2 className="font-heading text-lg font-semibold text-foreground">
+              Kịch bản trình diễn Camunda
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Demo chứng minh workflow không chỉ là sơ đồ tĩnh: engine giữ trạng
+              thái, chờ sự kiện bên ngoài, ghi incident và cho phép retry đúng
+              bước lỗi mà không chạy lại toàn bộ quy trình.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          {[
+            ['1. Chọn dữ liệu', 'Chọn một giao dịch gần đây rồi mở workflow.'],
+            [
+              '2. Tạo trạng thái',
+              'Chạy kịch bản chờ callback hoặc cố ý tạo incident.',
+            ],
+            [
+              '3. Quan sát',
+              'Chỉ bước hiện tại đổi màu; lịch sử và incident được engine lưu.',
+            ],
+            [
+              '4. Khôi phục',
+              'Với incident, bấm Gỡ lỗi demo và Retry để workflow chạy tiếp.',
+            ],
+          ].map(([title, description]) => (
+            <div
+              key={title}
+              className="rounded-2xl border border-violet-100 bg-violet-50/70 p-3"
+            >
+              <p className="text-sm font-semibold text-violet-800">{title}</p>
+              <p className="mt-1 text-xs leading-5 text-violet-700">
+                {description}
+              </p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          <b>Kết luận khi trình bày:</b> Camunda phù hợp với quy trình dài có
+          nhiều bước, timeout, callback và lỗi cần tiếp tục từ đúng vị trí; nếu
+          chỉ viết chuỗi hàm thông thường, trạng thái và việc retry sẽ khó quan
+          sát, khó khôi phục hơn.
+        </p>
+      </section>
+
       <form
         onSubmit={(event) => {
           void handleSearch(event);
@@ -546,7 +595,7 @@ export default function AdminWorkflowsPage() {
               className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
             />
             <span className="block text-xs text-muted-foreground">
-              M? don h?ng; d?ng l?m business key c?a payment workflow.
+              Mã đơn hàng; được dùng làm business key của payment workflow.
             </span>
           </label>
 
@@ -562,7 +611,7 @@ export default function AdminWorkflowsPage() {
               className="w-full rounded-xl border border-white/50 bg-white/60 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
             />
             <span className="block text-xs text-muted-foreground">
-              M? giao d?ch thanh to?n; t?m payment v? c?c refund li?n quan.
+              Mã giao dịch thanh toán; tìm payment và các refund liên quan.
             </span>
           </label>
 
@@ -585,7 +634,7 @@ export default function AdminWorkflowsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/30 px-5 py-4">
           <div>
             <h2 className="font-heading text-lg font-semibold text-foreground">
-              Giao d?ch g?n d?y
+              Giao dịch gần đây
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Chọn một giao dịch để mở workflow, không cần sao chép UUID.
@@ -598,7 +647,7 @@ export default function AdminWorkflowsPage() {
 
         {contextsLoading ? (
           <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-            ?ang t?i giao d?ch g?n d?y...
+            Đang tải giao dịch gần đây...
           </div>
         ) : contexts.length === 0 ? (
           <div className="px-5 py-8 text-center text-sm text-muted-foreground">
@@ -609,7 +658,7 @@ export default function AdminWorkflowsPage() {
             <table className="w-full min-w-[860px]">
               <thead>
                 <tr className="border-b border-white/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-5 py-3">M? don</th>
+                  <th className="px-5 py-3">Mã đơn</th>
                   <th className="px-5 py-3">Khách hàng</th>
                   <th className="px-5 py-3">Thanh toán</th>
                   <th className="px-5 py-3">Trạng thái</th>
@@ -625,7 +674,7 @@ export default function AdminWorkflowsPage() {
                   >
                     <td className="px-5 py-3">
                       <p className="text-sm font-semibold text-foreground">
-                        {context.orderCode ?? '?on chua c? m? hi?n th?'}
+                        {context.orderCode ?? 'Đơn chưa có mã hiển thị'}
                       </p>
                       <p className="mt-1 max-w-48 truncate text-[11px] text-muted-foreground">
                         {context.orderId}
@@ -706,7 +755,7 @@ export default function AdminWorkflowsPage() {
               <div>
                 <p className="text-sm font-semibold text-foreground">
                   Theo dõi realtime bằng polling mỗi{' '}
-                  {WORKFLOW_POLL_INTERVAL_MS / 1000} gi?y
+                  {WORKFLOW_POLL_INTERVAL_MS / 1000} giây
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {lastUpdated

@@ -469,6 +469,33 @@ function KafkaDemoPanel() {
         </span>
       </div>
 
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        {[
+          ['1. Kiểm tra', 'Consumer demo phải ở trạng thái đang chạy.'],
+          ['2. Chạy sync', 'Bấm Gửi đồng bộ và quan sát caller bị chặn.'],
+          ['3. Chạy Kafka', 'Bấm Gửi qua Kafka với cùng nội dung để so sánh.'],
+          [
+            '4. Kết luận',
+            'Đợi log consumer xuất hiện và đối chiếu hai thời gian.',
+          ],
+        ].map(([title, description]) => (
+          <div
+            key={title}
+            className="rounded-2xl border border-sky-100 bg-sky-50/70 p-3"
+          >
+            <p className="text-sm font-semibold text-sky-800">{title}</p>
+            <p className="mt-1 text-xs leading-5 text-sky-700">{description}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-4 rounded-xl bg-violet-50 px-4 py-3 text-sm text-violet-800">
+        <b>Vì sao có demo này?</b> Cùng một nghiệp vụ được chạy theo hai cách để
+        nhìn thấy khác biệt bằng số liệu. Kafka không làm downstream xử lý nhanh
+        hơn; Kafka giúp caller không phải chờ, tách producer khỏi consumer và
+        giữ message để consumer xử lý nền.
+      </p>
+
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-sm">
           <span className="text-xs font-semibold text-muted-foreground">
@@ -511,7 +538,7 @@ function KafkaDemoPanel() {
           <button
             type="button"
             onClick={() => void handleSync()}
-            disabled={syncBusy}
+            disabled={syncBusy || !recipient.trim() || !message.trim()}
             className="mt-3 inline-flex items-center gap-2 rounded-xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {syncBusy ? (
@@ -544,7 +571,7 @@ function KafkaDemoPanel() {
           <button
             type="button"
             onClick={() => void handleAsync()}
-            disabled={asyncBusy}
+            disabled={asyncBusy || !recipient.trim() || !message.trim()}
             className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {asyncBusy ? (
@@ -565,6 +592,26 @@ function KafkaDemoPanel() {
           ) : null}
         </div>
       </div>
+
+      {syncResult && asyncResult ? (
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <p className="font-semibold">Kết luận từ lần chạy hiện tại</p>
+          {asyncResult.published === false ? (
+            <p className="mt-1">
+              Luồng đồng bộ đã chạy, nhưng chưa thể so sánh đầy đủ vì Kafka chưa
+              kết nối. Kiểm tra broker và biến KAFKA_BROKERS rồi thử lại.
+            </p>
+          ) : (
+            <p className="mt-1">
+              Request đồng bộ mất {syncResult.clientRttMs} ms; request Kafka mất{' '}
+              {asyncResult.clientRttMs} ms. Caller được giải phóng sớm hơn
+              khoảng{' '}
+              {Math.max(0, syncResult.clientRttMs - asyncResult.clientRttMs)}{' '}
+              ms, còn công việc thật tiếp tục ở consumer bên dưới.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="mt-4">
         <h3 className="text-sm font-semibold text-foreground">
