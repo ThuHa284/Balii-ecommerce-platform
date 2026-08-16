@@ -385,17 +385,18 @@ export default function AdminCampaignsPage() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-2 text-xs uppercase tracking-[0.24em] text-rose-700/70">
-              Quản lý chiến dịch khuyến mãi
+              Quản lý chương trình khuyến mãi
             </p>
             <span className="inline-flex rounded-full border border-rose-900/10 bg-white/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-rose-900/70">
               {roleLabel}
             </span>
             <h1 className="font-heading text-3xl font-bold text-slate-900">
-              Chiến dịch không còn dùng chung với bộ sưu tập
+              Chiến dịch khuyến mãi
             </h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Mỗi chiến dịch có thời gian chạy, mức giảm thêm hoặc quà tặng
-              riêng, gắn trực tiếp với danh sách sản phẩm cần đẩy bán.
+              Thiết lập thời gian áp dụng, mức giảm hoặc quà tặng và chọn những
+              sản phẩm tham gia. Chiến dịch quyết định ưu đãi bán hàng, độc lập
+              với bộ sưu tập dùng để trưng bày sản phẩm.
             </p>
           </div>
           <button

@@ -2998,6 +2998,33 @@ export class OrderServiceService {
     );
   }
 
+  private async loadAdminNotificationRecipients() {
+    const configuredRecipients = (
+      this.configService.get<string>('ADMIN_ORDER_EMAILS') || ''
+    )
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+    const roleRecipients: Array<{ email: string }> =
+      await this.dataSource.query(
+        `
+        SELECT DISTINCT LOWER(users.email) AS email
+        FROM user_service.users users
+        JOIN user_service.roles roles ON roles.id = users.role_id
+        WHERE users.is_active = TRUE
+          AND roles.name IN ('ADMIN', 'SUPER_ADMIN')
+          AND users.email IS NOT NULL
+        `,
+      );
+
+    return [
+      ...new Set([
+        ...configuredRecipients,
+        ...roleRecipients.map((item) => item.email.trim().toLowerCase()),
+      ]),
+    ];
+  }
+
   private createMailerTransport() {
     return nodemailer.createTransport({
       host: this.configService.get<string>('MAIL_HOST'),
@@ -3161,12 +3188,7 @@ export class OrderServiceService {
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     const customerHtml = this.buildOrderCreatedHtml(order, customer.fullName);
-    const adminRecipients = (
-      this.configService.get<string>('ADMIN_ORDER_EMAILS') || ''
-    )
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const adminRecipients = await this.loadAdminNotificationRecipients();
 
     if (customer.email) {
       await transporter.sendMail({
@@ -3215,12 +3237,7 @@ export class OrderServiceService {
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     const invoiceHtml = this.buildInvoiceHtml(order, customer.fullName);
-    const adminRecipients = (
-      this.configService.get<string>('ADMIN_ORDER_EMAILS') || ''
-    )
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const adminRecipients = await this.loadAdminNotificationRecipients();
 
     if (customer.email) {
       await transporter.sendMail({
@@ -3265,12 +3282,7 @@ export class OrderServiceService {
       return;
     }
 
-    const adminRecipients = (
-      this.configService.get<string>('ADMIN_ORDER_EMAILS') || ''
-    )
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const adminRecipients = await this.loadAdminNotificationRecipients();
 
     if (!adminRecipients.length) {
       return;

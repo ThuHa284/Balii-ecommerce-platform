@@ -75,6 +75,9 @@ export interface InventoryMovement {
   eventType: string;
   referenceType: string | null;
   referenceId: string | null;
+  orderCode: string | null;
+  customerName: string | null;
+  customerEmail: string | null;
   actorId: string | null;
   stockDelta: number;
   reservedDelta: number;

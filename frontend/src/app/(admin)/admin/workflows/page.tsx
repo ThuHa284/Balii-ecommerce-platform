@@ -3,7 +3,6 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import {
   AlertTriangle,
-  ExternalLink,
   Loader2,
   PauseCircle,
   PlayCircle,
@@ -514,15 +513,11 @@ export default function AdminWorkflowsPage() {
             payment hoặc refund.
           </p>
         </div>
-        <a
-          href="http://localhost:8082/camunda/app/cockpit/default/"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white/70 px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-white"
-        >
-          <ExternalLink className="h-4 w-4" />
-          Mở Camunda Cockpit
-        </a>
+        <div className="max-w-sm rounded-2xl border border-violet-200 bg-violet-50/80 px-4 py-3 text-sm text-violet-800">
+          Camunda Cockpit không được công khai trên Internet. Trạng thái engine,
+          sơ đồ BPMN và incident được đọc an toàn qua backend và hiển thị ngay
+          tại trang này.
+        </div>
       </div>
 
       <WorkflowOverview />
