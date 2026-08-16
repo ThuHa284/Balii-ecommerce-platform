@@ -369,6 +369,7 @@ services:
     environment:
       NODE_ENV: production
       APP_ENV: production
+      TRUST_PROXY_HOPS: '1'
       API_GATEWAY_PORT: 4000
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
       USER_SERVICE_URL: http://user-service:3001
@@ -381,7 +382,7 @@ services:
       MARKET_ANALYSIS_SERVICE_URL: http://market-analysis-service:3011
       CHATBOT_SERVICE_URL: http://chatbot-service:3012
     ports:
-      - '4000:4000'
+      - '127.0.0.1:4000:4000'
     healthcheck:
       test:
         [
