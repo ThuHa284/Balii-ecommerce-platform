@@ -114,6 +114,10 @@ jobs:
           debug: true
       - name: Rebuild backend services
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CALLBACK_URL: ${{ secrets.GOOGLE_CALLBACK_URL }}
         with:
           host: 163.61.110.43
           username: root
@@ -121,10 +125,29 @@ jobs:
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           command_timeout: 15m
+          envs: GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_CALLBACK_URL
           script: |
             set -eu
             cd /opt/balii-backend
             export APP_ENV_FILE=.env.production.vps
+            upsert_secret_env() {
+              key="$1"
+              value="$2"
+              test -n "$value" || {
+                echo "Thiếu GitHub Secret: $key" >&2
+                exit 1
+              }
+              tmp_file="$(mktemp)"
+              if test -f "$APP_ENV_FILE"; then
+                grep -v "^${key}=" "$APP_ENV_FILE" > "$tmp_file" || true
+              fi
+              printf '%s=%s\n' "$key" "$value" >> "$tmp_file"
+              chmod 600 "$tmp_file"
+              mv "$tmp_file" "$APP_ENV_FILE"
+            }
+            upsert_secret_env GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
+            upsert_secret_env GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
+            upsert_secret_env GOOGLE_CALLBACK_URL "$GOOGLE_CALLBACK_URL"
             bash scripts/prepare-thesis-demo-env.sh "$APP_ENV_FILE"
             rm -f \
               'apps/product-service/src/product-service.controller.spec.ts' \
