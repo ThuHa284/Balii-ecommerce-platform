@@ -43,6 +43,9 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -57,6 +60,8 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
 
   kafka-init:
     image: confluentinc/cp-kafka:7.5.0
@@ -427,3 +432,6 @@ volumes:
   postgres_data:
   redis_data:
   qdrant_data:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
