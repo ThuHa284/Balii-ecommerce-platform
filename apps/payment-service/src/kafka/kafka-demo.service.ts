@@ -47,6 +47,8 @@ export class KafkaDemoService implements OnModuleInit, OnModuleDestroy {
   private kafka: Kafka | null = null;
   private producer: Producer | null = null;
   private consumer: Consumer | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private isConnecting = false;
 
   // In-memory processing log for the UI. Newest first.
   private readonly processedLog: Array<{
@@ -60,6 +62,14 @@ export class KafkaDemoService implements OnModuleInit, OnModuleDestroy {
   }> = [];
 
   async onModuleInit() {
+    await this.bootstrapKafka();
+  }
+
+  private async bootstrapKafka() {
+    if (this.isConnecting || (this.producer && this.consumer)) {
+      return;
+    }
+
     const brokers = this.readBrokers();
     if (!brokers.length) {
       this.logger.warn(
@@ -68,6 +78,7 @@ export class KafkaDemoService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    this.isConnecting = true;
     try {
       this.kafka = new Kafka({
         clientId: process.env.KAFKA_CLIENT_ID || 'payment-service',
@@ -98,13 +109,24 @@ export class KafkaDemoService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(
         `Kafka demo could not connect. Async demo will be unavailable: ${error instanceof Error ? error.message : String(error)}`,
       );
+      await this.consumer?.disconnect().catch(() => undefined);
+      await this.producer?.disconnect().catch(() => undefined);
       this.kafka = null;
       this.producer = null;
       this.consumer = null;
+    } finally {
+      this.isConnecting = false;
+      if (!this.producer || !this.consumer) {
+        this.scheduleKafkaReconnect();
+      }
     }
   }
 
   async onModuleDestroy() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     try {
       await this.consumer?.disconnect();
     } catch {
@@ -115,6 +137,20 @@ export class KafkaDemoService implements OnModuleInit, OnModuleDestroy {
     } catch {
       // ignore
     }
+  }
+
+  private scheduleKafkaReconnect() {
+    if (this.reconnectTimer) {
+      return;
+    }
+
+    const delayMs = Number(process.env.KAFKA_RECONNECT_INTERVAL_MS || 10000);
+    this.logger.log(`Kafka demo sẽ thử kết nối lại sau ${delayMs}ms.`);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.bootstrapKafka();
+    }, delayMs);
+    this.reconnectTimer.unref?.();
   }
 
   isConnected() {

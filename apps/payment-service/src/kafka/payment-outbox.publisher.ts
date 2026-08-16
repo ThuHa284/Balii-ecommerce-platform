@@ -99,6 +99,8 @@ export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
   private producer: Producer | null = null;
   private kafka: Kafka | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private isConnecting = false;
   private isPublishing = false;
 
   constructor(private readonly dataSource: DataSource) {}
@@ -122,6 +124,10 @@ export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
 
     if (this.producer) {
@@ -222,6 +228,10 @@ export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
   }
 
   private async bootstrapKafkaProducer() {
+    if (this.isConnecting || this.producer) {
+      return;
+    }
+
     const brokers = (process.env.KAFKA_BROKERS || '')
       .split(',')
       .map((value) => value.trim())
@@ -234,6 +244,7 @@ export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    this.isConnecting = true;
     try {
       const kafka = new Kafka({
         clientId: process.env.KAFKA_CLIENT_ID || 'payment-service',
@@ -250,12 +261,32 @@ export class PaymentOutboxPublisher implements OnModuleInit, OnModuleDestroy {
       await this.producer.connect();
       this.logger.log(`Kafka producer đã kết nối tới ${brokers.join(', ')}`);
     } catch (error) {
+      await this.producer?.disconnect().catch(() => undefined);
       this.producer = null;
       this.kafka = null;
       this.logger.warn(
         `Không khởi tạo được Kafka producer. Event sẽ tiếp tục nằm trong outbox. ${error instanceof Error ? error.message : String(error)}`,
       );
+    } finally {
+      this.isConnecting = false;
+      if (!this.producer) {
+        this.scheduleKafkaReconnect();
+      }
     }
+  }
+
+  private scheduleKafkaReconnect() {
+    if (this.reconnectTimer) {
+      return;
+    }
+
+    const delayMs = Number(process.env.KAFKA_RECONNECT_INTERVAL_MS || 10000);
+    this.logger.log(`Sẽ thử kết nối lại Kafka sau ${delayMs}ms.`);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.bootstrapKafkaProducer();
+    }, delayMs);
+    this.reconnectTimer.unref?.();
   }
 
   async getAdminKafkaOverview() {
