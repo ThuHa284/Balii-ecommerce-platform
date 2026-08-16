@@ -145,7 +145,7 @@ jobs:
               exit 1
             }
             if ! docker compose --env-file .env.production.vps -f docker-compose.prod.yml up -d; then
-              docker compose --env-file .env.production.vps -f docker-compose.prod.yml logs --no-color --tail 150 production-env-check migrations postgres kafka payment-service
+              docker compose --env-file .env.production.vps -f docker-compose.prod.yml logs --no-color --tail 150 production-env-check migrations postgres zookeeper kafka kafka-init payment-service
               df -h /
               docker system df || true
               exit 1
