@@ -6,7 +6,6 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
-  ExternalLink,
   Inbox,
   Loader2,
   Network,
@@ -130,15 +129,10 @@ function KafkaDashboard() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Làm mới
           </button>
-          <a
-            href={data?.kafkaUiUrl || 'http://localhost:8081'}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Mở Kafka UI: Topic & Partition
-          </a>
+          <span className="inline-flex items-center gap-2 rounded-xl bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 ring-1 ring-violet-200">
+            <Server className="h-4 w-4" />
+            Topic và partition hiển thị ngay bên dưới
+          </span>
         </div>
       </div>
 
@@ -152,8 +146,8 @@ function KafkaDashboard() {
         <>
           <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <Metric
-              label="Kết nối Kafka"
-              value={data.connected ? 'Hoạt động' : 'Mất kết nối'}
+              label="Trạng thái Kafka"
+              value={data.connected ? 'Đã kết nối' : 'Chưa kết nối'}
               icon={
                 data.connected ? (
                   <CheckCircle2 className="h-5 w-5 text-emerald-600" />

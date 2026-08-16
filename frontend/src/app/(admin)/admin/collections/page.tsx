@@ -249,23 +249,23 @@ export default function AdminCollectionsPage() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-2 text-xs uppercase tracking-[0.24em] text-amber-700/70">
-              Quản lý chiến dịch
+              Quản lý bộ sưu tập
             </p>
             <span className="inline-flex rounded-full border border-amber-900/10 bg-white/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-900/70">
               {roleLabel}
             </span>
             <h1 className="font-heading text-3xl font-bold text-slate-900">
-              Quản lý chiến dịch
+              Bộ sưu tập sản phẩm (BST)
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600">
-              Tạo chiến dịch riêng trong trang admin, gắn sản phẩm theo mùa vụ,
-              concept hoặc đợt bán hàng để đội nội dung và vận hành phối hợp rõ
-              ràng hơn.
+              Nhóm các sản phẩm theo mùa, phong cách hoặc chủ đề để khách hàng
+              dễ khám phá. Bộ sưu tập chỉ dùng để trưng bày và phân loại, không
+              tự tạo giảm giá.
             </p>
             {!canDelete ? (
               <p className="mt-3 max-w-2xl rounded-2xl border border-amber-200 bg-white/70 px-4 py-3 text-sm text-slate-600">
-                Admin có thể tạo và cập nhật chiến dịch. Xóa chiến dịch được giữ
-                riêng cho super admin.
+                Admin có thể tạo và cập nhật bộ sưu tập. Quyền xóa bộ sưu tập
+                được dành riêng cho super admin.
               </p>
             ) : null}
           </div>

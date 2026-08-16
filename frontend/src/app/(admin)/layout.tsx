@@ -13,9 +13,9 @@ export default function AdminLayout({
       allowedRoles={[UserRole.ADMIN, UserRole.SUPER_ADMIN]}
       redirectTo="/login"
     >
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen items-start">
         <AdminSidebar />
-        <main className="flex-1 p-6 pt-20 lg:p-8 overflow-auto">
+        <main className="min-w-0 flex-1 overflow-x-hidden p-6 pt-20 lg:p-8">
           {children}
         </main>
       </div>

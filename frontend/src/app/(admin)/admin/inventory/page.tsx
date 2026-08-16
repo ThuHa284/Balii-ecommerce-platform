@@ -52,6 +52,9 @@ type MovementGroup = {
   eventType: string;
   referenceType: string | null;
   referenceId: string | null;
+  orderCode: string | null;
+  customerName: string | null;
+  customerEmail: string | null;
   productNames: string[];
   createdAt: string;
   stockDelta: number;
@@ -126,9 +129,11 @@ export function groupInventoryMovements(
       ? (referenceTypeLabels[first.referenceType] ?? first.referenceType)
       : null;
     const title =
-      referenceLabel && first.referenceId
-        ? `${referenceLabel} ${first.referenceId}`
-        : `${formatEventType(first.eventType)} · ${productNames.join(', ')}`;
+      first.referenceType === 'order'
+        ? `Đơn hàng của ${first.customerName || first.customerEmail || 'khách hàng'}`
+        : referenceLabel && first.referenceId
+          ? referenceLabel
+          : `${formatEventType(first.eventType)} · ${productNames.join(', ')}`;
 
     return {
       id,
@@ -136,6 +141,9 @@ export function groupInventoryMovements(
       eventType: first.eventType,
       referenceType: first.referenceType,
       referenceId: first.referenceId,
+      orderCode: first.orderCode,
+      customerName: first.customerName,
+      customerEmail: first.customerEmail,
       productNames,
       createdAt: first.createdAt,
       stockDelta: rows.reduce((sum, row) => sum + row.stockDelta, 0),
@@ -201,6 +209,9 @@ export default function AdminInventoryPage() {
             movement.eventType,
             formatEventType(movement.eventType),
             movement.referenceId,
+            movement.orderCode,
+            movement.customerName,
+            movement.customerEmail,
           ]
             .filter(Boolean)
             .some((value) => String(value).toLowerCase().includes(keyword)),
@@ -254,6 +265,16 @@ export default function AdminInventoryPage() {
                 <p className="truncate font-semibold" title={group.title}>
                   {group.title}
                 </p>
+                {group.referenceType === 'order' ? (
+                  <p className="mt-1 break-all text-[11px] text-slate-500">
+                    {group.orderCode ? `Mã đơn #${group.orderCode}` : 'Đơn hàng'}
+                    {group.referenceId ? ` · ID ${group.referenceId}` : ''}
+                  </p>
+                ) : group.referenceId ? (
+                  <p className="mt-1 break-all text-[11px] text-slate-500">
+                    ID {group.referenceId}
+                  </p>
+                ) : null}
                 <p className="mt-1 text-xs text-muted-foreground">
                   {formatDateTime(group.createdAt)} ·{' '}
                   {formatEventType(group.eventType)} · {group.variants.length}{' '}

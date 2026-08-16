@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
   Cpu,
   Database,
-  ExternalLink,
   Layers3,
   RefreshCw,
   RotateCcw,
@@ -22,13 +21,6 @@ export default function VectorDatabasePage() {
   const [loading, setLoading] = useState(true);
   const [reindexing, setReindexing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const dashboardUrl = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return 'http://localhost:6335/dashboard';
-    }
-    return `http://${window.location.hostname || 'localhost'}:6335/dashboard`;
-  }, []);
 
   async function loadDiagnostics() {
     try {
@@ -107,15 +99,10 @@ export default function VectorDatabasePage() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Làm mới
           </button>
-          <a
-            href={dashboardUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Mở Qdrant Dashboard
-          </a>
+          <span className="inline-flex items-center gap-2 rounded-xl bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 ring-1 ring-violet-200">
+            <Database className="h-4 w-4" />
+            Qdrant được bảo vệ trong mạng nội bộ
+          </span>
         </div>
       </div>
 
@@ -183,18 +170,18 @@ export default function VectorDatabasePage() {
         <ol className="mt-5 grid gap-3 lg:grid-cols-3">
           <Step
             number="1"
-            title="Mở collection"
-            detail="Vào Qdrant Dashboard, chọn Collections rồi mở balii_chatbot_knowledge."
+            title="Kiểm tra collection"
+            detail="Xem tên collection, trạng thái sẵn sàng và số point ở các thẻ phía trên."
           />
           <Step
             number="2"
-            title="Xem point và payload"
-            detail="Mở Points để thấy vector cùng payload sản phẩm, FAQ và policy đã được lập chỉ mục."
+            title="Kiểm tra dữ liệu vector"
+            detail="Số Indexed points cho biết sản phẩm, FAQ và chính sách đã được lập chỉ mục vào Qdrant."
           />
           <Step
             number="3"
             title="Reindex và đối chiếu"
-            detail="Bấm Reindex catalog, làm mới dashboard và đối chiếu Indexed points trên màn hình này."
+            detail="Bấm Reindex catalog rồi đối chiếu lại Indexed points ngay trên màn hình này."
           />
         </ol>
 

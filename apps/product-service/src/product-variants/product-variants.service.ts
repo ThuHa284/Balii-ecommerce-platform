@@ -21,6 +21,9 @@ type InventoryMovementRow = {
   eventType: string;
   referenceType: string | null;
   referenceId: string | null;
+  orderCode: string | null;
+  customerName: string | null;
+  customerEmail: string | null;
   actorId: string | null;
   stockDelta: number;
   reservedDelta: number;
@@ -151,6 +154,9 @@ export class ProductVariantsService {
         movement.event_type AS "eventType",
         movement.reference_type AS "referenceType",
         movement.reference_id AS "referenceId",
+        related_order.order_code AS "orderCode",
+        customer.full_name AS "customerName",
+        customer.email AS "customerEmail",
         movement.actor_id AS "actorId",
         movement.stock_delta AS "stockDelta",
         movement.reserved_delta AS "reservedDelta",
@@ -161,6 +167,11 @@ export class ProductVariantsService {
       JOIN product_service.product_variants variant
         ON variant.id = movement.variant_id
       JOIN product_service.products product ON product.id = variant.product_id
+      LEFT JOIN order_service.orders related_order
+        ON movement.reference_type = 'order'
+       AND related_order.id::text = movement.reference_id
+      LEFT JOIN user_service.users customer
+        ON customer.id = related_order.user_id
       ${where}
       ORDER BY movement.id DESC
       LIMIT $${params.length}

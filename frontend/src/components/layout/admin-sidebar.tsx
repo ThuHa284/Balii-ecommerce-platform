@@ -40,8 +40,8 @@ const adminLinks: AdminLink[] = [
   { href: '/admin/products', label: 'Sản phẩm', icon: Package },
   { href: '/admin/inventory', label: 'Đối soát tồn kho', icon: Warehouse },
   { href: '/admin/categories', label: 'Danh mục', icon: Grid2x2 },
-  { href: '/admin/collections', label: 'Bộ sưu tập', icon: Library },
-  { href: '/admin/campaigns', label: 'Chiến dịch', icon: Megaphone },
+  { href: '/admin/collections', label: 'Bộ sưu tập (BST)', icon: Library },
+  { href: '/admin/campaigns', label: 'Chiến dịch khuyến mãi', icon: Megaphone },
   { href: '/admin/orders', label: 'Đơn hàng', icon: ShoppingCart },
   { href: '/admin/workflows', label: 'Workflow', icon: Route },
   {
@@ -264,7 +264,7 @@ export default function AdminSidebar() {
         {navigationContent(() => setIsMobileOpen(false))}
       </aside>
 
-      <aside className="hidden min-h-screen w-64 flex-col rounded-none border-b-0 border-l-0 border-t-0 p-6 glass-card lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto rounded-none border-b-0 border-l-0 border-t-0 p-6 glass-card lg:flex">
         {navigationContent()}
       </aside>
     </>
