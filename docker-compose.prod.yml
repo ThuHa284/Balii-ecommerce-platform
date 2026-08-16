@@ -42,6 +42,7 @@ services:
     restart: unless-stopped
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -56,6 +57,24 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      kafka:
+        condition: service_started
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        cub kafka-ready -b kafka:29092 1 120 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.success --partitions 3 --replication-factor 1 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.failed --partitions 3 --replication-factor 1 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.expired --partitions 3 --replication-factor 1 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payment.refund.completed --partitions 3 --replication-factor 1 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic notification.refund.completed --partitions 3 --replication-factor 1 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic demo.notification --partitions 1 --replication-factor 1
+    restart: 'no'
 
   camunda:
     image: ${CAMUNDA_IMAGE:-camunda/camunda-bpm-platform:run-7.23.0}
@@ -218,8 +237,8 @@ services:
     depends_on:
       migrations:
         condition: service_completed_successfully
-      kafka:
-        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
       camunda:
         condition: service_started
       camunda-deploy:
