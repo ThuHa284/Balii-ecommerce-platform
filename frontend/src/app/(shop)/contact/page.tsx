@@ -46,7 +46,7 @@ export default function ContactPage() {
             <div className="space-y-3 pt-2">
               {/* Shopee Channel Button */}
               <a
-                href="https://shopee.vn"
+                href="https://shopee.vn/balii941?categoryId=100017&entryPoint=ShopByPDP&itemId=52262162720"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-between p-4 rounded-xl border border-orange-200 bg-orange-50/35 hover:bg-orange-50/60 hover:scale-[1.01] active:scale-95 transition-all group gap-3"
@@ -65,7 +65,7 @@ export default function ContactPage() {
 
               {/* TikTok Shop Button */}
               <a
-                href="https://tiktok.com"
+                href="https://vt.tiktok.com/ZS96rgAn3T2Wn-lIlcD/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50/40 hover:bg-slate-50/80 hover:scale-[1.01] active:scale-95 transition-all group gap-3"
