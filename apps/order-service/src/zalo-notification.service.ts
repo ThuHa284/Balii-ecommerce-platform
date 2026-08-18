@@ -19,6 +19,7 @@ export type ZaloNewOrderNotification = {
   items: Array<{
     productName: string;
     variantLabel?: string | null;
+    sku?: string | null;
     quantity: number;
     lineTotal: number;
   }>;
@@ -173,8 +174,13 @@ export function buildZaloNewOrderMessage(
   notification: ZaloNewOrderNotification,
 ) {
   const itemLines = notification.items.slice(0, 10).map((item, index) => {
-    const variant = item.variantLabel ? ` (${item.variantLabel})` : '';
-    return `${index + 1}. ${item.productName}${variant} × ${item.quantity} — ${formatCurrency(item.lineTotal)}`;
+    const variantLabel = item.variantLabel?.trim() || 'Mặc định';
+    const sku = item.sku?.trim();
+    return [
+      `${index + 1}. ${item.productName}`,
+      `   Biến thể: ${variantLabel}${sku ? ` • SKU: ${sku}` : ''}`,
+      `   SL: ${item.quantity} • Thành tiền: ${formatCurrency(item.lineTotal)}`,
+    ].join('\n');
   });
   if (notification.items.length > 10) {
     itemLines.push(`… và ${notification.items.length - 10} sản phẩm khác`);
@@ -189,7 +195,7 @@ export function buildZaloNewOrderMessage(
     '',
     ...itemLines,
     '',
-    `Thanh toán: ${notification.paymentMethod.toUpperCase()}`,
+    `Thanh toán: ${formatPaymentMethod(notification.paymentMethod)}`,
     `Tổng cộng: ${formatCurrency(notification.totalAmount)}`,
     `Xem đơn: ${notification.adminUrl}`,
   ].join('\n');
@@ -205,6 +211,17 @@ function formatCurrency(value: number) {
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function formatPaymentMethod(value: string) {
+  const labels: Record<string, string> = {
+    cod: 'COD',
+    vnpay: 'VNPay',
+    bank_transfer: 'Chuyển khoản ngân hàng',
+    mock_online: 'Thanh toán mô phỏng',
+  };
+  const normalized = value.trim().toLowerCase();
+  return labels[normalized] || value.trim() || 'Chưa xác định';
 }
 
 function getErrorMessage(error: unknown) {
