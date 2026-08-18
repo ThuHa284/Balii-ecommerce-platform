@@ -3052,14 +3052,72 @@ export class OrderServiceService {
       shippingAddress.district,
       shippingAddress.province,
     ]
-      .filter(Boolean)
-      .map((item) => String(item))
+      .map((item) => safeString(item))
+      .filter(
+        (item) =>
+          Boolean(item) && !/^\[hệ thống\]/i.test(item),
+      )
       .join(', ');
+  }
+
+  private buildEmailShell(options: {
+    preheader: string;
+    eyebrow: string;
+    title: string;
+    content: string;
+  }) {
+    return `<!doctype html>
+      <html lang="vi">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>${escapeEmailHtml(options.title)}</title>
+        </head>
+        <body style="margin:0;padding:0;background:#f5f3ff;font-family:Arial,Helvetica,sans-serif;color:#1e1b4b;">
+          <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeEmailHtml(options.preheader)}</div>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f5f3ff;padding:24px 12px;">
+            <tr>
+              <td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:680px;background:#ffffff;border:1px solid #ede9fe;border-radius:22px;overflow:hidden;box-shadow:0 12px 35px rgba(76,29,149,.10);">
+                  <tr>
+                    <td style="background:#6d28d9;padding:26px 30px;color:#ffffff;">
+                      <div style="font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#ddd6fe;">Balii Sleepwear</div>
+                      <div style="margin-top:9px;font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#ede9fe;">${escapeEmailHtml(options.eyebrow)}</div>
+                      <h1 style="margin:8px 0 0;font-size:27px;line-height:1.25;color:#ffffff;">${escapeEmailHtml(options.title)}</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:28px 30px;">${options.content}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:18px 30px;background:#fafafa;border-top:1px solid #f1f5f9;text-align:center;color:#64748b;font-size:12px;line-height:1.6;">
+                      Đây là email tự động từ Balii. Nếu cần hỗ trợ, vui lòng phản hồi email này.<br />
+                      Cảm ơn bạn đã tin tưởng Balii Sleepwear.
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>`;
+  }
+
+  private buildEmailButton(label: string, url: string) {
+    return `
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0 4px;">
+        <tr>
+          <td style="border-radius:12px;background:#6d28d9;">
+            <a href="${escapeEmailHtml(url)}" style="display:inline-block;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;">${escapeEmailHtml(label)}</a>
+          </td>
+        </tr>
+      </table>`;
   }
 
   private buildInvoiceHtml(
     order: ReturnType<OrderServiceService['mapOrder']>,
     customerName: string,
+    orderUrl: string,
   ) {
     const shippingAddress = this.buildShippingAddressText(
       order.shippingAddress,
@@ -3068,46 +3126,55 @@ export class OrderServiceService {
       .map(
         (item) => `
           <tr>
-            <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.productName}<br /><span style="color:#64748b;font-size:12px;">${item.variantLabel ?? ''}</span></td>
-            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;">${item.quantity}</td>
-            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${this.formatCurrency(item.unitPrice)}</td>
-            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${this.formatCurrency(item.lineTotal)}</td>
+            <td style="padding:12px 8px;border-bottom:1px solid #ede9fe;font-size:14px;line-height:1.45;">${escapeEmailHtml(item.productName)}<br /><span style="color:#64748b;font-size:12px;">${escapeEmailHtml(item.variantLabel ?? '')}</span></td>
+            <td style="padding:12px 8px;border-bottom:1px solid #ede9fe;text-align:center;font-size:14px;">${item.quantity}</td>
+            <td style="padding:12px 8px;border-bottom:1px solid #ede9fe;text-align:right;font-size:14px;white-space:nowrap;">${this.formatCurrency(item.unitPrice)}</td>
+            <td style="padding:12px 8px;border-bottom:1px solid #ede9fe;text-align:right;font-size:14px;font-weight:700;white-space:nowrap;">${this.formatCurrency(item.lineTotal)}</td>
           </tr>
         `,
       )
       .join('');
 
-    return `
-      <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;color:#0f172a;">
-        <h2 style="margin-bottom:8px;">Balii Sleepwear - Hóa đơn thanh toán</h2>
-        <p>Xin chào ${customerName}, đơn hàng <strong>#${order.orderNumber}</strong> đã được thanh toán thành công.</p>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;">
-          <p style="margin:0 0 6px;"><strong>Người nhận:</strong> ${safeString(order.shippingAddress.recipientName) || customerName}</p>
-          <p style="margin:0 0 6px;"><strong>Số điện thoại:</strong> ${safeString(order.shippingAddress.phone)}</p>
-          <p style="margin:0;"><strong>Địa chỉ:</strong> ${shippingAddress}</p>
-        </div>
-        <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+    const content = `
+        <p style="margin:0 0 8px;font-size:16px;line-height:1.65;">Xin chào <strong>${escapeEmailHtml(customerName)}</strong>,</p>
+        <p style="margin:0 0 20px;color:#475569;font-size:14px;line-height:1.65;">Thanh toán cho đơn hàng <strong style="color:#6d28d9;">#${escapeEmailHtml(order.orderNumber)}</strong> đã thành công. Hóa đơn được trình bày trực tiếp trong email để bạn xem thuận tiện trên điện thoại.</p>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:14px;margin:18px 0;">
+          <tr><td style="padding:16px 18px;font-size:14px;line-height:1.7;">
+            <strong style="color:#4c1d95;">Thông tin giao hàng</strong><br />
+            ${escapeEmailHtml(safeString(order.shippingAddress.recipientName) || customerName)} · ${escapeEmailHtml(safeString(order.shippingAddress.phone))}<br />
+            <span style="color:#475569;">${escapeEmailHtml(shippingAddress)}</span>
+          </td></tr>
+        </table>
+        <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:18px;">
           <thead>
-            <tr style="background:#f1f5f9;">
-              <th style="padding:10px;text-align:left;">Sản phẩm</th>
-              <th style="padding:10px;text-align:center;">SL</th>
-              <th style="padding:10px;text-align:right;">Đơn giá</th>
-              <th style="padding:10px;text-align:right;">Thành tiền</th>
+            <tr style="background:#f5f3ff;color:#4c1d95;">
+              <th style="padding:11px 8px;text-align:left;font-size:12px;text-transform:uppercase;">Sản phẩm</th>
+              <th style="padding:11px 8px;text-align:center;font-size:12px;text-transform:uppercase;">SL</th>
+              <th style="padding:11px 8px;text-align:right;font-size:12px;text-transform:uppercase;">Đơn giá</th>
+              <th style="padding:11px 8px;text-align:right;font-size:12px;text-transform:uppercase;">Thành tiền</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
-        <div style="margin-top:20px;display:flex;justify-content:flex-end;">
-          <div style="min-width:280px;">
-            <p style="display:flex;justify-content:space-between;"><span>Tạm tính</span><strong>${this.formatCurrency(order.subtotal)}</strong></p>
-            <p style="display:flex;justify-content:space-between;"><span>Giảm giá</span><strong>${this.formatCurrency(order.discountAmount)}</strong></p>
-            <p style="display:flex;justify-content:space-between;"><span>Phí vận chuyển</span><strong>${this.formatCurrency(order.shippingFee)}</strong></p>
-            <p style="display:flex;justify-content:space-between;font-size:18px;"><span>Tổng thanh toán</span><strong>${this.formatCurrency(order.totalAmount)}</strong></p>
-          </div>
-        </div>
-        <p style="margin-top:24px;color:#475569;">Balii sẽ sớm chuẩn bị và đóng gói đơn hàng của bạn.</p>
-      </div>
-    `;
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:20px;background:#f8fafc;border-radius:14px;">
+          <tr><td style="padding:16px 18px;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="4" border="0" style="font-size:14px;color:#475569;">
+              <tr><td>Tạm tính</td><td align="right"><strong>${this.formatCurrency(order.subtotal)}</strong></td></tr>
+              <tr><td>Giảm giá</td><td align="right"><strong>-${this.formatCurrency(order.discountAmount)}</strong></td></tr>
+              <tr><td>Phí vận chuyển</td><td align="right"><strong>${this.formatCurrency(order.shippingFee)}</strong></td></tr>
+              <tr><td style="padding-top:10px;border-top:1px solid #e2e8f0;font-size:16px;color:#1e1b4b;"><strong>Tổng thanh toán</strong></td><td align="right" style="padding-top:10px;border-top:1px solid #e2e8f0;font-size:19px;color:#6d28d9;"><strong>${this.formatCurrency(order.totalAmount)}</strong></td></tr>
+            </table>
+          </td></tr>
+        </table>
+        <p style="margin:20px 0 0;color:#475569;font-size:14px;line-height:1.6;">Balii sẽ sớm chuẩn bị và đóng gói đơn hàng của bạn.</p>
+        ${this.buildEmailButton('Theo dõi đơn hàng', orderUrl)}`;
+
+    return this.buildEmailShell({
+      preheader: `Thanh toán đơn #${order.orderNumber} đã thành công.`,
+      eyebrow: 'Thanh toán thành công',
+      title: `Hóa đơn #${order.orderNumber}`,
+      content,
+    });
   }
 
   private buildAdminOrderHtml(
@@ -3115,6 +3182,7 @@ export class OrderServiceService {
     customerName: string,
     customerEmail: string | null,
     headline = 'Đơn hàng mới cần xử lý',
+    adminOrderUrl?: string,
   ) {
     const shippingAddress = this.buildShippingAddressText(
       order.shippingAddress,
@@ -3122,53 +3190,77 @@ export class OrderServiceService {
     const itemList = order.items
       .map(
         (item) =>
-          `<li>${item.productName} - ${item.variantLabel ?? ''} - SL ${item.quantity}</li>`,
+          `<tr><td style="padding:10px 8px;border-bottom:1px solid #ede9fe;">${escapeEmailHtml(item.productName)}<br /><span style="font-size:12px;color:#64748b;">${escapeEmailHtml(item.variantLabel ?? '')}</span></td><td align="center" style="padding:10px 8px;border-bottom:1px solid #ede9fe;">${item.quantity}</td><td align="right" style="padding:10px 8px;border-bottom:1px solid #ede9fe;font-weight:700;">${this.formatCurrency(item.lineTotal)}</td></tr>`,
       )
       .join('');
 
-    return `
-      <div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;color:#0f172a;">
-        <h2>${headline}</h2>
-        <p><strong>Mã đơn:</strong> #${order.orderNumber}</p>
-        <p><strong>Khách hàng:</strong> ${customerName}</p>
-        <p><strong>Email:</strong> ${customerEmail ?? 'Không có'}</p>
-        <p><strong>SĐT:</strong> ${safeString(order.shippingAddress.phone)}</p>
-        <p><strong>Địa chỉ giao hàng:</strong> ${shippingAddress}</p>
-        <p><strong>Tổng thanh toán:</strong> ${this.formatCurrency(order.totalAmount)}</p>
-        <p><strong>Phương thức thanh toán:</strong> ${order.paymentMethod}</p>
-        <h3>Danh sách sản phẩm</h3>
-        <ul>${itemList}</ul>
+    const content = `
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:14px;">
+          <tr><td style="padding:16px 18px;font-size:14px;line-height:1.75;">
+            <strong style="color:#4c1d95;">Khách hàng</strong><br />
+            ${escapeEmailHtml(customerName)} · ${escapeEmailHtml(safeString(order.shippingAddress.phone))}<br />
+            <span style="color:#64748b;">${escapeEmailHtml(customerEmail ?? 'Không có email')}</span><br />
+            <span style="color:#475569;">${escapeEmailHtml(shippingAddress)}</span>
+          </td></tr>
+        </table>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="7" border="0" style="margin:18px 0;background:#f8fafc;border-radius:12px;font-size:14px;">
+          <tr><td style="color:#64748b;">Tổng thanh toán</td><td align="right" style="font-size:18px;color:#6d28d9;"><strong>${this.formatCurrency(order.totalAmount)}</strong></td></tr>
+          <tr><td style="color:#64748b;">Phương thức</td><td align="right"><strong>${escapeEmailHtml(order.paymentMethod)}</strong></td></tr>
+          <tr><td style="color:#64748b;">Trạng thái</td><td align="right"><strong>${escapeEmailHtml(order.status)}</strong></td></tr>
+        </table>
+        <h2 style="margin:22px 0 8px;font-size:16px;color:#1e1b4b;">Sản phẩm trong đơn</h2>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;font-size:14px;">
+          <thead><tr style="background:#f5f3ff;color:#4c1d95;"><th align="left" style="padding:10px 8px;">Sản phẩm</th><th style="padding:10px 8px;">SL</th><th align="right" style="padding:10px 8px;">Thành tiền</th></tr></thead>
+          <tbody>${itemList}</tbody>
+        </table>
         ${
           order.customerNote
-            ? `<p><strong>Ghi chú khách hàng:</strong> ${order.customerNote}</p>`
+            ? `<div style="margin-top:18px;padding:14px 16px;border-left:4px solid #8b5cf6;background:#faf5ff;color:#475569;font-size:14px;"><strong>Ghi chú khách hàng:</strong> ${escapeEmailHtml(order.customerNote)}</div>`
             : ''
         }
-      </div>
-    `;
+        ${adminOrderUrl ? this.buildEmailButton('Mở trang quản lý đơn hàng', adminOrderUrl) : ''}`;
+
+    return this.buildEmailShell({
+      preheader: `${headline} #${order.orderNumber}.`,
+      eyebrow: 'Thông báo quản trị',
+      title: `${headline} #${order.orderNumber}`,
+      content,
+    });
   }
 
   private buildOrderCreatedHtml(
     order: ReturnType<OrderServiceService['mapOrder']>,
     customerName: string,
+    orderUrl: string,
   ) {
     const shippingAddress = this.buildShippingAddressText(
       order.shippingAddress,
     );
 
-    return `
-      <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;color:#0f172a;">
-        <h2 style="margin-bottom:8px;">Balii Sleepwear - Đặt hàng thành công</h2>
-        <p>Xin chào ${customerName}, Balii đã ghi nhận đơn hàng <strong>#${order.orderNumber}</strong> của bạn.</p>
-        <p>Trạng thái hiện tại: <strong>${order.status}</strong>. Hệ thống sẽ tiếp tục cập nhật khi đơn được xác nhận và giao hàng.</p>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;">
-          <p style="margin:0 0 6px;"><strong>Người nhận:</strong> ${safeString(order.shippingAddress.recipientName) || customerName}</p>
-          <p style="margin:0 0 6px;"><strong>Số điện thoại:</strong> ${safeString(order.shippingAddress.phone)}</p>
-          <p style="margin:0;"><strong>Địa chỉ:</strong> ${shippingAddress}</p>
-        </div>
-        <p><strong>Tổng thanh toán:</strong> ${this.formatCurrency(order.totalAmount)}</p>
-        <p><strong>Phương thức thanh toán:</strong> ${order.paymentMethod}</p>
-      </div>
-    `;
+    const content = `
+      <p style="margin:0 0 8px;font-size:16px;line-height:1.65;">Xin chào <strong>${escapeEmailHtml(customerName)}</strong>,</p>
+      <p style="margin:0 0 20px;color:#475569;font-size:14px;line-height:1.65;">Balii đã ghi nhận đơn hàng <strong style="color:#6d28d9;">#${escapeEmailHtml(order.orderNumber)}</strong>. Chúng tôi sẽ thông báo khi đơn được xác nhận và bắt đầu giao.</p>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="8" border="0" style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:14px;font-size:14px;line-height:1.55;">
+        <tr><td style="padding:16px 18px;">
+          <strong style="color:#4c1d95;">Thông tin đơn hàng</strong><br />
+          Người nhận: ${escapeEmailHtml(safeString(order.shippingAddress.recipientName) || customerName)}<br />
+          Điện thoại: ${escapeEmailHtml(safeString(order.shippingAddress.phone))}<br />
+          Địa chỉ: <span style="color:#475569;">${escapeEmailHtml(shippingAddress)}</span>
+        </td></tr>
+      </table>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="7" border="0" style="margin-top:18px;background:#f8fafc;border-radius:12px;font-size:14px;">
+        <tr><td style="color:#64748b;">Tổng thanh toán</td><td align="right" style="font-size:18px;color:#6d28d9;"><strong>${this.formatCurrency(order.totalAmount)}</strong></td></tr>
+        <tr><td style="color:#64748b;">Phương thức</td><td align="right"><strong>${escapeEmailHtml(order.paymentMethod)}</strong></td></tr>
+        <tr><td style="color:#64748b;">Trạng thái</td><td align="right"><strong>${escapeEmailHtml(order.status)}</strong></td></tr>
+      </table>
+      ${this.buildEmailButton('Xem chi tiết đơn hàng', orderUrl)}`;
+
+    return this.buildEmailShell({
+      preheader: `Balii đã ghi nhận đơn hàng #${order.orderNumber}.`,
+      eyebrow: 'Đặt hàng thành công',
+      title: `Cảm ơn bạn đã đặt hàng`,
+      content,
+    });
   }
 
   private async sendOrderCreatedNotifications(
@@ -3187,7 +3279,11 @@ export class OrderServiceService {
       this.configService.get<string>('MAIL_FROM') || 'no-reply@balii.com';
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    const customerHtml = this.buildOrderCreatedHtml(order, customer.fullName);
+    const customerHtml = this.buildOrderCreatedHtml(
+      order,
+      customer.fullName,
+      `${frontendUrl}/account/orders/${order.id}`,
+    );
     const adminRecipients = await this.loadAdminNotificationRecipients();
 
     if (customer.email) {
@@ -3195,13 +3291,7 @@ export class OrderServiceService {
         from,
         to: customer.email,
         subject: `Đặt hàng thành công #${order.orderNumber}`,
-        html: `
-          ${customerHtml}
-          <p style="font-family:Arial,sans-serif;color:#475569;margin-top:24px;">
-            Bạn có thể theo dõi đơn hàng tại:
-            <a href="${frontendUrl}/account/orders/${order.id}">${frontendUrl}/account/orders/${order.id}</a>
-          </p>
-        `,
+        html: customerHtml,
       });
     }
 
@@ -3215,6 +3305,7 @@ export class OrderServiceService {
           customer.fullName,
           customer.email,
           'Đơn hàng mới cần xác nhận',
+          `${frontendUrl}/admin/orders`,
         ),
       });
     }
@@ -3236,7 +3327,11 @@ export class OrderServiceService {
       this.configService.get<string>('MAIL_FROM') || 'no-reply@balii.com';
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    const invoiceHtml = this.buildInvoiceHtml(order, customer.fullName);
+    const invoiceHtml = this.buildInvoiceHtml(
+      order,
+      customer.fullName,
+      `${frontendUrl}/account/orders/${order.id}`,
+    );
     const adminRecipients = await this.loadAdminNotificationRecipients();
 
     if (customer.email) {
@@ -3244,20 +3339,7 @@ export class OrderServiceService {
         from,
         to: customer.email,
         subject: `Thanh toán thành công cho đơn #${order.orderNumber}`,
-        html: `
-          ${invoiceHtml}
-          <p style="font-family:Arial,sans-serif;color:#475569;margin-top:24px;">
-            Bạn có thể theo dõi đơn hàng tại:
-            <a href="${frontendUrl}/account/orders/${order.id}">${frontendUrl}/account/orders/${order.id}</a>
-          </p>
-        `,
-        attachments: [
-          {
-            filename: `hoa-don-${order.orderNumber}.html`,
-            content: invoiceHtml,
-            contentType: 'text/html; charset=utf-8',
-          },
-        ],
+        html: invoiceHtml,
       });
     }
 
@@ -3270,6 +3352,8 @@ export class OrderServiceService {
           order,
           customer.fullName,
           customer.email,
+          'Đơn mới cần đóng gói',
+          `${frontendUrl}/admin/orders`,
         ),
       });
     }
@@ -3765,4 +3849,13 @@ function safeString(value: unknown): string {
   }
 
   return '';
+}
+
+function escapeEmailHtml(value: unknown): string {
+  return safeString(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }

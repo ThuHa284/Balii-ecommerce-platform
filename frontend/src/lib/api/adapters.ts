@@ -227,6 +227,16 @@ function safeString(value: unknown) {
   return typeof value === 'string' ? value : '';
 }
 
+function mapVisibleLocation(value: unknown, fallbackLabel: string, id: number) {
+  const name = safeString(value).trim();
+
+  if (/^\[hệ thống\]/i.test(name)) {
+    return '';
+  }
+
+  return name || humanizeLocation(fallbackLabel, id);
+}
+
 function resolveColorCode(colorName: string, colorCode?: string) {
   if (colorCode && colorCode.trim()) {
     return colorCode;
@@ -547,24 +557,21 @@ export function mapOrder(input: BackendOrder): Order {
       wardId: Number(input.shippingAddress.wardId ?? 0),
       fullName: safeString(input.shippingAddress.recipientName),
       phone: safeString(input.shippingAddress.phone),
-      province:
-        safeString(input.shippingAddress.province) ||
-        humanizeLocation(
-          'Tỉnh/Thành phố',
-          Number(input.shippingAddress.provinceId ?? 0),
-        ),
-      district:
-        safeString(input.shippingAddress.district) ||
-        humanizeLocation(
-          'Quận/Huyện',
-          Number(input.shippingAddress.districtId ?? 0),
-        ),
-      ward:
-        safeString(input.shippingAddress.ward) ||
-        humanizeLocation(
-          'Phường/Xã',
-          Number(input.shippingAddress.wardId ?? 0),
-        ),
+      province: mapVisibleLocation(
+        input.shippingAddress.province,
+        'Tỉnh/Thành phố',
+        Number(input.shippingAddress.provinceId ?? 0),
+      ),
+      district: mapVisibleLocation(
+        input.shippingAddress.district,
+        'Quận/Huyện',
+        Number(input.shippingAddress.districtId ?? 0),
+      ),
+      ward: mapVisibleLocation(
+        input.shippingAddress.ward,
+        'Phường/Xã',
+        Number(input.shippingAddress.wardId ?? 0),
+      ),
       street: safeString(input.shippingAddress.streetAddress),
       isDefault: false,
     },
