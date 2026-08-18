@@ -132,6 +132,10 @@ export async function buildTryOnFormData(
   formData.append('mode', request.mode || 'performance');
   formData.append('garmentPhotoType', request.garmentPhotoType || 'auto');
 
+  if (request.skipPersonAnalysis) {
+    formData.append('skipPersonAnalysis', 'true');
+  }
+
   if (request.productId) {
     formData.append('productId', request.productId);
   }

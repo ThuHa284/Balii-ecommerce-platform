@@ -76,7 +76,7 @@ function PersonAnalysisCard({
             AI đoán tuổi và giới tính
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Phân tích nhanh từ ảnh người dùng trước khi thử đồ.
+            Chỉ phân tích khi bạn bấm nút; kết quả không dùng để chặn thử đồ.
           </p>
         </div>
         <button
@@ -203,9 +203,7 @@ function TryOnContent() {
     !!userImage &&
     !!garmentImage &&
     !isGenerating &&
-    !resultImage &&
-    !!garmentTargetGender &&
-    garmentRecommendedAgeGroups.length > 0;
+    !resultImage;
 
   const canGenerateProductDesign =
     !!garmentImage &&
@@ -330,7 +328,9 @@ function TryOnContent() {
       setResultSaved(
         Boolean(response.id && useAuthStore.getState().isAuthenticated),
       );
-      setPersonAnalysis(response.personAnalysis ?? null);
+      if (response.personAnalysis) {
+        setPersonAnalysis(response.personAnalysis);
+      }
       setConfidence(0);
       setCurrentStep('result');
       setWarningData(null);
@@ -356,18 +356,12 @@ function TryOnContent() {
         return;
       }
 
-      if (!garmentTargetGender || !garmentRecommendedAgeGroups.length) {
-        toast.error(
-          'Sản phẩm chưa có đủ metadata để AI kiểm tra trước khi tạo ảnh.',
-        );
-        return;
-      }
-
       const request: TryOnRequest = {
         userImage,
         garmentImage,
+        skipPersonAnalysis: true,
         productId: selectedProduct?.id,
-        targetGender: garmentTargetGender,
+        targetGender: garmentTargetGender ?? undefined,
         recommendedAgeGroups: garmentRecommendedAgeGroups,
       };
 
