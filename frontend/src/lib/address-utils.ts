@@ -41,7 +41,12 @@ export function formatAddressLine(
   address: Pick<Address, 'street' | 'ward' | 'province'>,
 ) {
   return [address.street, address.ward, address.province]
-    .filter((item) => typeof item === 'string' && item.trim().length > 0)
+    .filter(
+      (item) =>
+        typeof item === 'string' &&
+        item.trim().length > 0 &&
+        !/^\[hệ thống\]/i.test(item.trim()),
+    )
     .join(', ');
 }
 
