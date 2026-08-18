@@ -64,9 +64,6 @@ export async function createOrder(orderData: {
       provinceId: orderData.address.provinceId,
       districtId: orderData.address.districtId,
       wardId: orderData.address.wardId,
-      province: orderData.address.province,
-      district: orderData.address.district,
-      ward: orderData.address.ward,
       streetAddress: orderData.address.street,
     },
   });
