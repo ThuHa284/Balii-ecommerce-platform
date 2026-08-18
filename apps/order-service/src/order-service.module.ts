@@ -11,6 +11,7 @@ import { CartClientService } from './clients/cart-client.service';
 import { CloudinaryService } from './cloudinary.service';
 import { InternalServiceGuard } from './auth/internal-service.guard';
 import { PaymentClientService } from './clients/payment-client.service';
+import { ZaloNotificationService } from './zalo-notification.service';
 
 loadEnv();
 
@@ -38,6 +39,7 @@ loadEnv();
     CloudinaryService,
     InternalServiceGuard,
     PaymentClientService,
+    ZaloNotificationService,
   ],
 })
 export class OrderServiceModule {}

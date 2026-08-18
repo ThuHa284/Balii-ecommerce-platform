@@ -15,6 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
+import { ZaloNotificationService } from './zalo-notification.service';
 import { randomUUID } from 'crypto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { Order } from './entities/order.entity';
@@ -251,6 +252,7 @@ export class OrderServiceService {
     private readonly configService: ConfigService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly paymentClientService: PaymentClientService,
+    private readonly zaloNotificationService: ZaloNotificationService,
   ) {}
 
   async createOrder(userId: string | undefined, dto: CreateOrderDto) {
@@ -2767,8 +2769,8 @@ export class OrderServiceService {
                 WHERE id = $1
                 RETURNING id
                 `,
-              [item.variantId, item.quantity],
-            );
+                [item.variantId, item.quantity],
+              );
       const rows = this.returnedRows<{ id: string }>(updateResult);
 
       if (!rows.length) {
@@ -3053,10 +3055,7 @@ export class OrderServiceService {
       shippingAddress.province,
     ]
       .map((item) => safeString(item))
-      .filter(
-        (item) =>
-          Boolean(item) && !/^\[hệ thống\]/i.test(item),
-      )
+      .filter((item) => Boolean(item) && !/^\[hệ thống\]/i.test(item))
       .join(', ');
   }
 
@@ -3266,24 +3265,66 @@ export class OrderServiceService {
   private async sendOrderCreatedNotifications(
     order: ReturnType<OrderServiceService['mapOrder']>,
   ) {
-    if (!this.isMailEnabled()) {
+    const mailEnabled = this.isMailEnabled();
+    const zaloEnabled = this.zaloNotificationService.isEnabled();
+    if (!mailEnabled && !zaloEnabled) {
       this.logger.warn(
-        `MAIL_HOST/MAIL_PORT/MAIL_USER/MAIL_PASS chưa cấu hình. Bỏ qua gửi mail cho đơn ${order.id}.`,
+        `Email và Zalo đều chưa cấu hình. Bỏ qua thông báo đơn ${order.id}.`,
       );
       return;
     }
 
-    const transporter = this.createMailerTransport();
     const customer = await this.loadCustomerContact(order.userId);
-    const from =
-      this.configService.get<string>('MAIL_FROM') || 'no-reply@balii.com';
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    const customerHtml = this.buildOrderCreatedHtml(
-      order,
-      customer.fullName,
-      `${frontendUrl}/account/orders/${order.id}`,
-    );
+    const tasks: Array<Promise<unknown>> = [];
+
+    if (mailEnabled) {
+      tasks.push(this.sendOrderCreatedEmails(order, customer, frontendUrl));
+    } else {
+      this.logger.warn(
+        `MAIL_HOST/MAIL_PORT/MAIL_USER/MAIL_PASS chưa cấu hình. Chỉ gửi Zalo cho đơn ${order.id}.`,
+      );
+    }
+
+    if (zaloEnabled) {
+      tasks.push(
+        this.zaloNotificationService.sendNewOrder({
+          orderNumber: order.orderNumber,
+          customerName: customer.fullName,
+          customerPhone: safeString(order.shippingAddress.phone),
+          shippingAddress: this.buildShippingAddressText(order.shippingAddress),
+          paymentMethod: order.paymentMethod,
+          totalAmount: order.totalAmount,
+          adminUrl: `${frontendUrl}/admin/orders`,
+          items: order.items.map((item) => ({
+            productName: item.productName,
+            variantLabel: item.variantLabel,
+            quantity: item.quantity,
+            lineTotal: item.lineTotal,
+          })),
+        }),
+      );
+    }
+
+    const results = await Promise.allSettled(tasks);
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error(
+          `Gửi thông báo đơn ${order.id} thất bại: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+        );
+      }
+    }
+  }
+
+  private async sendOrderCreatedEmails(
+    order: ReturnType<OrderServiceService['mapOrder']>,
+    customer: CustomerContact,
+    frontendUrl: string,
+  ) {
+    const transporter = this.createMailerTransport();
+    const from =
+      this.configService.get<string>('MAIL_FROM') || 'no-reply@balii.com';
     const adminRecipients = await this.loadAdminNotificationRecipients();
 
     if (customer.email) {
@@ -3291,7 +3332,11 @@ export class OrderServiceService {
         from,
         to: customer.email,
         subject: `Đặt hàng thành công #${order.orderNumber}`,
-        html: customerHtml,
+        html: this.buildOrderCreatedHtml(
+          order,
+          customer.fullName,
+          `${frontendUrl}/account/orders/${order.id}`,
+        ),
       });
     }
 
