@@ -449,18 +449,21 @@ export class OrderServiceService {
     }
 
     const response = await this.findMyOrderById(userId, savedOrder.id);
-    void this.sendOrderCreatedNotifications(response).catch((error) => {
-      const message =
-        error instanceof Error ? error.message : 'Unknown email error';
-      this.logger.warn(
-        `Unable to send order created emails for order ${savedOrder.id}: ${message}`,
-      );
-    });
-
-    return {
+    const responseWithCheckoutPayment = {
       ...response,
       paymentMethod: dto.paymentMethod,
     };
+    void this.sendOrderCreatedNotifications(responseWithCheckoutPayment).catch(
+      (error) => {
+        const message =
+          error instanceof Error ? error.message : 'Unknown email error';
+        this.logger.warn(
+          `Unable to send order created emails for order ${savedOrder.id}: ${message}`,
+        );
+      },
+    );
+
+    return responseWithCheckoutPayment;
   }
 
   async findMyOrders(userId: string | undefined) {
@@ -3300,6 +3303,7 @@ export class OrderServiceService {
           items: order.items.map((item) => ({
             productName: item.productName,
             variantLabel: item.variantLabel,
+            sku: item.sku,
             quantity: item.quantity,
             lineTotal: item.lineTotal,
           })),
