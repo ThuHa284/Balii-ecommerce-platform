@@ -118,6 +118,12 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_CALLBACK_URL: ${{ secrets.GOOGLE_CALLBACK_URL }}
+          ZALO_NOTIFICATION_ENABLED: ${{ secrets.ZALO_NOTIFICATION_ENABLED }}
+          ZALO_IMEI: ${{ secrets.ZALO_IMEI }}
+          ZALO_USER_AGENT: ${{ secrets.ZALO_USER_AGENT }}
+          ZALO_COOKIE_BASE64: ${{ secrets.ZALO_COOKIE_BASE64 }}
+          ZALO_GROUP_ID: ${{ secrets.ZALO_GROUP_ID }}
+          ZALO_NOTIFICATION_TIMEOUT_MS: ${{ secrets.ZALO_NOTIFICATION_TIMEOUT_MS }}
         with:
           host: 163.61.110.43
           username: root
@@ -125,7 +131,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           command_timeout: 15m
-          envs: GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_CALLBACK_URL
+          envs: GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_CALLBACK_URL,ZALO_NOTIFICATION_ENABLED,ZALO_IMEI,ZALO_USER_AGENT,ZALO_COOKIE_BASE64,ZALO_GROUP_ID,ZALO_NOTIFICATION_TIMEOUT_MS
           script: |
             set -eu
             cd /opt/balii-backend
@@ -148,6 +154,12 @@ jobs:
             upsert_secret_env GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
             upsert_secret_env GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
             upsert_secret_env GOOGLE_CALLBACK_URL "$GOOGLE_CALLBACK_URL"
+            upsert_secret_env ZALO_NOTIFICATION_ENABLED "$ZALO_NOTIFICATION_ENABLED"
+            upsert_secret_env ZALO_IMEI "$ZALO_IMEI"
+            upsert_secret_env ZALO_USER_AGENT "$ZALO_USER_AGENT"
+            upsert_secret_env ZALO_COOKIE_BASE64 "$ZALO_COOKIE_BASE64"
+            upsert_secret_env ZALO_GROUP_ID "$ZALO_GROUP_ID"
+            upsert_secret_env ZALO_NOTIFICATION_TIMEOUT_MS "$ZALO_NOTIFICATION_TIMEOUT_MS"
             bash scripts/prepare-thesis-demo-env.sh "$APP_ENV_FILE"
             rm -f \
               'apps/product-service/src/product-service.controller.spec.ts' \

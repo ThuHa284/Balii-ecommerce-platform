@@ -246,7 +246,32 @@ Nếu cần test try-on và AI đoán tuổi/giới tính:
 3. `gateway`
 4. `frontend`
 
-## 8. Cách tắt
+## 8. Thiết lập thông báo đơn hàng qua Zalo cá nhân
+
+`zca-js` là API không chính thức và có rủi ro làm tài khoản bị khóa. Nên dùng một tài khoản Zalo riêng chỉ để gửi thông báo.
+
+Tại thư mục gốc, chạy:
+
+```powershell
+npm run setup:zalo
+```
+
+1. Quét mã QR bằng tài khoản Zalo dùng để gửi thông báo.
+2. Chọn group nhận đơn trong danh sách hiện ra.
+3. Script tạo file `.env.zalo.generated`.
+4. Sao chép các biến trong file đó vào `root/.env` hoặc secret production.
+5. Xóa `.env.zalo.generated` sau khi cấu hình xong vì file chứa phiên đăng nhập.
+6. Khởi động lại `order-service`.
+
+Muốn tắt mà không xóa cấu hình:
+
+```env
+ZALO_NOTIFICATION_ENABLED=false
+```
+
+Khi bật thành công, mỗi đơn mới sẽ gửi mã đơn, khách hàng, điện thoại, địa chỉ, danh sách sản phẩm, tổng tiền và link trang quản trị vào group đã chọn. Nếu Zalo lỗi, đơn hàng và email vẫn tiếp tục hoạt động bình thường.
+
+## 9. Cách tắt
 
 Mỗi service đang chạy trong terminal nào thì quay lại terminal đó và bấm:
 
@@ -260,7 +285,7 @@ Nếu PowerShell hỏi xác nhận, bấm:
 Y
 ```
 
-## 9. Lỗi thường gặp
+## 10. Lỗi thường gặp
 
 ### `503 Service Unavailable` ở `/admin/market-analysis/search-by-image`
 

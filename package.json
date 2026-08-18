@@ -38,6 +38,7 @@
     "init:prod-env": "powershell -ExecutionPolicy Bypass -File scripts/bootstrap-production-env.ps1",
     "validate:prod-env": "node scripts/validate-production-env.js",
     "test:production-api": "node scripts/test-production-api.mjs",
+    "setup:zalo": "node scripts/setup-zalo-notifications.mjs",
     "test:e2e-commerce": "node scripts/e2e-commerce-flow.mjs",
     "demo:local:start": "powershell -ExecutionPolicy Bypass -File scripts/local-demo.ps1 -Action Start",
     "demo:local:stop": "powershell -ExecutionPolicy Bypass -File scripts/local-demo.ps1 -Action Stop",
@@ -81,7 +82,8 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^1.0.0",
-    "uuid": "^14.0.0"
+    "uuid": "^14.0.0",
+    "zca-js": "^2.1.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

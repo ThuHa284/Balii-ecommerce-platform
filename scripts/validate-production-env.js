@@ -200,6 +200,26 @@ if (
   );
 }
 
+if (env.ZALO_NOTIFICATION_ENABLED === 'true') {
+  for (const key of ['ZALO_IMEI', 'ZALO_USER_AGENT']) {
+    if (!env[key]?.trim()) {
+      problems.push(`${key} là bắt buộc khi bật thông báo Zalo.`);
+    }
+  }
+
+  if (!env.ZALO_COOKIE_BASE64?.trim() && !env.ZALO_COOKIE_JSON?.trim()) {
+    problems.push(
+      'Cần ZALO_COOKIE_BASE64 hoặc ZALO_COOKIE_JSON khi bật thông báo Zalo.',
+    );
+  }
+
+  if (!env.ZALO_GROUP_ID?.trim() && !env.ZALO_GROUP_IDS?.trim()) {
+    problems.push(
+      'Cần ZALO_GROUP_ID hoặc ZALO_GROUP_IDS khi bật thông báo Zalo.',
+    );
+  }
+}
+
 if (env.APP_ENV === 'production' && !isThesisDemo) {
   if (env.PAYMENT_ALLOW_UNVERIFIED_WEBHOOKS !== 'false') {
     problems.push(
