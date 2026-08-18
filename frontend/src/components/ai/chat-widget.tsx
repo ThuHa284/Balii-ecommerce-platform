@@ -10,7 +10,7 @@ import Link from 'next/link';
 
 const MARKETPLACE_LINKS = [
   {
-    href: 'https://shopee.vn/balii941?categoryId=100017&entryPoint=ShopByPDP&itemId=52262162720',
+    href: 'https://vn.shp.ee/E6J5GzXY',
     label: 'Shopee',
     bgClass: 'bg-orange-500 hover:bg-orange-600 shadow-orange-300/30',
     logo: (

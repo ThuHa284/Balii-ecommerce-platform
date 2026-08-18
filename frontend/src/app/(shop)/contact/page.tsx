@@ -46,7 +46,7 @@ export default function ContactPage() {
             <div className="space-y-3 pt-2">
               {/* Shopee Channel Button */}
               <a
-                href="https://shopee.vn/balii941?categoryId=100017&entryPoint=ShopByPDP&itemId=52262162720"
+                href="https://vn.shp.ee/E6J5GzXY"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-between p-4 rounded-xl border border-orange-200 bg-orange-50/35 hover:bg-orange-50/60 hover:scale-[1.01] active:scale-95 transition-all group gap-3"
