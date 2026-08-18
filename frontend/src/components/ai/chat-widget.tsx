@@ -60,8 +60,12 @@ export default function ChatWidget() {
   }, [messages]);
 
   useEffect(() => {
-    if (isCartDrawerOpen) setIsOpen(false);
-  }, [isCartDrawerOpen]);
+    return useCartStore.subscribe((state, previousState) => {
+      if (state.isCartDrawerOpen && !previousState.isCartDrawerOpen) {
+        setIsOpen(false);
+      }
+    });
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
