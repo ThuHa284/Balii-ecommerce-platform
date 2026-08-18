@@ -5,6 +5,7 @@ import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 import { ChatMessage } from '@/types/ai.types';
 import { sendChatMessage } from '@/lib/api/ai.api';
 import { cn } from '@/lib/utils';
+import { useCartStore } from '@/store/cart.store';
 import Link from 'next/link';
 
 const MARKETPLACE_LINKS = [
@@ -40,6 +41,7 @@ const MARKETPLACE_LINKS = [
 
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
+  const isCartDrawerOpen = useCartStore((state) => state.isCartDrawerOpen);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -56,6 +58,14 @@ export default function ChatWidget() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    return useCartStore.subscribe((state, previousState) => {
+      if (state.isCartDrawerOpen && !previousState.isCartDrawerOpen) {
+        setIsOpen(false);
+      }
+    });
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -92,7 +102,12 @@ export default function ChatWidget() {
   return (
     <>
       {/* Floating widget stack — bottom right */}
-      <div className="fixed bottom-20 right-3 z-50 flex flex-col-reverse items-center gap-2.5 sm:bottom-6 sm:right-6 sm:gap-3">
+      <div
+        className={cn(
+          'fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-3 z-40 flex flex-row-reverse items-center gap-2.5 transition-all duration-200 sm:bottom-6 sm:right-6 sm:flex-col-reverse sm:gap-3',
+          isCartDrawerOpen && 'pointer-events-none translate-y-2 opacity-0',
+        )}
+      >
         {/* Chatbot toggle — primary, always at bottom */}
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -111,29 +126,30 @@ export default function ChatWidget() {
         </button>
 
         {/* Marketplace circular icon buttons */}
-        {MARKETPLACE_LINKS.map((item) => (
-          <a
-            key={item.label}
-            href={item.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              'flex h-11 w-11 items-center justify-center rounded-full shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 sm:h-12 sm:w-12',
-              item.bgClass,
-            )}
-            aria-label={item.label}
-            title={item.label}
-          >
-            {item.logo}
-          </a>
-        ))}
+        {!isOpen &&
+          MARKETPLACE_LINKS.map((item) => (
+            <a
+              key={item.label}
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                'flex h-11 w-11 items-center justify-center rounded-full shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 sm:h-12 sm:w-12',
+                item.bgClass,
+              )}
+              aria-label={item.label}
+              title={item.label}
+            >
+              {item.logo}
+            </a>
+          ))}
       </div>
 
       {/* Chat panel */}
       <div
         className={cn(
-          'fixed bottom-40 left-4 right-4 z-40 max-h-[min(500px,calc(100vh-11rem))] w-auto overflow-hidden glass-card transition-all duration-300 sm:bottom-24 sm:left-auto sm:right-6 sm:w-[360px]',
-          isOpen
+          'fixed bottom-[calc(9rem+env(safe-area-inset-bottom))] left-4 right-4 z-40 max-h-[min(500px,calc(100vh-11rem))] w-auto overflow-hidden glass-card transition-all duration-300 sm:bottom-24 sm:left-auto sm:right-6 sm:w-[360px]',
+          isOpen && !isCartDrawerOpen
             ? 'translate-y-0 scale-100 opacity-100'
             : 'pointer-events-none translate-y-4 scale-95 opacity-0',
         )}
