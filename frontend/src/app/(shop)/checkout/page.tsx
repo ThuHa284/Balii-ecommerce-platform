@@ -34,7 +34,11 @@ export default function CheckoutPage() {
     serverTotal,
     hydrateCart,
   } = useCartStore();
-  const { hydrateAddresses, isAuthenticated } = useAuthStore();
+  const {
+    hydrateAddresses,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+  } = useAuthStore();
   const selectedAddress = useSelectedAddress();
   const [isLoading, setIsLoading] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -46,6 +50,10 @@ export default function CheckoutPage() {
   const checkoutKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (isAuthLoading) {
+      return;
+    }
+
     if (!isAuthenticated) {
       router.replace('/login?redirect=/checkout');
       return;
@@ -53,7 +61,13 @@ export default function CheckoutPage() {
 
     void hydrateAddresses();
     void hydrateCart();
-  }, [hydrateAddresses, hydrateCart, isAuthenticated, router]);
+  }, [
+    hydrateAddresses,
+    hydrateCart,
+    isAuthenticated,
+    isAuthLoading,
+    router,
+  ]);
 
   const subtotal = serverSubtotal;
   const shippingFee = serverShippingFee;
@@ -150,6 +164,21 @@ export default function CheckoutPage() {
       setIsLoading(false);
     }
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center pt-24">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          Đang khôi phục phiên đăng nhập...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="pb-16 pt-28">
