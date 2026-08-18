@@ -1,4 +1,5 @@
 import torch
+from pathlib import Path
 from PIL import Image
 from torchvision import transforms
 from model import GenderAgeModel
@@ -8,8 +9,9 @@ AGE_CLASSES = ["under_18", "18_25", "26_35", "36_plus"]
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-model = GenderAgeModel()
-checkpoint = torch.load("models/gender_age_model.pth", map_location=device)
+model = GenderAgeModel(pretrained=False)
+model_path = Path(__file__).resolve().parent / "models" / "gender_age_model.pth"
+checkpoint = torch.load(model_path, map_location=device)
 model.load_state_dict(checkpoint["model_state_dict"])
 model.to(device)
 model.eval()

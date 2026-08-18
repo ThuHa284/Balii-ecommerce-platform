@@ -1,0 +1,28 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY ai-service/ai-gender-age-service/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY ai-service/ai-gender-age-service/app.py ./app.py
+COPY ai-service/ai-gender-age-service/inference.py ./inference.py
+COPY ai-service/ai-gender-age-service/model.py ./model.py
+COPY ai-service/ai-gender-age-service/models/gender_age_model.pth ./models/gender_age_model.pth
+
+RUN test -s ./models/gender_age_model.pth \
+    && useradd --create-home --uid 10001 balii \
+    && chown -R balii:balii /app
+
+USER balii
+
+EXPOSE 8010
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8010"]

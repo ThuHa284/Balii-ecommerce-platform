@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import axios from 'axios';
 import FormData from 'form-data';
 import { validateUploadedImage } from '@app/common';
@@ -27,15 +31,21 @@ export class PersonAnalysisService {
       contentType: personImage.mimetype,
     });
 
-    const response = await axios.post(
-      `${this.aiServiceUrl}/analyze-person`,
-      formData,
-      {
-        headers: formData.getHeaders(),
-        timeout: 30000,
-      },
-    );
+    try {
+      const response = await axios.post(
+        `${this.aiServiceUrl}/analyze-person`,
+        formData,
+        {
+          headers: formData.getHeaders(),
+          timeout: 30000,
+        },
+      );
 
-    return response.data.data;
+      return response.data.data;
+    } catch {
+      throw new ServiceUnavailableException(
+        'Dịch vụ nhận diện giới tính và nhóm tuổi đang tạm thời không khả dụng.',
+      );
+    }
   }
 }

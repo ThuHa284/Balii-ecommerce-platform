@@ -108,7 +108,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          source: 'apps,libs,database,frontend,infra/camunda,infra/nginx,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,Dockerfile.migrations,docker-compose.prod.yml,.dockerignore'
+          source: 'apps,libs,database,frontend,ai-service/ai-gender-age-service,infra/camunda,infra/nginx,scripts,package.json,package-lock.json,nest-cli.json,tsconfig.json,tsconfig.build.json,Dockerfile.backend,Dockerfile.migrations,Dockerfile.gender-age,docker-compose.prod.yml,.dockerignore'
           target: /opt/balii-backend
           overwrite: true
           debug: true
@@ -169,13 +169,15 @@ jobs:
               exit 1
             }
             if ! docker compose --env-file .env.production.vps -f docker-compose.prod.yml up -d; then
-              docker compose --env-file .env.production.vps -f docker-compose.prod.yml logs --no-color --tail 150 production-env-check migrations postgres zookeeper kafka kafka-init payment-service
+              docker compose --env-file .env.production.vps -f docker-compose.prod.yml logs --no-color --tail 150 production-env-check migrations postgres zookeeper kafka kafka-init gender-age-service virtual-tryon-service payment-service
               df -h /
               docker system df || true
               exit 1
             fi
             docker compose --env-file .env.production.vps -f docker-compose.prod.yml exec -T kafka \
               kafka-topics --bootstrap-server kafka:29092 --list | grep -Fx 'demo.notification'
+            docker compose --env-file .env.production.vps -f docker-compose.prod.yml exec -T gender-age-service \
+              python -c "from PIL import Image; from inference import predict_gender_age; result = predict_gender_age(Image.new('RGB', (224, 224), 'white')); assert result['gender'] in ('male', 'female'); assert result['ageGroup'] in ('under_18', '18_25', '26_35', '36_plus')"
             docker compose --env-file .env.production.vps -f docker-compose.prod.yml exec -T postgres \
               sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
               < database/migrations/20260717-add-order-return-requests.sql

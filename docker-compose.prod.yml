@@ -281,6 +281,27 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
 
+  gender-age-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.gender-age
+    restart: unless-stopped
+    init: true
+    environment:
+      PYTHONUNBUFFERED: '1'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/', timeout=5)",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 60s
+
   virtual-tryon-service:
     build:
       context: .
@@ -292,6 +313,8 @@ services:
     depends_on:
       migrations:
         condition: service_completed_successfully
+      gender-age-service:
+        condition: service_healthy
     env_file:
       - ${APP_ENV_FILE:-.env.production}
     environment:
@@ -300,6 +323,7 @@ services:
       TRYON_SERVICE_PORT: 3010
       DB_HOST: postgres
       DB_PORT: 5432
+      AI_GENDER_AGE_SERVICE_URL: http://gender-age-service:8010
 
   market-analysis-service:
     build:
