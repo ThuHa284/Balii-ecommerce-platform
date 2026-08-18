@@ -13,6 +13,7 @@ export interface SuggestedFilters {
 export interface TryOnRequest {
   userImage: string;
   garmentImage: string;
+  skipPersonAnalysis?: boolean;
   productId?: string;
   targetGender?: 'male' | 'female' | 'unisex';
   recommendedAgeGroups?: string[];
@@ -49,7 +50,7 @@ export interface TryOnSyncResponse {
   cloudinaryPublicId?: string;
   message?: string;
   error?: string;
-  personAnalysis?: PersonAnalysis;
+  personAnalysis?: PersonAnalysis | null;
   warnings?: string[];
   suggestions?: string[];
   suggestedFilters?: SuggestedFilters;

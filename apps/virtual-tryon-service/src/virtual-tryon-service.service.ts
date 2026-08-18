@@ -539,7 +539,10 @@ export class VirtualTryonServiceService
     const garmentFile = files.garmentImage?.[0];
     const modelImageBase64 = this.fileToBase64(modelFile, 'modelImage');
     const garmentImageBase64 = this.fileToBase64(garmentFile, 'garmentImage');
-    const analysis = await this.analyzePersonSafely(modelFile);
+    const analysis =
+      dto.skipPersonAnalysis === 'true'
+        ? null
+        : await this.analyzePersonSafely(modelFile);
     const warningResult = this.buildTryOnWarnings(analysis, dto);
     const userConfirmed = dto.confirmWarnings === 'true';
 

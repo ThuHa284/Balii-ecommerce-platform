@@ -35,6 +35,10 @@ export class CreateTryOnDto {
   @IsOptional()
   @IsBooleanString()
   confirmWarnings?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  skipPersonAnalysis?: string;
 }
 
 export class CreateProductDesignDto {
