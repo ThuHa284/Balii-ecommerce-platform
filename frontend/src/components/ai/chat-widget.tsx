@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 const MARKETPLACE_LINKS = [
   {
-    href: 'https://shopee.vn',
+    href: 'https://shopee.vn/balii941?categoryId=100017&entryPoint=ShopByPDP&itemId=52262162720',
     label: 'Shopee',
     bgClass: 'bg-orange-500 hover:bg-orange-600 shadow-orange-300/30',
     logo: (
@@ -92,16 +92,16 @@ export default function ChatWidget() {
   return (
     <>
       {/* Floating widget stack — bottom right */}
-      <div className="fixed bottom-20 right-4 z-40 flex flex-col-reverse items-center gap-3 sm:bottom-6 sm:right-6">
+      <div className="fixed bottom-20 right-3 z-50 flex flex-col-reverse items-center gap-2.5 sm:bottom-6 sm:right-6 sm:gap-3">
         {/* Chatbot toggle — primary, always at bottom */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            'rounded-full bg-violet-500 p-4 text-white shadow-2xl shadow-violet-400/30 transition-all duration-300',
+            'rounded-full bg-violet-500 p-3.5 text-white shadow-2xl shadow-violet-400/30 transition-all duration-300 sm:p-4',
             'hover:scale-110 active:scale-95 hover:shadow-violet-400/40',
             isOpen && 'rotate-90',
           )}
-          aria-label="Mở chat hỗ trợ"
+          aria-label={isOpen ? 'Đóng chat hỗ trợ' : 'Mở chat hỗ trợ'}
         >
           {isOpen ? (
             <X className="h-6 w-6" />
@@ -118,7 +118,7 @@ export default function ChatWidget() {
             target="_blank"
             rel="noopener noreferrer"
             className={cn(
-              'hidden items-center justify-center w-12 h-12 rounded-full shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 sm:flex',
+              'flex h-11 w-11 items-center justify-center rounded-full shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 sm:h-12 sm:w-12',
               item.bgClass,
             )}
             aria-label={item.label}

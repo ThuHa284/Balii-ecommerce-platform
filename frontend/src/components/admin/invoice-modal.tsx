@@ -79,7 +79,7 @@ export default function InvoiceModal({
                   BALII SLEEPWEAR
                 </h1>
                 <p className="text-[8px]">Kênh mua sắm đồ ngủ cao cấp online</p>
-                <p className="text-[8px]">Shopee: shopee.vn/balii.sleepwear</p>
+                <p className="text-[8px]">Shopee: shopee.vn/balii941</p>
                 <p className="text-[8px]">Hotline: 0987 654 321</p>
               </div>
 
