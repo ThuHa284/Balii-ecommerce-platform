@@ -3,11 +3,15 @@ from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
 
 
 class GenderAgeModel(nn.Module):
-    def __init__(self):
+    def __init__(self, pretrained: bool = True):
         super().__init__()
 
         base = mobilenet_v3_small(
-            weights=MobileNet_V3_Small_Weights.DEFAULT
+            weights=(
+                MobileNet_V3_Small_Weights.DEFAULT
+                if pretrained
+                else None
+            )
         )
 
         in_features = base.classifier[0].in_features
