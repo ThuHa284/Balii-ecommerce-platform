@@ -96,8 +96,10 @@ export class UsersService {
       );
     }
 
-    targetUser.roleId = nextRole.id;
-    await this.userRepo.save(targetUser);
+    // Update the join column directly. The loaded targetUser still contains its
+    // previous `role` relation, which can overwrite a newly assigned roleId
+    // when the whole entity is saved by TypeORM.
+    await this.userRepo.update(targetUser.id, { roleId: nextRole.id });
     await this.revokeSessions(targetUser.id);
 
     const updatedUser = await this.userRepo.findOne({
